@@ -1,13 +1,12 @@
-import { Fragment, useMemo } from "react"
+import { Fragment } from "react"
 
 import { sortByAlphabet } from "~/lib/utils"
 import { getPreferredTitle, useFeedStore } from "~/store/feed"
-import { useListByView } from "~/store/list"
 import { getSubscriptionByFeedId } from "~/store/subscription"
 
 import { useFeedListSortSelector } from "../atom"
 import { FeedCategory } from "../category"
-import { ListItem } from "../item"
+import { InboxItem, ListItem } from "../item"
 import type { FeedListProps, ListListProps } from "./types"
 
 export const SortByAlphabeticalFeedList = ({
@@ -63,23 +62,21 @@ export const SortByAlphabeticalFeedList = ({
   )
 }
 
-export const SortByAlphabeticalListList = ({ view }: ListListProps) => {
-  const isDesc = useFeedListSortSelector((s) => s.order === "desc")
-
-  const lists = useListByView(view)
-
-  const sortedLists = useMemo(() => {
-    const res = lists.sort((a, b) => {
-      return sortByAlphabet(a.title ?? "", b.title ?? "")
-    })
-
-    return isDesc ? res.reverse() : res
-  }, [isDesc, lists])
-
+export const SortByAlphabeticalListList = ({ view, data }: ListListProps) => {
   return (
     <div>
-      {sortedLists.map((list) => (
-        <ListItem key={list.id} listId={list.id} view={view} />
+      {Object.keys(data).map((listId) => (
+        <ListItem key={listId} listId={listId} view={view} />
+      ))}
+    </div>
+  )
+}
+
+export const SortByAlphabeticalInboxList = ({ view, data }: ListListProps) => {
+  return (
+    <div>
+      {Object.keys(data).map((inboxId) => (
+        <InboxItem key={inboxId} inboxId={inboxId} view={view} />
       ))}
     </div>
   )
