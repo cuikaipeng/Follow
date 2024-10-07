@@ -29,8 +29,17 @@ export function SettingModalLayout(
   const tab = useSettingTab()
   const elementRef = useRef<HTMLDivElement>(null)
   const edgeElementRef = useRef<HTMLDivElement>(null)
-  const { handlePointDown, isResizeable, resizeableStyle } = useResizeableModal(elementRef, {
+  const dragController = useDragControls()
+  const {
+    handleResizeStart,
+    handleResizeStop,
+    preferDragDir,
+    relocateModal,
+    isResizeable,
+    resizeableStyle,
+  } = useResizeableModal(elementRef, {
     enableResizeable: true,
+    dragControls: dragController,
   })
 
   useEffect(() => {
@@ -47,15 +56,14 @@ export function SettingModalLayout(
     draggable: state.modalDraggable,
     overlay: state.modalOverlay,
   }))
-  const dragController = useDragControls()
   const handleDrag: PointerEventHandler<HTMLDivElement> = useCallback(
     (e) => {
       if (draggable) {
         dragController.start(e)
-        handlePointDown()
+        relocateModal()
       }
     },
-    [dragController, draggable, handlePointDown],
+    [dragController, draggable, relocateModal],
   )
   const measureDragConstraints = useCallback((constraints: BoundingBox) => {
     if (getOS() === "Windows") {
@@ -80,7 +88,7 @@ export function SettingModalLayout(
         )}
         style={resizeableStyle}
         onContextMenu={preventDefault}
-        drag={draggable}
+        drag={draggable && (preferDragDir || draggable)}
         dragControls={dragController}
         dragListener={false}
         dragMomentum={false}
@@ -93,9 +101,9 @@ export function SettingModalLayout(
       >
         <SettingContext.Provider value={defaultCtx}>
           <Resizable
-            onResizeStart={handlePointDown}
+            onResizeStart={handleResizeStart}
+            onResizeStop={handleResizeStop}
             enable={resizableOnly("bottomRight")}
-            style={{ ...resizeableStyle, position: "static" }}
             defaultSize={{
               width: 800,
               height: 700,
@@ -119,8 +127,8 @@ export function SettingModalLayout(
                   {settings.map((t) => (
                     <button
                       key={t.path}
-                      className={`my-0.5 flex w-full items-center rounded-lg px-2.5 py-0.5 leading-loose text-theme-foreground/70 transition-colors ${
-                        tab === t.path ? "bg-theme-item-active text-theme-foreground/90" : ""
+                      className={`my-0.5 flex w-full items-center rounded-lg px-2.5 py-0.5 leading-loose text-theme-foreground/70 duration-200 hover:bg-theme-item-hover ${
+                        tab === t.path ? "!bg-theme-item-active !text-theme-foreground/90" : ""
                       }`}
                       type="button"
                       onClick={() => setTab(t.path)}
