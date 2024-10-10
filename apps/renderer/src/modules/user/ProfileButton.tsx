@@ -1,15 +1,14 @@
 import { repository } from "@pkg"
 import type { FC } from "react"
-import { memo, useState } from "react"
+import { forwardRef, memo, useCallback, useLayoutEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router-dom"
 
-import { useWhoami } from "~/atoms/user"
 import { useSignOut } from "~/hooks/biz/useSignOut"
 import { useMeasure } from "~/hooks/common"
 import { nextFrame } from "~/lib/dom"
 import { cn } from "~/lib/utils"
 import { useAchievementModal } from "~/modules/achievement/hooks"
-import { usePowerModal } from "~/modules/power/hooks"
 import { usePresentUserProfileModal } from "~/modules/profile/hooks"
 import { useSettingModal } from "~/modules/settings/modal/hooks"
 import { Balance } from "~/modules/wallet/balance"
@@ -38,10 +37,10 @@ export const ProfileButton: FC<LoginProps> = memo((props) => {
   const presentUserProfile = usePresentUserProfileModal("dialog")
   const presentAchievement = useAchievementModal()
   const { t } = useTranslation()
-  const [ref, { x, y }] = useMeasure()
+
   const [dropdown, setDropdown] = useState(false)
 
-  const presentPowerModal = usePowerModal()
+  const navigate = useNavigate()
 
   if (status !== "authenticated") {
     return <LoginButton {...props} />
@@ -51,9 +50,7 @@ export const ProfileButton: FC<LoginProps> = memo((props) => {
     <>
       <DropdownMenu onOpenChange={setDropdown}>
         <DropdownMenuTrigger asChild className="!outline-none focus-visible:bg-theme-item-hover">
-          <ActionButton>
-            <UserAvatar ref={ref} className="h-6 p-0 [&_*]:border-0" hideName />
-          </ActionButton>
+          <TransitionAvatar stage={dropdown ? "zoom-in" : ""} />
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
@@ -70,7 +67,7 @@ export const ProfileButton: FC<LoginProps> = memo((props) => {
 
           <DropdownMenuItem
             onClick={() => {
-              nextFrame(presentPowerModal)
+              navigate("/power")
             }}
           >
             <div className="flex w-full items-center justify-between gap-6 px-1.5 font-semibold">
@@ -135,30 +132,70 @@ export const ProfileButton: FC<LoginProps> = memo((props) => {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {x !== 0 && y !== 0 && (
+    </>
+  )
+})
+ProfileButton.displayName = "ProfileButton"
+
+const TransitionAvatar = forwardRef<
+  HTMLButtonElement,
+  {
+    stage: "zoom-in" | ""
+  } & React.HTMLAttributes<HTMLButtonElement>
+>(({ stage, ...props }, forwardRef) => {
+  const [ref, { x, y }, forceRefresh] = useMeasure()
+  const [avatarHovered, setAvatarHovered] = useState(false)
+
+  const zoomIn = stage === "zoom-in"
+  const [currentZoomIn, setCurrentZoomIn] = useState(false)
+  useLayoutEffect(() => {
+    if (zoomIn) {
+      setCurrentZoomIn(true)
+    }
+  }, [zoomIn])
+
+  return (
+    <>
+      <ActionButton
+        {...props}
+        ref={forwardRef}
+        onMouseEnter={useCallback(() => {
+          forceRefresh()
+          setAvatarHovered(true)
+        }, [forceRefresh])}
+        onMouseLeave={useCallback(() => {
+          setAvatarHovered(false)
+        }, [])}
+      >
+        <UserAvatar ref={ref} className="h-6 p-0 [&_*]:border-0" hideName />
+      </ActionButton>
+      {x !== 0 && y !== 0 && (avatarHovered || zoomIn || currentZoomIn) && (
         <RootPortal>
           <UserAvatar
             style={{
-              left: x - (dropdown ? 16 : 0),
+              left: x - (zoomIn ? 16 : 0),
               top: y,
             }}
             className={cn(
-              "pointer-events-none fixed -bottom-6 z-[999] p-0 duration-200 [&_*]:border-0",
+              "pointer-events-none fixed -bottom-6 p-0 duration-200 [&_*]:border-0",
               "transform-gpu will-change-[left,top,height]",
-              dropdown ? "h-14 " : "h-6",
+              zoomIn ? "z-[999] h-14" : "z-[-1] h-6",
             )}
             hideName
+            onTransitionEnd={() => {
+              if (!zoomIn && currentZoomIn) {
+                setCurrentZoomIn(false)
+              }
+            }}
           />
         </RootPortal>
       )}
     </>
   )
 })
-ProfileButton.displayName = "ProfileButton"
 
 function PowerButton() {
-  const user = useWhoami()
-  const wallet = useWallet({ userId: user?.id })
+  const wallet = useWallet()
   const { isLoading } = wallet
   const myWallet = wallet.data?.[0]
 
