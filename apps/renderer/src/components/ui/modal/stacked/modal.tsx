@@ -1,10 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog"
 import type { BoundingBox } from "framer-motion"
-import { useAnimationControls, useDragControls } from "framer-motion"
 import { produce } from "immer"
 import { useSetAtom } from "jotai"
 import { Resizable } from "re-resizable"
-import type { PointerEventHandler, PropsWithChildren, SyntheticEvent } from "react"
+import type { FC, PropsWithChildren, SyntheticEvent } from "react"
 import {
   createElement,
   forwardRef,
@@ -33,10 +32,12 @@ import { Divider } from "../../divider"
 import { RootPortalProvider } from "../../portal/provider"
 import { EllipsisHorizontalTextWithTooltip } from "../../typography"
 import { modalStackAtom } from "./atom"
-import { modalMontionConfig } from "./constants"
+import { MODAL_STACK_Z_INDEX, modalMontionConfig } from "./constants"
 import type { CurrentModalContentProps, ModalActionsInternal } from "./context"
-import { CurrentModalContext } from "./context"
-import { useResizeableModal } from "./hooks"
+import { CurrentModalContext, CurrentModalStateContext } from "./context"
+import { useModalAnimate } from "./internal/use-animate"
+import { useModalResizeAndDrag } from "./internal/use-drag"
+import { useModalSelect } from "./internal/use-select"
 import { ModalOverlay } from "./overlay"
 import type { ModalOverlayOptions, ModalProps } from "./types"
 
@@ -56,7 +57,7 @@ export const ModalInternal = memo(
       onClose?: (open: boolean) => void
     } & PropsWithChildren
   >(function Modal(
-    { item, overlayOptions, onClose: onPropsClose, children, isTop, isBottom },
+    { item, overlayOptions, onClose: onPropsClose, children, isTop, index, isBottom },
     ref,
   ) {
     const {
@@ -113,67 +114,22 @@ export const ModalInternal = memo(
     )
 
     const modalElementRef = useRef<HTMLDivElement>(null)
-
-    const dragController = useDragControls()
     const {
-      handleResizeStop,
+      handleDrag,
       handleResizeStart,
+      handleResizeStop,
       relocateModal,
       preferDragDir,
       isResizeable,
       resizeableStyle,
-    } = useResizeableModal(modalElementRef, {
-      enableResizeable: resizeable,
-      dragControls: dragController,
+
+      dragController,
+    } = useModalResizeAndDrag(modalElementRef, {
+      resizeable,
+      draggable,
     })
-    const animateController = useAnimationControls()
-    useEffect(() => {
-      nextFrame(() => {
-        animateController.start(modalMontionConfig.animate)
-      })
-    }, [animateController])
-    const noticeModal = useCallback(() => {
-      animateController
-        .start({
-          scale: 1.05,
-          transition: {
-            duration: 0.06,
-          },
-        })
-        .then(() => {
-          animateController.start({
-            scale: 1,
-          })
-        })
-    }, [animateController])
 
-    const handleDrag: PointerEventHandler<HTMLDivElement> = useCallback(
-      (e) => {
-        if (draggable) {
-          dragController.start(e)
-        }
-      },
-      [dragController, draggable],
-    )
-
-    useEffect(() => {
-      if (isTop) return
-      animateController.start({
-        scale: 0.96,
-        y: 10,
-      })
-      return () => {
-        try {
-          animateController.stop()
-          animateController.start({
-            scale: 1,
-            y: 0,
-          })
-        } catch {
-          /* empty */
-        }
-      }
-    }, [isTop])
+    const { noticeModal, animateController } = useModalAnimate(!!isTop)
 
     const modalContentRef = useRef<HTMLDivElement>(null)
     const ModalProps: ModalActionsInternal = useMemo(
@@ -221,34 +177,17 @@ export const ModalInternal = memo(
       }
     }, [currentIsClosing])
 
-    const switchHotkeyScope = useSwitchHotKeyScope()
-    useEffect(() => {
-      switchHotkeyScope("Modal")
-      return () => {
-        switchHotkeyScope("Home")
-      }
-    }, [switchHotkeyScope])
+    useShortcutScope()
 
     const modalStyle = resizeableStyle
-    const isSelectingRef = useRef(false)
-    const handleSelectStart = useCallback(() => {
-      isSelectingRef.current = true
-    }, [])
-    const handleDetectSelectEnd = useCallback(() => {
-      nextFrame(() => {
-        if (isSelectingRef.current) {
-          isSelectingRef.current = false
-        }
-      })
-    }, [])
-
+    const { handleSelectStart, handleDetectSelectEnd, isSelectingRef } = useModalSelect()
     const handleClickOutsideToDismiss = useCallback(
       (e: SyntheticEvent) => {
         if (isSelectingRef.current) return
         const fn = modal ? (clickOutsideToDismiss && canClose ? dismiss : noticeModal) : undefined
         fn?.(e)
       },
-      [canClose, clickOutsideToDismiss, dismiss, modal, noticeModal],
+      [canClose, clickOutsideToDismiss, dismiss, modal, noticeModal, isSelectingRef],
     )
 
     const openAutoFocus = useCallback(
@@ -274,12 +213,14 @@ export const ModalInternal = memo(
 
     const Overlay = (
       <ModalOverlay
+        zIndex={MODAL_STACK_Z_INDEX - 1}
         blur={overlayOptions?.blur}
-        className={cn(overlayOptions?.className, {
-          invisible: item.overlay ? false : !(modalSettingOverlay && isBottom),
-        })}
+        hidden={
+          item.overlay ? currentIsClosing : !(modalSettingOverlay && isBottom) || currentIsClosing
+        }
       />
     )
+
     if (CustomModalComponent) {
       return (
         <Wrapper>
@@ -296,6 +237,9 @@ export const ModalInternal = memo(
                     currentIsClosing ? "!pointer-events-none" : "!pointer-events-auto",
                     modalContainerClassName,
                   )}
+                  style={{
+                    zIndex: MODAL_STACK_Z_INDEX + index,
+                  }}
                   onPointerUp={handleDetectSelectEnd}
                   onClick={handleClickOutsideToDismiss}
                   onFocus={stopPropagation}
@@ -308,9 +252,9 @@ export const ModalInternal = memo(
                     onSelect={handleSelectStart}
                     onKeyUp={handleDetectSelectEnd}
                   >
-                    <CurrentModalContext.Provider value={ModalContextProps}>
+                    <ModalContext modalContextProps={ModalContextProps} isTop={!!isTop}>
                       <CustomModalComponent>{finalChildren}</CustomModalComponent>
-                    </CurrentModalContext.Provider>
+                    </ModalContext>
                   </div>
                 </div>
               </Dialog.Content>
@@ -340,6 +284,9 @@ export const ModalInternal = memo(
                 onFocus={stopPropagation}
                 onPointerUp={handleDetectSelectEnd}
                 onClick={handleClickOutsideToDismiss}
+                style={{
+                  zIndex: MODAL_STACK_Z_INDEX + index,
+                }}
               >
                 {DragBar}
 
@@ -392,7 +339,11 @@ export const ModalInternal = memo(
                         </EllipsisHorizontalTextWithTooltip>
                       </Dialog.Title>
                       {canClose && (
-                        <Dialog.DialogClose className="center p-2" tabIndex={1} onClick={close}>
+                        <Dialog.DialogClose
+                          className="center z-[1] p-2"
+                          tabIndex={1}
+                          onClick={close}
+                        >
                           <i className="i-mgc-close-cute-re" />
                         </Dialog.DialogClose>
                       )}
@@ -400,9 +351,9 @@ export const ModalInternal = memo(
                     <Divider className="my-2 shrink-0 border-slate-200 opacity-80 dark:border-neutral-800" />
 
                     <div className="min-h-0 shrink grow overflow-auto px-4 py-2">
-                      <CurrentModalContext.Provider value={ModalContextProps}>
+                      <ModalContext modalContextProps={ModalContextProps} isTop={!!isTop}>
                         {finalChildren}
-                      </CurrentModalContext.Provider>
+                      </ModalContext>
                     </div>
                   </ResizeSwitch>
                 </m.div>
@@ -414,3 +365,35 @@ export const ModalInternal = memo(
     )
   }),
 )
+
+const useShortcutScope = () => {
+  const switchHotkeyScope = useSwitchHotKeyScope()
+  useEffect(() => {
+    switchHotkeyScope("Modal")
+    return () => {
+      switchHotkeyScope("Home")
+    }
+  }, [switchHotkeyScope])
+}
+
+const ModalContext: FC<
+  PropsWithChildren & {
+    modalContextProps: CurrentModalContentProps
+    isTop: boolean
+  }
+> = ({ modalContextProps, isTop, children }) => {
+  return (
+    <CurrentModalContext.Provider value={modalContextProps}>
+      <CurrentModalStateContext.Provider
+        value={useMemo(
+          () => ({
+            isTop: !!isTop,
+          }),
+          [isTop],
+        )}
+      >
+        {children}
+      </CurrentModalStateContext.Provider>
+    </CurrentModalContext.Provider>
+  )
+}
