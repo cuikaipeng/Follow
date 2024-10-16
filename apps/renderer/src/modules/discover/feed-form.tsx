@@ -261,10 +261,12 @@ const FeedInnerForm = ({
 
   const suggestions = useMemo(
     () =>
-      categories.data?.map((i) => ({
-        name: i,
-        value: i,
-      })) || [],
+      (
+        categories.data?.map((i) => ({
+          name: i,
+          value: i,
+        })) || []
+      ).sort((a, b) => a.name.localeCompare(b.name)),
     [categories.data],
   )
 
@@ -306,7 +308,6 @@ const FeedInnerForm = ({
                   <div>
                     <Autocomplete
                       maxHeight={window.innerHeight < 600 ? 120 : 240}
-                      portal
                       suggestions={suggestions}
                       {...(field as any)}
                       onSuggestionSelected={(suggestion) => {
