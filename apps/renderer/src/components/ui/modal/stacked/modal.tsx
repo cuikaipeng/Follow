@@ -24,7 +24,7 @@ import { SafeFragment } from "~/components/common/Fragment"
 import { m } from "~/components/common/Motion"
 import { ErrorComponentType } from "~/components/errors/enum"
 import { ElECTRON_CUSTOM_TITLEBAR_HEIGHT, isElectronBuild } from "~/constants"
-import { useSwitchHotKeyScope } from "~/hooks/common"
+import { useRefValue, useSwitchHotKeyScope } from "~/hooks/common"
 import { nextFrame, stopPropagation } from "~/lib/dom"
 import { cn, getOS } from "~/lib/utils"
 
@@ -131,10 +131,12 @@ export const ModalInternal = memo(
 
     const { noticeModal, animateController } = useModalAnimate(!!isTop)
 
+    const getIndex = useEventCallback(() => index)
     const modalContentRef = useRef<HTMLDivElement>(null)
     const ModalProps: ModalActionsInternal = useMemo(
       () => ({
         dismiss: close,
+        getIndex,
         setClickOutSideToDismiss: (v) => {
           setStack((state) =>
             produce(state, (draft) => {
@@ -146,7 +148,7 @@ export const ModalInternal = memo(
           )
         },
       }),
-      [close, item.id, setStack],
+      [close, getIndex, item.id, setStack],
     )
 
     const ModalContextProps = useMemo<CurrentModalContentProps>(
@@ -157,17 +159,17 @@ export const ModalInternal = memo(
       [ModalProps],
     )
 
-    const edgeElementRef = useRef<HTMLDivElement>(null)
+    const [edgeElementRef, setEdgeElementRef] = useState<HTMLDivElement | null>(null)
 
     const finalChildren = useMemo(
       () => (
         <AppErrorBoundary errorType={ErrorComponentType.Modal}>
-          <RootPortalProvider value={edgeElementRef.current as HTMLElement}>
+          <RootPortalProvider value={edgeElementRef as HTMLElement}>
             {children ?? createElement(content, ModalProps)}
           </RootPortalProvider>
         </AppErrorBoundary>
       ),
-      [ModalProps, children, content],
+      [ModalProps, children, content, edgeElementRef],
     )
 
     useEffect(() => {
@@ -210,16 +212,19 @@ export const ModalInternal = memo(
     }, [])
 
     useImperativeHandle(ref, () => modalElementRef.current!)
+    const currentModalZIndex = MODAL_STACK_Z_INDEX + index * 2
 
     const Overlay = (
       <ModalOverlay
-        zIndex={MODAL_STACK_Z_INDEX - 1}
+        zIndex={currentModalZIndex - 1}
         blur={overlayOptions?.blur}
         hidden={
           item.overlay ? currentIsClosing : !(modalSettingOverlay && isBottom) || currentIsClosing
         }
       />
     )
+
+    const mutateableEdgeElementRef = useRefValue(edgeElementRef)
 
     if (CustomModalComponent) {
       return (
@@ -230,7 +235,7 @@ export const ModalInternal = memo(
               <Dialog.DialogTitle className="sr-only">{title}</Dialog.DialogTitle>
               <Dialog.Content asChild aria-describedby={undefined} onOpenAutoFocus={openAutoFocus}>
                 <div
-                  ref={edgeElementRef}
+                  ref={setEdgeElementRef}
                   className={cn(
                     "no-drag-region fixed",
                     modal ? "inset-0 overflow-auto" : "left-0 top-0",
@@ -238,7 +243,7 @@ export const ModalInternal = memo(
                     modalContainerClassName,
                   )}
                   style={{
-                    zIndex: MODAL_STACK_Z_INDEX + index,
+                    zIndex: currentModalZIndex,
                   }}
                   onPointerUp={handleDetectSelectEnd}
                   onClick={handleClickOutsideToDismiss}
@@ -273,7 +278,7 @@ export const ModalInternal = memo(
             {Overlay}
             <Dialog.Content asChild aria-describedby={undefined} onOpenAutoFocus={openAutoFocus}>
               <div
-                ref={edgeElementRef}
+                ref={setEdgeElementRef}
                 className={cn(
                   "fixed flex",
                   modal ? "inset-0 overflow-auto" : "left-0 top-0",
@@ -285,7 +290,7 @@ export const ModalInternal = memo(
                 onPointerUp={handleDetectSelectEnd}
                 onClick={handleClickOutsideToDismiss}
                 style={{
-                  zIndex: MODAL_STACK_Z_INDEX + index,
+                  zIndex: currentModalZIndex,
                 }}
               >
                 {DragBar}
@@ -314,7 +319,7 @@ export const ModalInternal = memo(
                   dragElastic={0}
                   dragListener={false}
                   dragMomentum={false}
-                  dragConstraints={edgeElementRef}
+                  dragConstraints={mutateableEdgeElementRef}
                   onMeasureDragConstraints={measureDragConstraints}
                   whileDrag={{
                     cursor: "grabbing",
