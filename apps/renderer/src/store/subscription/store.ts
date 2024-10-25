@@ -22,12 +22,7 @@ import { feedActions, getFeedById } from "../feed"
 import { inboxActions } from "../inbox"
 import { listActions } from "../list"
 import { feedUnreadActions } from "../unread"
-import {
-  createImmerSetter,
-  createZustandStore,
-  doMutationAndTransaction,
-  reloadWhenHotUpdate,
-} from "../utils/helper"
+import { createImmerSetter, createZustandStore, doMutationAndTransaction } from "../utils/helper"
 import { subscriptionCategoryExistSelector } from "./selector"
 
 export type SubscriptionFlatModel = Omit<SubscriptionModel, "feeds"> & {
@@ -398,6 +393,36 @@ class SubscriptionActions {
     ).then(() => feed)
   }
 
+  async unfollowMany(feedIdList: string[]) {
+    for (const feedId of feedIdList) {
+      // Remove feed and subscription
+      set((state) =>
+        produce(state, (draft) => {
+          delete draft.data[feedId]
+          for (const view in draft.feedIdByView) {
+            const currentViewFeedIds = draft.feedIdByView[view] as string[]
+            currentViewFeedIds.splice(currentViewFeedIds.indexOf(feedId), 1)
+          }
+        }),
+      )
+
+      // Remove feed's entries
+      entryActions.clearByFeedId(feedId)
+      // Clear feed's unread count
+      feedUnreadActions.updateByFeedId(feedId, 0)
+    }
+
+    return doMutationAndTransaction(
+      () =>
+        apiClient.subscriptions.$delete({
+          json: {
+            feedIdList,
+          },
+        }),
+      () => SubscriptionService.removeSubscriptionMany(whoami()!.id, feedIdList),
+    )
+  }
+
   async changeCategoryView(
     category: string,
     currentView: FeedViewType,
@@ -508,7 +533,3 @@ export const isListSubscription = (feedId?: FeedId) => {
 
 export const subscriptionCategoryExist = (name: string) =>
   subscriptionCategoryExistSelector(name)(get())
-
-if (import.meta.env.DEV) {
-  reloadWhenHotUpdate(import.meta.hot)
-}
