@@ -3,13 +3,13 @@ on:
   push:
     branches: [main, dev]
 
-name: CI Format, Typecheck and Lint
+name: CI Build web and SSR server
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
-    name: Format, Lint and Typecheck
+    name: Build web and SSR server
     runs-on: ubuntu-latest
 
     strategy:
@@ -40,8 +40,6 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install
-      - name: Format, Lint and Typecheck
+      - name: Build web and SSR server
         run: |
-          npm exec turbo run format:check typecheck lint
-      - name: Run test
-        run: npm exec turbo run test
+          npm exec turbo run build:web @follow/server#build
