@@ -31,6 +31,7 @@ import { useFeedById, useFeedHeaderTitle } from "~/store/feed"
 import { useSubscriptionByFeedId } from "~/store/subscription"
 
 import { useEntriesByView, useEntryMarkReadHandler } from "./hooks"
+import { useSnapEntryIdList } from "./hooks/useEntryIdListSnap"
 import { EntryItem, EntryItemSkeleton } from "./item"
 import { PictureMasonry } from "./Items/picture-masonry"
 import { EntryListHeader } from "./layouts/EntryListHeader"
@@ -55,7 +56,9 @@ function EntryColumnImpl() {
     }, []),
     isArchived,
   })
+
   const { entriesIds, isFetchingNextPage, groupedCounts } = entries
+  useSnapEntryIdList(entriesIds)
 
   const {
     entryId: activeEntryId,
@@ -171,10 +174,10 @@ function EntryColumnImpl() {
 
   // automatically fetch archived entries when there is no entries in timeline
   useEffect(() => {
-    if (!isArchived && virtuosoOptions.totalCount === 0 && !entries.isLoading) {
+    if (showArchivedButton && virtuosoOptions.totalCount === 0 && !entries.isLoading) {
       setIsArchived(true)
     }
-  }, [entries.isLoading, isArchived, virtuosoOptions.totalCount])
+  }, [entries.isLoading, showArchivedButton, virtuosoOptions.totalCount])
 
   return (
     <div
