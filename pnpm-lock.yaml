@@ -486,6 +486,9 @@ importers:
       path-to-regexp:
         specifier: 8.2.0
         version: 8.2.0
+      plain-shiki:
+        specifier: 0.0.12
+        version: 0.0.12(shiki@1.22.0)
       re-resizable:
         specifier: 6.10.0
         version: 6.10.0(patch_hash=yitcmpfwcomg2fky72uc3lhk2i)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -8134,6 +8137,11 @@ packages:
 
   pkg-types@1.2.1:
     resolution: {integrity: sha512-sQoqa8alT3nHjGuTjuKgOnvjo4cljkufdtLMnO2LBP/wRwuDlo1tkaEdMxCRhyGRPacv/ztlZgDPm2b7FAmEvw==}
+
+  plain-shiki@0.0.12:
+    resolution: {integrity: sha512-jaR0Rhm0wWOn1unMrt0yOTYI83y+ntabQ///GxYyRSYFRsNJZRrT7dpWbtX/QRFL44cznutwCT5EiEXj1KwXVQ==}
+    peerDependencies:
+      shiki: ^1.22.0
 
   plist@3.1.0:
     resolution: {integrity: sha512-uysumyrvkUX0rX/dEVqt8gC3sTBzd4zoWfLeS29nb53imdaXVvLINYXTI2GNqzaMuvacNx4uJQ8+b3zXR0pkgQ==}
@@ -18967,6 +18975,10 @@ snapshots:
       confbox: 0.1.8
       mlly: 1.7.2
       pathe: 1.1.2
+
+  plain-shiki@0.0.12(shiki@1.22.0):
+    dependencies:
+      shiki: 1.22.0
 
   plist@3.1.0:
     dependencies:
