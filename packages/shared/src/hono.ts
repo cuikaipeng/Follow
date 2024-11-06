@@ -5282,6 +5282,15 @@ declare const _routes: hono_hono_base.HonoBase<Env, {
         };
     };
 } & {
+    "/metrics": {
+        $get: {
+            input: {};
+            output: {};
+            outputFormat: string;
+            status: 200;
+        };
+    };
+} & {
     "/lists": {
         $get: {
             input: {
@@ -6856,6 +6865,18 @@ declare const _routes: hono_hono_base.HonoBase<Env, {
                 } | undefined;
             };
             outputFormat: "json" | "text";
+            status: 200;
+        };
+    };
+    "/entries/stream": {
+        $post: {
+            input: {
+                json: {
+                    ids: string[];
+                };
+            };
+            output: {};
+            outputFormat: string;
             status: 200;
         };
     };
