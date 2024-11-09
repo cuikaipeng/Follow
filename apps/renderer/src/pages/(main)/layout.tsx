@@ -1,6 +1,8 @@
+import { DndContext, pointerWithin } from "@dnd-kit/core"
 import { useViewport } from "@follow/components/hooks/useViewport.js"
 import { PanelSplitter } from "@follow/components/ui/divider/index.js"
 import { RootPortal } from "@follow/components/ui/portal/index.jsx"
+import type { FeedViewType } from "@follow/constants"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { preventDefault } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
@@ -30,15 +32,17 @@ import { ErrorComponentType } from "~/components/errors/enum"
 import { Kbd } from "~/components/ui/kbd/Kbd"
 import { PlainModal } from "~/components/ui/modal/stacked/custom-modal"
 import { DeclarativeModal } from "~/components/ui/modal/stacked/declarative-modal"
-import { HotKeyScopeMap, isDev } from "~/constants"
+import { HotKeyScopeMap, isDev, isWebBuild } from "~/constants"
 import { shortcuts } from "~/constants/shortcuts"
 import { useDailyTask } from "~/hooks/biz/useDailyTask"
+import { useBatchUpdateSubscription } from "~/hooks/biz/useSubscriptionActions"
 import { useAuthQuery, useI18n } from "~/hooks/common"
 import { EnvironmentIndicator } from "~/modules/app/EnvironmentIndicator"
 import { NetworkStatusIndicator } from "~/modules/app/NetworkStatusIndicator"
 import { LoginModalContent } from "~/modules/auth/LoginModalContent"
 import { DebugRegistry } from "~/modules/debug/registry"
 import { FeedColumn } from "~/modules/feed-column"
+import { useSelectedFeedIds } from "~/modules/feed-column/atom"
 import { AutoUpdater } from "~/modules/feed-column/auto-updater"
 import { CornerPlayer } from "~/modules/feed-column/corner-player"
 import { useShortcutsModal } from "~/modules/modal/shortcuts"
@@ -63,7 +67,7 @@ const FooterInfo = () => {
         </div>
       )}
 
-      {!ELECTRON && (
+      {isWebBuild && (
         <div className="center absolute inset-y-0 right-2">
           <button
             type="button"
@@ -101,6 +105,10 @@ export function Component() {
   const { data: remoteSettings, isLoading } = useAuthQuery(settings.get(), {})
   const isNewUser = !isLoading && remoteSettings && Object.keys(remoteSettings.updated).length === 0
 
+  const [selectedIds, setSelectedIds] = useSelectedFeedIds()
+
+  const { mutate } = useBatchUpdateSubscription()
+
   if (isNotSupportWidth) {
     return <NotSupport />
   }
@@ -114,14 +122,32 @@ export function Component() {
       </Suspense>
       <AppLayoutGridContainerProvider>
         <FeedResponsiveResizerContainer containerRef={containerRef}>
-          <FeedColumn>
-            <CornerPlayer />
-            <FooterInfo />
+          <DndContext
+            collisionDetection={pointerWithin}
+            onDragEnd={(event) => {
+              if (!event.over) {
+                return
+              }
 
-            {ELECTRON && <AutoUpdater />}
+              const { category, view } = event.over.data.current as {
+                category: string
+                view: FeedViewType
+              }
 
-            <NetworkStatusIndicator />
-          </FeedColumn>
+              mutate({ category, view, feedIdList: selectedIds })
+
+              setSelectedIds([])
+            }}
+          >
+            <FeedColumn>
+              <CornerPlayer />
+              <FooterInfo />
+
+              {ELECTRON && <AutoUpdater />}
+
+              <NetworkStatusIndicator />
+            </FeedColumn>
+          </DndContext>
         </FeedResponsiveResizerContainer>
       </AppLayoutGridContainerProvider>
 
@@ -268,7 +294,7 @@ const FeedResponsiveResizerContainer = ({
         className={cn(
           "shrink-0 overflow-hidden",
           "absolute inset-y-0 z-[2]",
-          feedColumnTempShow && !feedColumnShow && "shadow-drawer-to-right z-[12] border-r",
+          feedColumnTempShow && !feedColumnShow && "shadow-drawer-to-right z-[12]",
           !feedColumnShow && !feedColumnTempShow ? "-translate-x-full delay-200" : "",
           !isDragging ? "duration-200" : "",
         )}
