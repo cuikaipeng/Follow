@@ -3,16 +3,16 @@ import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
 import type { FeedViewType } from "@follow/constants"
 import { views } from "@follow/constants"
 import { stopPropagation } from "@follow/utils/dom"
-import { cn } from "@follow/utils/utils"
+import { cn, isKeyForMultiSelectPressed } from "@follow/utils/utils"
 import * as HoverCard from "@radix-ui/react-hover-card"
 import { AnimatePresence, m } from "framer-motion"
-import { memo, useMemo, useRef, useState } from "react"
-import { isHotkeyPressed } from "react-hotkeys-hook"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import Selecto from "react-selecto"
 import { useEventListener } from "usehooks-ts"
 
+import { useGeneralSettingSelector } from "~/atoms/settings/general"
 import { IconOpacityTransition } from "~/components/ux/transition/icon"
 import { FEED_COLLECTION_LIST } from "~/constants"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
@@ -45,13 +45,17 @@ const useFeedsGroupedData = (view: FeedViewType) => {
 
   const data = useSubscriptionByView(view) || remoteData
 
+  const autoGroup = useGeneralSettingSelector((state) => state.autoGroup)
+
   return useMemo(() => {
     if (!data || data.length === 0) return {}
 
     const groupFolder = {} as Record<string, string[]>
 
     for (const subscription of data) {
-      const category = subscription.category || subscription.defaultCategory
+      const category =
+        subscription.category || (autoGroup ? subscription.defaultCategory : subscription.feedId)
+
       if (category) {
         if (!groupFolder[category]) {
           groupFolder[category] = []
@@ -61,7 +65,7 @@ const useFeedsGroupedData = (view: FeedViewType) => {
     }
 
     return groupFolder
-  }, [data])
+  }, [autoGroup, data])
 }
 
 const useListsGroupedData = (view: FeedViewType) => {
@@ -136,6 +140,12 @@ function FeedListImpl({ className, view }: { className?: string; view: number })
   const scrollerRef = useRef<HTMLDivElement>(null)
   const selectoRef = useRef<Selecto>(null)
   const [selectedFeedIds, setSelectedFeedIds] = useSelectedFeedIds()
+  const [currentStartFeedId, setCurrentStartFeedId] = useState<string | null>(null)
+  useEffect(() => {
+    if (selectedFeedIds.length <= 1) {
+      setCurrentStartFeedId(null)
+    }
+  }, [selectedFeedIds])
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: "selected-feed",
@@ -199,19 +209,78 @@ function FeedListImpl({ className, view }: { className?: string; view: number })
         ref={selectoRef}
         rootContainer={document.body}
         dragContainer={"#feeds-area"}
-        dragCondition={() => selectedFeedIds.length === 0 || isHotkeyPressed("Meta")}
+        dragCondition={(e) => {
+          const inputEvent = e.inputEvent as MouseEvent
+          const target = inputEvent.target as HTMLElement
+          const closest = target.closest("[data-feed-id]") as HTMLElement | null
+          const dataFeedId = closest?.dataset.feedId
+
+          if (
+            dataFeedId &&
+            selectedFeedIds.includes(dataFeedId) &&
+            !isKeyForMultiSelectPressed(inputEvent)
+          )
+            return false
+
+          return true
+        }}
+        onDragStart={(e) => {
+          if (!isKeyForMultiSelectPressed(e.inputEvent as MouseEvent)) {
+            setSelectedFeedIds([])
+          }
+        }}
         selectableTargets={["[data-feed-id]"]}
         continueSelect
-        hitRate={10}
+        hitRate={1}
         onSelect={(e) => {
           const allChanged = [...e.added, ...e.removed]
             .map((el) => el.dataset.feedId)
             .filter((id) => id !== undefined)
+          const added = allChanged.filter((id) => !selectedFeedIds.includes(id))
+          const removed = allChanged.filter((id) => selectedFeedIds.includes(id))
+
+          if (isKeyForMultiSelectPressed(e.inputEvent as MouseEvent)) {
+            const allVisible = Array.from(document.querySelectorAll("[data-feed-id]")).map(
+              (el) => (el as HTMLElement).dataset.feedId,
+            )
+            const currentSelected =
+              added.length === 1 ? added[0] : removed.length === 1 ? removed[0] : null
+            const currentIndex = currentSelected ? allVisible.indexOf(currentSelected) : -1
+
+            // command or ctrl with click, update start feed id
+            if (!(e.inputEvent as MouseEvent).shiftKey && currentSelected) {
+              setCurrentStartFeedId(currentSelected)
+            }
+
+            // shift with click, select all between
+            if ((e.inputEvent as MouseEvent).shiftKey && currentSelected) {
+              const firstSelected = currentStartFeedId ?? selectedFeedIds[0]
+              if (firstSelected) {
+                const firstIndex = allVisible.indexOf(firstSelected)
+
+                const order =
+                  firstIndex < currentIndex
+                    ? [firstIndex, currentIndex]
+                    : [currentIndex, firstIndex]
+                const between = allVisible.slice(order[0], order[1] + 1) as string[]
+
+                setSelectedFeedIds((prev) => {
+                  // with intersection, we need to update selected ids as between
+                  // otherwise, we need to add between to selected ids
+                  const hasIntersection = between.slice(1, -1).some((id) => prev.includes(id))
+
+                  return [
+                    ...(hasIntersection ? prev.filter((id) => between.includes(id)) : prev),
+                    ...between,
+                  ]
+                })
+                return
+              }
+            }
+          }
 
           setSelectedFeedIds((prev) => {
-            const added = allChanged.filter((id) => !prev.includes(id))
-            const removed = new Set(allChanged.filter((id) => prev.includes(id)))
-            return [...prev.filter((id) => !removed.has(id)), ...added]
+            return [...prev.filter((id) => !removed.includes(id)), ...added]
           })
         }}
         scrollOptions={{
@@ -315,16 +384,21 @@ const ListHeader = ({ view }: { view: number }) => {
   const expansion = Object.values(categoryOpenStateData).every((value) => value === true)
   useUpdateUnreadCount()
 
-  const totalUnread = useFeedUnreadStore((state) => {
-    let unread = 0
+  const totalUnread = useFeedUnreadStore(
+    useCallback(
+      (state) => {
+        let unread = 0
 
-    for (const category in feedsData) {
-      for (const feedId of feedsData[category]) {
-        unread += state.data[feedId] || 0
-      }
-    }
-    return unread
-  })
+        for (const category in feedsData) {
+          for (const feedId of feedsData[category]) {
+            unread += state.data[feedId] || 0
+          }
+        }
+        return unread
+      },
+      [feedsData],
+    ),
+  )
 
   const navigateEntry = useNavigateEntry()
 

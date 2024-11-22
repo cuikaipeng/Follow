@@ -17,11 +17,13 @@ import { useOnClickOutside } from "usehooks-ts"
 
 import type { MenuItemInput } from "~/atoms/context-menu"
 import { useShowContextMenu } from "~/atoms/context-menu"
+import { useGeneralSettingSelector } from "~/atoms/settings/general"
 import { ROUTE_FEED_IN_FOLDER } from "~/constants"
+import { useAddFeedToFeedList } from "~/hooks/biz/useFeedActions"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { getRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { createErrorToaster } from "~/lib/error-parser"
-import { getPreferredTitle, useAddFeedToFeedList, useFeedStore } from "~/store/feed"
+import { getPreferredTitle, useFeedStore } from "~/store/feed"
 import { useOwnedListByView } from "~/store/list"
 import {
   subscriptionActions,
@@ -48,14 +50,26 @@ interface FeedCategoryProps {
 function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCategoryProps) {
   const { t } = useTranslation()
 
-  const sortByUnreadFeedList = useFeedUnreadStore((state) =>
-    ids.sort((a, b) => (state.data[b] || 0) - (state.data[a] || 0)),
+  const sortByUnreadFeedList = useFeedUnreadStore(
+    useCallback(
+      (state) =>
+        ids.sort((a, b) => {
+          const unreadCompare = (state.data[b] || 0) - (state.data[a] || 0)
+          if (unreadCompare !== 0) {
+            return unreadCompare
+          }
+          return a.localeCompare(b)
+        }),
+      [ids],
+    ),
   )
 
   const navigate = useNavigateEntry()
 
   const subscription = useSubscriptionByFeedId(ids[0])
-  const folderName = subscription?.category || subscription.defaultCategory
+  const autoGroup = useGeneralSettingSelector((state) => state.autoGroup)
+  const folderName =
+    subscription?.category || (autoGroup ? subscription.defaultCategory : subscription.feedId)
 
   const showCollapse = sortByUnreadFeedList.length > 1 || !!subscription?.category
 
@@ -126,8 +140,8 @@ function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCatego
     }
   }
 
-  const unread = useFeedUnreadStore((state) =>
-    ids.reduce((acc, feedId) => (state.data[feedId] || 0) + acc, 0),
+  const unread = useFeedUnreadStore(
+    useCallback((state) => ids.reduce((acc, feedId) => (state.data[feedId] || 0) + acc, 0), [ids]),
   )
 
   const isActive = useRouteParamsSelector(
@@ -452,18 +466,23 @@ const SortedFeedItems = (props: SortListProps) => {
 const SortByAlphabeticalList = (props: SortListProps) => {
   const { ids, showCollapse, view } = props
   const isDesc = useFeedListSortSelector((s) => s.order === "desc")
-  const sortedFeedList = useFeedStore((state) => {
-    const res = ids.sort((a, b) => {
-      const feedTitleA = getPreferredTitle(state.feeds[a]) || ""
-      const feedTitleB = getPreferredTitle(state.feeds[b]) || ""
-      return sortByAlphabet(feedTitleA, feedTitleB)
-    })
+  const sortedFeedList = useFeedStore(
+    useCallback(
+      (state) => {
+        const res = ids.sort((a, b) => {
+          const feedTitleA = getPreferredTitle(state.feeds[a]) || ""
+          const feedTitleB = getPreferredTitle(state.feeds[b]) || ""
+          return sortByAlphabet(feedTitleA, feedTitleB)
+        })
 
-    if (isDesc) {
-      return res
-    }
-    return res.reverse()
-  })
+        if (isDesc) {
+          return res
+        }
+        return res.reverse()
+      },
+      [ids, isDesc],
+    ),
+  )
   return (
     <Fragment>
       {sortedFeedList.map((feedId) => (
@@ -479,10 +498,15 @@ const SortByAlphabeticalList = (props: SortListProps) => {
 }
 const SortByUnreadList = ({ ids, showCollapse, view }: SortListProps) => {
   const isDesc = useFeedListSortSelector((s) => s.order === "desc")
-  const sortByUnreadFeedList = useFeedUnreadStore((state) => {
-    const res = ids.sort((a, b) => (state.data[b] || 0) - (state.data[a] || 0))
-    return isDesc ? res : res.reverse()
-  })
+  const sortByUnreadFeedList = useFeedUnreadStore(
+    useCallback(
+      (state) => {
+        const res = ids.sort((a, b) => (state.data[b] || 0) - (state.data[a] || 0))
+        return isDesc ? res : res.reverse()
+      },
+      [ids, isDesc],
+    ),
+  )
 
   return (
     <Fragment>
