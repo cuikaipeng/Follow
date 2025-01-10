@@ -8,10 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from "@follow/components/ui/table/index.jsx"
+import { EllipsisTextWithTooltip } from "@follow/components/ui/typography/index.js"
 import type { RSSHubModel } from "@follow/models"
 import { useTranslation } from "react-i18next"
 
-import RSSHubIcon from "~/assets/rsshub-icon.png"
+import RSSHubIconUrl from "~/assets/rsshub-icon.png?url"
 import { whoami } from "~/atoms/user"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { useAuthQuery } from "~/hooks/common"
@@ -22,6 +23,7 @@ import { UserAvatar } from "~/modules/user/UserAvatar"
 import { Queries } from "~/queries"
 import { useSetRSSHubMutation } from "~/queries/rsshub"
 
+const RSSHubIcon = new URL(RSSHubIconUrl, import.meta.url).href
 export function Component() {
   const { t } = useTranslation("settings")
   const { present } = useModalStack()
@@ -31,12 +33,12 @@ export function Component() {
   const list = useAuthQuery(Queries.rsshub.list())
 
   return (
-    <div className="relative flex w-full max-w-4xl flex-col items-center gap-8 px-4 pb-8 lg:pb-4">
-      <div className="motion-preset-shake center text-accent motion-delay-500">
+    <div className="relative flex w-full flex-col items-center gap-8 px-4 pb-8 lg:px-20 lg:pb-4">
+      <div className="center">
         <img src={RSSHubIcon} className="mt-12 size-20" />
       </div>
       <div className="text-2xl font-bold">{t("words.rsshub", { ns: "common" })}</div>
-      <div className="text-sm">{t("rsshub.description")}</div>
+      <div className="max-w-4xl text-sm">{t("rsshub.description")}</div>
       <Button
         onClick={() =>
           present({
@@ -64,31 +66,31 @@ function List({ data }: { data?: RSSHubModel[] }) {
   const { present } = useModalStack()
 
   return (
-    <Table containerClassName="mt-2">
+    <Table containerClassName="mt-2 overflow-x-auto">
       <TableHeader>
         <TableRow>
           <TableHead className="font-bold" size="sm" />
-          <TableHead className="font-bold" size="sm">
+          <TableHead className="w-[150px] font-bold" size="sm">
             {t("rsshub.table.owner")}
           </TableHead>
           <TableHead className="font-bold" size="sm">
             {t("rsshub.table.description")}
           </TableHead>
-          <TableHead className="font-bold" size="sm">
+          <TableHead className="w-[120px] text-right font-bold" size="sm">
             {t("rsshub.table.price")}
           </TableHead>
-          <TableHead className="font-bold" size="sm">
+          <TableHead className="w-[100px] text-right font-bold" size="sm">
             {t("rsshub.table.userCount")}
           </TableHead>
-          <TableHead className="font-bold" size="sm">
+          <TableHead className="w-[100px] text-right font-bold" size="sm">
             {t("rsshub.table.userLimit")}
           </TableHead>
-          <TableCell size="sm" />
+          <TableCell className="w-[100px]" size="sm" />
         </TableRow>
       </TableHeader>
       <TableBody className="border-t-[12px] border-transparent [&_td]:!px-3">
         <TableRow>
-          <TableCell>Official</TableCell>
+          <TableCell className="text-nowrap font-bold">{t("rsshub.table.official")}</TableCell>
           <TableCell>
             <span className="flex items-center gap-2">
               <Logo className="size-6" />
@@ -97,12 +99,12 @@ function List({ data }: { data?: RSSHubModel[] }) {
           </TableCell>
           <TableCell>Follow Built-in RSSHub</TableCell>
           <TableCell>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center justify-end gap-1">
               0 <i className="i-mgc-power text-accent" />
             </span>
           </TableCell>
-          <TableCell>*</TableCell>
-          <TableCell>{t("rsshub.table.unlimited")}</TableCell>
+          <TableCell className="text-right">*</TableCell>
+          <TableCell className="text-right">{t("rsshub.table.unlimited")}</TableCell>
           <TableCell>
             {!status?.data?.usage?.rsshubId && (
               <Button disabled className="shrink-0">
@@ -119,14 +121,14 @@ function List({ data }: { data?: RSSHubModel[] }) {
         {data?.map((instance) => {
           return (
             <TableRow key={instance.id}>
-              <TableCell>
+              <TableCell className="text-nowrap">
                 {(() => {
                   const flag: string[] = []
                   if (status?.data?.usage?.rsshubId === instance.id) {
-                    flag.push("In use")
+                    flag.push(t("rsshub.table.inuse"))
                   }
                   if (instance.ownerUserId === me?.id) {
-                    flag.push("Yours")
+                    flag.push(t("rsshub.table.yours"))
                   }
                   return flag.join(" / ")
                 })()}
@@ -139,17 +141,25 @@ function List({ data }: { data?: RSSHubModel[] }) {
                 />
               </TableCell>
               <TableCell>
-                <div className="line-clamp-2">{instance.description}</div>
+                <EllipsisTextWithTooltip className="line-clamp-2">
+                  {instance.description}
+                </EllipsisTextWithTooltip>
               </TableCell>
               <TableCell>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center justify-end gap-1">
                   {instance.price} <i className="i-mgc-power text-accent" />
                 </span>
               </TableCell>
-              <TableCell>{instance.userCount}</TableCell>
-              <TableCell>{instance.userLimit || t("rsshub.table.unlimited")}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
+              <TableCell className="text-right">{instance.userCount}</TableCell>
+              <TableCell className="text-right">
+                {instance.userLimit === null
+                  ? t("rsshub.table.unlimited")
+                  : instance.userLimit > 1
+                    ? instance.userLimit
+                    : t("rsshub.table.private")}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex w-max items-center gap-2">
                   <Button
                     className="shrink-0"
                     variant={status?.data?.usage?.rsshubId === instance.id ? "outline" : "primary"}

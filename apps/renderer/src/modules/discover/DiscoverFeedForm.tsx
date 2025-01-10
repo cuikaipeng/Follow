@@ -28,7 +28,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { getSidebarActiveView } from "~/atoms/sidebar"
-import { CopyButton } from "~/components/ui/code-highlighter"
+import { CopyButton } from "~/components/ui/button/CopyButton"
 import { Markdown } from "~/components/ui/markdown/Markdown"
 import { useCurrentModal, useIsTopModal, useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { getViewFromRoute } from "~/lib/utils"
@@ -79,7 +79,8 @@ const FeedDescription = ({ description }: { description?: string }) => {
     <>
       <p>{t("discover.feed_description")}</p>
       <Markdown className="w-full max-w-full cursor-text select-text break-all prose-p:my-1">
-        {description}
+        {/* Fix markdown directive */}
+        {description.replaceAll("::: ", ":::")}
       </Markdown>
     </>
   )
@@ -248,7 +249,7 @@ export const DiscoverFeedForm = ({
       )}
       <form className="flex flex-col gap-4" onSubmit={form.handleSubmit(onSubmit)} ref={formElRef}>
         {keys.map((keyItem) => {
-          const parameters = normalizeRSSHubParameters(route.parameters[keyItem.name])
+          const parameters = normalizeRSSHubParameters(route.parameters?.[keyItem.name])
 
           const formRegister = form.register(keyItem.name)
 
@@ -330,7 +331,7 @@ export const DiscoverFeedForm = ({
         )}
         <div
           className={cn(
-            "sticky bottom-0 -mt-4 mb-1 flex w-full justify-end py-3",
+            "sticky bottom-0 -mt-4 mb-1 flex w-full justify-end pt-3",
             submitButtonClassName,
           )}
         >
