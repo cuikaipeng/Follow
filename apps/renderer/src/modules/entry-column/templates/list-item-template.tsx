@@ -59,12 +59,10 @@ export function ListItem({
   const lineClamp = useMemo(() => {
     const envIsSafari = isSafari()
     let lineClampTitle = settingWideMode ? 1 : 2
-    let lineClampDescription = settingWideMode ? 1 : 2
+    const lineClampDescription = settingWideMode ? 1 : 2
+
     if (translation?.title) {
-      lineClampTitle += settingWideMode ? 1 : 2
-    }
-    if (translation?.description) {
-      lineClampDescription += settingWideMode ? 1 : 2
+      lineClampTitle += 1
     }
 
     // for tailwind
@@ -76,7 +74,7 @@ export function ListItem({
       title: envIsSafari ? `line-clamp-[${lineClampTitle}]` : "",
       description: envIsSafari ? `line-clamp-[${lineClampDescription}]` : "",
     }
-  }, [translation?.title, translation?.description, settingWideMode])
+  }, [settingWideMode])
 
   // NOTE: prevent 0 height element, react virtuoso will not stop render any more
   if (!entry || !(feed || inbox)) return null
@@ -85,7 +83,7 @@ export function ListItem({
 
   const related = feed || inbox
 
-  const hasAudio = entry.entries?.attachments?.[0].url
+  const hasAudio = entry.entries?.attachments?.[0]!.url
   const hasMedia = entry.entries?.media?.[0]?.url
 
   const marginWidth = 8 * (isMobile ? 1.125 : 1)
@@ -182,9 +180,9 @@ export function ListItem({
       {withAudio && !!hasAudio && (
         <AudioCover
           entryId={entryId}
-          src={entry.entries!.attachments![0].url}
+          src={entry.entries!.attachments![0]!.url}
           durationInSeconds={Number.parseInt(
-            String(entry.entries!.attachments![0].duration_in_seconds ?? 0),
+            String(entry.entries!.attachments![0]!.duration_in_seconds ?? 0),
             10,
           )}
           feedIcon={

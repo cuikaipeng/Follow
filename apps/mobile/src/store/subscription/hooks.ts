@@ -6,7 +6,12 @@ import { useCallback } from "react"
 import { getFeed } from "../feed/getter"
 import { getList } from "../list/getters"
 import { getUnreadCount } from "../unread/getter"
-import { getSubscription, getSubscriptionByCategory, getSubscriptionByView } from "./getter"
+import {
+  getFeedSubscriptionByView,
+  getSubscription,
+  getSubscriptionByCategory,
+  getSubscriptionByView,
+} from "./getter"
 import { subscriptionSyncService, useSubscriptionStore } from "./store"
 
 export const usePrefetchSubscription = (view: FeedViewType) => {
@@ -40,6 +45,10 @@ const sortUngroupedSubscriptionByAlphabet = (
 
 export const useSubscriptionByView = (view: FeedViewType) => {
   return useSubscriptionStore(useCallback(() => getSubscriptionByView(view), [view]))
+}
+
+export const useFeedSubscriptionByView = (view: FeedViewType) => {
+  return useSubscriptionStore(useCallback(() => getFeedSubscriptionByView(view), [view]))
 }
 
 export const useGroupedSubscription = (view: FeedViewType) => {
@@ -114,7 +123,7 @@ export const useSortedGroupedSubscription = (
       })
       const sortedList = [] as { category: string; subscriptionIds: string[] }[]
       for (const category of sortedCategories) {
-        sortedList.push({ category, subscriptionIds: grouped[category] })
+        sortedList.push({ category, subscriptionIds: grouped[category]! })
       }
       return sortedList
     }, [grouped, sortBy, sortOrder]),
@@ -138,10 +147,31 @@ export const useSortedUngroupedSubscription = (
   )
 }
 
+export const useSortedFeedSubscriptionByAlphabet = (ids: string[]) => {
+  return useSubscriptionStore(
+    useCallback(() => {
+      return ids.sort((a, b) => {
+        const leftFeed = getFeed(a)
+        const rightFeed = getFeed(b)
+        if (!leftFeed || !rightFeed) return 0
+        return sortByAlphabet(leftFeed.title!, rightFeed.title!)
+      })
+    }, [ids]),
+  )
+}
+
 export const useSubscription = (id: string) => {
   return useSubscriptionStore((state) => {
     return state.data[id]
   })
+}
+
+export const useAllListSubscription = () => {
+  return useSubscriptionStore(
+    useCallback((state) => {
+      return Object.values(state.listIdByView).flatMap((list) => Array.from(list))
+    }, []),
+  )
 }
 
 export const useListSubscription = (view: FeedViewType) => {
@@ -193,3 +223,6 @@ export const useListSubscriptionCategory = (view: FeedViewType) => {
 
 export const useSubscriptionByFeedId = (feedId: string) =>
   useSubscriptionStore(useCallback((state) => state.data[feedId] || null, [feedId]))
+
+export const useSubscriptionByListId = (listId: string) =>
+  useSubscriptionStore(useCallback((state) => state.data[listId] || null, [listId]))

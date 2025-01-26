@@ -11,18 +11,19 @@ import { router, Stack, useLocalSearchParams } from "expo-router"
 import { memo, useEffect, useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { Linking, Text, TouchableOpacity, View } from "react-native"
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 import { z } from "zod"
 
+import { BlurEffectWithBottomBorder } from "@/src/components/common/BlurEffect"
 import { HeaderTitleExtra } from "@/src/components/common/HeaderTitleExtra"
 import {
   ModalHeaderCloseButton,
-  ModalHeaderShubmitButton,
+  ModalHeaderSubmitButton,
 } from "@/src/components/common/ModalSharedComponents"
+import { SafeModalScrollView } from "@/src/components/common/SafeModalScrollView"
 import { FormProvider, useFormContext } from "@/src/components/ui/form/FormProvider"
 import { Select } from "@/src/components/ui/form/Select"
 import { TextField } from "@/src/components/ui/form/TextField"
-import MarkdownWeb from "@/src/components/ui/typography/MarkdownWeb"
+import { Markdown } from "@/src/components/ui/typography/Markdown"
 import { toast } from "@/src/lib/toast"
 import { feedSyncServices } from "@/src/store/feed/store"
 
@@ -54,7 +55,7 @@ export default function RsshubForm() {
   if (!parsedRoute || !routePrefix) {
     return null
   }
-  return <FormImpl route={parsedRoute} routePrefix={routePrefix as string} name={name} />
+  return <FormImpl route={parsedRoute} routePrefix={routePrefix as string} name={name!} />
 }
 
 function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
@@ -97,7 +98,7 @@ function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
     const ret = {} as Record<string, string | null>
     if (!route.parameters) return ret
     for (const key in route.parameters) {
-      const params = normalizeRSSHubParameters(route.parameters[key])
+      const params = normalizeRSSHubParameters(route.parameters[key]!)
       if (!params) continue
       ret[key] = params.default
     }
@@ -120,10 +121,10 @@ function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
       />
 
       <PortalProvider>
-        <KeyboardAwareScrollView className="bg-system-grouped-background">
-          <View className="bg-system-grouped-background-2 mx-2 gap-4 rounded-lg px-3 py-6">
+        <SafeModalScrollView className="bg-system-grouped-background">
+          <View className="bg-secondary-system-grouped-background mx-2 mt-2 gap-4 rounded-lg px-3 py-6">
             {keys.map((keyItem) => {
-              const parameters = normalizeRSSHubParameters(route.parameters[keyItem.name])
+              const parameters = normalizeRSSHubParameters(route.parameters[keyItem.name]!)
 
               return (
                 <View key={keyItem.name}>
@@ -162,7 +163,6 @@ function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
                       render={({ field: { onChange, value } }) => (
                         <Select
                           label={keyItem.name}
-                          wrapperClassName="mt-2"
                           options={parameters.options ?? []}
                           value={value}
                           onValueChange={onChange}
@@ -172,7 +172,9 @@ function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
                   )}
 
                   {!!parameters && (
-                    <Text className="text-text/80 ml-1 mt-2 text-xs">{parameters.description}</Text>
+                    <Text className="text-secondary-label ml-2 mt-1 text-xs">
+                      {parameters.description}
+                    </Text>
                   )}
                 </View>
               )
@@ -181,14 +183,18 @@ function FormImpl({ route, routePrefix, name }: RsshubFormParams) {
           <Maintainers maintainers={route.maintainers} />
 
           {!!route.description && (
-            <View className="mx-4 mt-4">
-              <MarkdownWeb
+            <View className="bg-system-background border-t-hairline border-opaque-separator mt-4 flex-1 px-4">
+              <Markdown
+                style={{
+                  paddingTop: 16,
+                  paddingBottom: 16,
+                }}
                 value={route.description.replaceAll("::: ", ":::")}
-                dom={{ matchContents: true, scrollEnabled: false }}
+                webViewProps={{ matchContents: true, scrollEnabled: false }}
               />
             </View>
           )}
-        </KeyboardAwareScrollView>
+        </SafeModalScrollView>
       </PortalProvider>
     </FormProvider>
   )
@@ -200,11 +206,13 @@ const Maintainers = ({ maintainers }: { maintainers?: string[] }) => {
   }
 
   return (
-    <View className="text-text/80 mx-4 mt-2 flex flex-row flex-wrap gap-x-1 text-sm">
-      <Text className="text-text/80 text-xs">This feed is provided by RSSHub, with credit to </Text>
+    <View className="text-tertiary-label mx-4 mt-2 flex flex-row flex-wrap gap-x-1 text-sm">
+      <Text className="text-secondary-label text-xs">
+        This feed is provided by RSSHub, with credit to{" "}
+      </Text>
       {maintainers.map((m) => (
         <TouchableOpacity key={m} onPress={() => Linking.openURL(`https://github.com/${m}`)}>
-          <Text className="text-text/50 text-xs">@{m}</Text>
+          <Text className="text-xs text-accent/90">@{m}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -232,10 +240,12 @@ const ScreenOptions = memo(({ name, routeName, route, routePrefix }: ScreenOptio
       options={{
         headerLeft: ModalHeaderCloseButton,
         gestureEnabled: !form.formState.isDirty,
+        headerBackground: BlurEffectWithBottomBorder,
+        headerTransparent: true,
 
         headerRight: () => (
           <FormProvider form={form}>
-            <ModalHeaderSubmitButton routePrefix={routePrefix} route={route} />
+            <ModalHeaderSubmitButtonImpl routePrefix={routePrefix} route={route} />
           </FormProvider>
         ),
 
@@ -255,17 +265,15 @@ const Title = ({ name, routeName, route, routePrefix }: ScreenOptionsProps) => {
   )
 }
 
-type ModalHeaderSubmitButtonProps = {
-  routePrefix: string
-  route: string
-}
-const ModalHeaderSubmitButton = ({ routePrefix, route }: ModalHeaderSubmitButtonProps) => {
-  return <ModalHeaderSubmitButtonImpl routePrefix={routePrefix} route={route} />
-}
-
 const routeParamsKeyPrefix = "route-params-"
 
-const ModalHeaderSubmitButtonImpl = ({ routePrefix, route }: ModalHeaderSubmitButtonProps) => {
+const ModalHeaderSubmitButtonImpl = ({
+  routePrefix,
+  route,
+}: {
+  routePrefix: string
+  route: string
+}) => {
   const form = useFormContext()
   const { isValid } = form.formState
 
@@ -327,5 +335,5 @@ const ModalHeaderSubmitButtonImpl = ({ routePrefix, route }: ModalHeaderSubmitBu
     }
   })
 
-  return <ModalHeaderShubmitButton isLoading={isLoading} isValid={isValid} onPress={submit} />
+  return <ModalHeaderSubmitButton isLoading={isLoading} isValid={isValid} onPress={submit} />
 }

@@ -1,8 +1,9 @@
+import { RSSHubCategories } from "@follow/constants"
 import { getDefaultHeaderHeight } from "@react-navigation/elements"
 import { router } from "expo-router"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import type { FC } from "react"
-import { useEffect, useRef, useState } from "react"
+import { useContext, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent } from "react-native"
 import {
   Animated,
@@ -17,11 +18,14 @@ import {
 } from "react-native"
 import { useSafeAreaFrame, useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { BlurEffect } from "@/src/components/common/HeaderBlur"
+import { BlurEffect } from "@/src/components/common/BlurEffect"
+import { TabBar } from "@/src/components/ui/tabview/TabBar"
 import { Search2CuteReIcon } from "@/src/icons/search_2_cute_re"
 import { accentColor, useColor } from "@/src/theme/colors"
 
+import { RSSHubCategoryCopyMap } from "./copy"
 import { useSearchPageContext } from "./ctx"
+import { DiscoverContext } from "./DiscoverContext"
 import { SearchTabBar } from "./SearchTabBar"
 
 export const SearchHeader: FC<{
@@ -38,7 +42,7 @@ export const SearchHeader: FC<{
       className="relative"
       onLayout={onLayout}
     >
-      {/* <BlurEffect /> */}
+      <BlurEffect />
       <View style={styles.header}>
         <ComposeSearchBar />
       </View>
@@ -54,23 +58,43 @@ const DiscoverHeaderImpl = () => {
   const frame = useSafeAreaFrame()
   const insets = useSafeAreaInsets()
   const headerHeight = getDefaultHeaderHeight(frame, false, insets.top)
+  const { animatedX, currentTabAtom, headerHeightAtom } = useContext(DiscoverContext)
+  const setCurrentTab = useSetAtom(currentTabAtom)
+  const setHeaderHeight = useSetAtom(headerHeightAtom)
 
   return (
-    <View style={{ height: headerHeight, paddingTop: insets.top }} className="relative">
+    <View
+      style={{ minHeight: headerHeight, paddingTop: insets.top }}
+      className="relative"
+      onLayout={(e) => {
+        setHeaderHeight(e.nativeEvent.layout.height)
+      }}
+    >
       <BlurEffect />
       <View style={styles.header}>
         <PlaceholerSearchBar />
       </View>
+
+      <TabBar
+        tabs={RSSHubCategories.map((category) => ({
+          name: RSSHubCategoryCopyMap[category],
+          value: category,
+        }))}
+        tabScrollContainerAnimatedX={animatedX}
+        onTabItemPress={(index) => {
+          setCurrentTab(index)
+        }}
+      />
     </View>
   )
 }
 
 const PlaceholerSearchBar = () => {
-  const placeholderTextColor = useColor("placeholderText")
+  const labelColor = useColor("secondaryLabel")
   return (
     <Pressable
       style={styles.searchbar}
-      className="bg-gray-5/60"
+      className="bg-tertiary-system-fill"
       onPress={() => {
         router.push("/search")
       }}
@@ -79,8 +103,8 @@ const PlaceholerSearchBar = () => {
         className="absolute inset-0 flex flex-row items-center justify-center"
         pointerEvents="none"
       >
-        <Search2CuteReIcon color={placeholderTextColor} height={18} width={18} />
-        <Text className="text-placeholder-text ml-1" style={styles.searchPlaceholderText}>
+        <Search2CuteReIcon color={labelColor} height={18} width={18} />
+        <Text className="text-secondary-label ml-1" style={styles.searchPlaceholderText}>
           Search
         </Text>
       </View>
@@ -116,7 +140,7 @@ const ComposeSearchBar = () => {
 const SearchInput = () => {
   const { searchFocusedAtom, searchValueAtom } = useSearchPageContext()
   const [isFocused, setIsFocused] = useAtom(searchFocusedAtom)
-  const placeholderTextColor = useColor("placeholderText")
+  const placeholderTextColor = useColor("secondaryLabel")
   const searchValue = useAtomValue(searchValueAtom)
   const setSearchValue = useSetAtom(searchValueAtom)
   const inputRef = useRef<TextInput>(null)
@@ -183,7 +207,7 @@ const SearchInput = () => {
   }, [isFocused])
 
   return (
-    <View style={styles.searchbar} className="bg-gray-5/60">
+    <View style={styles.searchbar} className="bg-tertiary-system-fill">
       {focusOrHasValue && (
         <Animated.View
           style={{
@@ -193,7 +217,7 @@ const SearchInput = () => {
         >
           <Search2CuteReIcon color={placeholderTextColor} height={18} width={18} />
           {!searchValue && !tempSearchValue && (
-            <Text className="text-placeholder-text ml-2" style={styles.searchPlaceholderText}>
+            <Text className="text-secondary-label ml-2" style={styles.searchPlaceholderText}>
               Search
             </Text>
           )}
@@ -228,7 +252,7 @@ const SearchInput = () => {
         pointerEvents="none"
       >
         <Search2CuteReIcon color={placeholderTextColor} height={18} width={18} />
-        <Text className="text-placeholder-text ml-1" style={styles.searchPlaceholderText}>
+        <Text className="text-secondary-label ml-1" style={styles.searchPlaceholderText}>
           Search
         </Text>
       </Animated.View>

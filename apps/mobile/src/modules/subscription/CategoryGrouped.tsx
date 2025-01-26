@@ -1,13 +1,16 @@
 import { memo, useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Text, TouchableOpacity } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 import { ItemPressable } from "@/src/components/ui/pressable/item-pressable"
 import { MingcuteRightLine } from "@/src/icons/mingcute_right_line"
 import { useUnreadCounts } from "@/src/store/unread/hooks"
+import { useColor } from "@/src/theme/colors"
 
 import { SubscriptionFeedCategoryContextMenu } from "../context-menu/feeds"
+import { closeDrawer, selectFeed } from "../feed-drawer/atoms"
 import { GroupedContext, useViewPageCurrentView } from "./ctx"
+import { ItemSeparator } from "./ItemSeparator"
 import { UnGroupedList } from "./UnGroupedList"
 
 // const CategoryList: FC<{
@@ -19,6 +22,7 @@ import { UnGroupedList } from "./UnGroupedList"
 //   })
 // }
 export const CategoryGrouped = memo(
+  // eslint-disable-next-line @eslint-react/no-unstable-context-value
   ({ category, subscriptionIds }: { category: string; subscriptionIds: string[] }) => {
     const unreadCounts = useUnreadCounts(subscriptionIds)
     const [expanded, setExpanded] = useState(false)
@@ -30,6 +34,7 @@ export const CategoryGrouped = memo(
     }, [rotateSharedValue])
     const view = useViewPageCurrentView()
 
+    const tertiaryLabelColor = useColor("tertiaryLabel")
     return (
       <>
         <SubscriptionFeedCategoryContextMenu
@@ -39,9 +44,13 @@ export const CategoryGrouped = memo(
         >
           <ItemPressable
             onPress={() => {
-              // TODO navigate to category
+              selectFeed({
+                type: "category",
+                categoryName: category,
+              })
+              closeDrawer()
             }}
-            className="border-item-pressed h-12 flex-row items-center border-b px-3"
+            className="h-12 flex-row items-center px-3"
           >
             <TouchableOpacity
               hitSlop={10}
@@ -52,21 +61,20 @@ export const CategoryGrouped = memo(
               className="size-5 flex-row items-center justify-center"
             >
               <Animated.View style={rotateStyle}>
-                <MingcuteRightLine color="gray" height={18} width={18} />
+                <MingcuteRightLine color={tertiaryLabelColor} height={18} width={18} />
               </Animated.View>
             </TouchableOpacity>
             <Text className="text-text ml-3">{category}</Text>
             {!!unreadCounts && (
-              <Text className="text-tertiary-label ml-auto text-xs">{unreadCounts}</Text>
+              <Text className="text-secondary-label ml-auto text-xs">{unreadCounts}</Text>
             )}
           </ItemPressable>
         </SubscriptionFeedCategoryContextMenu>
 
         {expanded && (
           <GroupedContext.Provider value={category}>
-            <View>
-              <UnGroupedList subscriptionIds={subscriptionIds} />
-            </View>
+            <ItemSeparator />
+            <UnGroupedList subscriptionIds={subscriptionIds} />
           </GroupedContext.Provider>
         )}
       </>

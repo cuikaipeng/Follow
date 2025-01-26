@@ -38,11 +38,11 @@ export const ViewTab = () => {
       indicatorPosition.value = withSpring(tabPositions[currentView] || 0, springConfig)
 
       if (tabRef.current) {
-        const x = currentView > 0 ? tabPositions[currentView - 1] + tabWidths[currentView - 1] : 0
+        const x = currentView > 0 ? tabPositions[currentView - 1]! + tabWidths[currentView - 1]! : 0
 
         const isCurrentTabVisible =
-          scrollOffsetX.current < tabPositions[currentView] &&
-          scrollOffsetX.current + tabWidths[currentView] > tabPositions[currentView]
+          scrollOffsetX.current < tabPositions[currentView]! &&
+          scrollOffsetX.current + tabWidths[currentView]! > tabPositions[currentView]!
 
         if (!isCurrentTabVisible) {
           tabRef.current.scrollTo({ x, y: 0, animated: true })
@@ -58,7 +58,7 @@ export const ViewTab = () => {
           translateX: indicatorPosition.value + 10 + Math.abs(offset),
         },
       ],
-      backgroundColor: views[currentView].activeColor,
+      backgroundColor: views[currentView]!.activeColor,
       width: (tabWidths[currentView] || 20) - 40 + Math.abs(offset),
     }
   })
@@ -66,7 +66,7 @@ export const ViewTab = () => {
   return (
     <ThemedBlurView
       style={[styles.tabContainer, { height: headerHeight + ViewTabHeight }]}
-      className="border-system-fill/60 relative border-b"
+      className="border-opaque-separator border-b-hairline relative"
     >
       <View className="absolute inset-x-0 bottom-0" style={{ height: ViewTabHeight }}>
         <ScrollView
@@ -74,7 +74,6 @@ export const ViewTab = () => {
             scrollOffsetX.current = event.nativeEvent.contentOffset.x
           }}
           showsHorizontalScrollIndicator={false}
-          className="border-tertiary-system-background"
           horizontal
           ref={tabRef}
           contentContainerStyle={styles.tabScroller}
