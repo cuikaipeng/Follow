@@ -1,10 +1,9 @@
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs"
 import { Header, useHeaderHeight } from "@react-navigation/elements"
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack"
 import { router, Stack, useNavigation } from "expo-router"
 import type { FC, PropsWithChildren } from "react"
 import { createContext, useContext, useEffect, useMemo, useRef } from "react"
-import type { ScrollViewProps } from "react-native"
+import type { ScrollView, ScrollViewProps } from "react-native"
 import {
   Animated as RNAnimated,
   StyleSheet,
@@ -17,6 +16,11 @@ import type { ReanimatedScrollEvent } from "react-native-reanimated/lib/typescri
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useColor } from "react-native-uikit-colors"
 
+import {
+  AttachNavigationScrollViewContext,
+  SetAttachNavigationScrollViewContext,
+} from "@/src/components/ui/tabbar/contexts/AttachNavigationScrollViewContext"
+import { useBottomTabBarHeight } from "@/src/components/ui/tabbar/hooks"
 import { useDefaultHeaderHeight } from "@/src/hooks/useDefaultHeaderHeight"
 import { MingcuteLeftLineIcon } from "@/src/icons/mingcute_left_line"
 
@@ -51,18 +55,29 @@ export const SafeNavigationScrollView: FC<SafeNavigationScrollViewProps> = ({
   const headerHeight = useHeaderHeight()
 
   const scrollY = useAnimatedValue(0)
+  const scrollViewRef = useRef<ScrollView>(null)
+
+  const setAttachNavigationScrollViewRef = useContext(SetAttachNavigationScrollViewContext)
+  useEffect(() => {
+    if (setAttachNavigationScrollViewRef) {
+      setAttachNavigationScrollViewRef(scrollViewRef)
+    }
+  }, [setAttachNavigationScrollViewRef, scrollViewRef])
 
   return (
     <NavigationContext.Provider value={useMemo(() => ({ scrollY }), [scrollY])}>
       {withHeaderBlur && <NavigationBlurEffectHeader />}
       <AnimatedScrollView
+        ref={scrollViewRef}
         onScroll={RNAnimated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
           useNativeDriver: true,
         })}
         {...props}
       >
         <View style={{ height: headerHeight - (withTopInset ? insets.top : 0) }} />
-        <View>{children}</View>
+        <AttachNavigationScrollViewContext.Provider value={scrollViewRef}>
+          <View>{children}</View>
+        </AttachNavigationScrollViewContext.Provider>
         <View style={{ height: tabBarHeight - (withBottomInset ? insets.bottom : 0) }} />
       </AnimatedScrollView>
     </NavigationContext.Provider>
@@ -130,6 +145,7 @@ export const NavigationBlurEffectHeader = ({
   }))
 
   const hideableBottom = headerHideableBottom?.()
+  const { headerLeft, ...rest } = props
 
   return (
     <Stack.Screen
@@ -141,13 +157,15 @@ export const NavigationBlurEffectHeader = ({
         ),
         headerTransparent: true,
 
-        headerLeft: canBack
-          ? () => (
-              <TouchableOpacity hitSlop={10} onPress={() => router.back()}>
-                <MingcuteLeftLineIcon height={20} width={20} color={label} />
-              </TouchableOpacity>
-            )
-          : undefined,
+        headerLeft:
+          headerLeft ??
+          (canBack
+            ? () => (
+                <TouchableOpacity hitSlop={10} onPress={() => router.back()}>
+                  <MingcuteLeftLineIcon height={20} width={20} color={label} />
+                </TouchableOpacity>
+              )
+            : undefined),
 
         header: headerHideableBottom
           ? ({ options }) => {
@@ -156,14 +174,16 @@ export const NavigationBlurEffectHeader = ({
                   <View pointerEvents="box-none" style={[StyleSheet.absoluteFill]}>
                     {options.headerBackground?.()}
                   </View>
+
                   <Header title={options.title ?? ""} {...options} headerBackground={() => null} />
+
                   {hideableBottom}
                 </Animated.View>
               )
             }
           : undefined,
 
-        ...props,
+        ...rest,
       }}
     />
   )

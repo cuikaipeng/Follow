@@ -1,6 +1,6 @@
 import { cn } from "@follow/utils"
-import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs"
 import { HeaderHeightContext } from "@react-navigation/elements"
+import { router } from "expo-router"
 import type { FC } from "react"
 import { createContext, memo, useContext, useState } from "react"
 import {
@@ -15,10 +15,12 @@ import {
   View,
 } from "react-native"
 import { useSharedValue } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AccordionItem } from "@/src/components/ui/accordion/AccordionItem"
 import { FeedIcon } from "@/src/components/ui/icon/feed-icon"
-import { ItemPressable } from "@/src/components/ui/pressable/item-pressable"
+import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
+import { BottomTabBarHeightContext } from "@/src/components/ui/tabbar/contexts/BottomTabBarHeightContext"
 import { MingcuteRightLine } from "@/src/icons/mingcute_right_line"
 import { useFeed, usePrefetchFeed } from "@/src/store/feed/hooks"
 import { useList } from "@/src/store/list/hooks"
@@ -39,6 +41,8 @@ export const FeedPanel = () => {
   const selectedCollection = useSelectedCollection()
   const [headerHeight, setHeaderHeight] = useState(0)
 
+  const insets = useSafeAreaInsets()
+
   if (selectedCollection.type === "view") {
     return (
       <View className="flex flex-1 overflow-hidden">
@@ -50,7 +54,7 @@ export const FeedPanel = () => {
         />
 
         <HeaderHeightContext.Provider value={headerHeight}>
-          <BottomTabBarHeightContext.Provider value={0}>
+          <BottomTabBarHeightContext.Provider value={insets.bottom}>
             <ViewPageCurrentViewProvider
               key={selectedCollection.viewId}
               value={selectedCollection.viewId}
@@ -131,6 +135,7 @@ const GroupedContext = createContext<string | null>(null)
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity)
 
 const CategoryGrouped = memo(
+  // eslint-disable-next-line @eslint-react/no-unstable-context-value
   ({ category, subscriptionIds }: { category: string; subscriptionIds: string[] }) => {
     const unreadCounts = useUnreadCounts(subscriptionIds)
     const isExpanded = useSharedValue(false)
@@ -154,6 +159,7 @@ const CategoryGrouped = memo(
               categoryName: category,
             })
             closeDrawer()
+            router.push(`/feeds/${category}`)
           }}
           className="h-12 flex-row items-center px-3"
         >

@@ -42,13 +42,15 @@ export const GeneralScreen = () => {
           <GroupedInsetListBaseCell>
             <Text className="text-label">Translation Language</Text>
 
-            <Select
-              value={translationLanguage}
-              onValueChange={(value) => {
-                setGeneralSetting("translationLanguage", value)
-              }}
-              options={Object.values(LanguageMap)}
-            />
+            <View className="w-[150px]">
+              <Select
+                value={translationLanguage}
+                onValueChange={(value) => {
+                  setGeneralSetting("translationLanguage", value)
+                }}
+                options={Object.values(LanguageMap)}
+              />
+            </View>
           </GroupedInsetListBaseCell>
         </GroupedInsetListCard>
       </View>
@@ -69,40 +71,46 @@ export const GeneralScreen = () => {
               }}
             />
           </GroupedInsetListCell>
-
-          <GroupedInsetListCell label="Show unread content on launch">
-            <Switch
-              size="sm"
-              value={showUnreadOnLaunch}
-              onValueChange={(value) => {
-                setGeneralSetting("unreadOnly", value)
-              }}
-            />
-          </GroupedInsetListCell>
-
-          <GroupedInsetListCell label="Group by date" description="Group entries by date.">
-            <Switch
-              size="sm"
-              value={groupByDate}
-              onValueChange={(value) => {
-                setGeneralSetting("groupByDate", value)
-              }}
-            />
-          </GroupedInsetListCell>
-
-          <GroupedInsetListCell
-            label="Expand long social media"
-            description="Automatically expand social media entries containing long text."
-          >
-            <Switch
-              size="sm"
-              value={expandLongSocialMedia}
-              onValueChange={(value) => {
-                setGeneralSetting("autoExpandLongSocialMedia", value)
-              }}
-            />
-          </GroupedInsetListCell>
         </GroupedInsetListCard>
+
+        {/* Timeline */}
+        <View className="mt-8">
+          <GroupedInsetListSectionHeader label="Timeline" />
+          <GroupedInsetListCard>
+            <GroupedInsetListCell label="Show unread content on launch">
+              <Switch
+                size="sm"
+                value={showUnreadOnLaunch}
+                onValueChange={(value) => {
+                  setGeneralSetting("unreadOnly", value)
+                }}
+              />
+            </GroupedInsetListCell>
+
+            <GroupedInsetListCell label="Group by date" description="Group entries by date.">
+              <Switch
+                size="sm"
+                value={groupByDate}
+                onValueChange={(value) => {
+                  setGeneralSetting("groupByDate", value)
+                }}
+              />
+            </GroupedInsetListCell>
+
+            <GroupedInsetListCell
+              label="Expand long social media"
+              description="Automatically expand social media entries containing long text."
+            >
+              <Switch
+                size="sm"
+                value={expandLongSocialMedia}
+                onValueChange={(value) => {
+                  setGeneralSetting("autoExpandLongSocialMedia", value)
+                }}
+              />
+            </GroupedInsetListCell>
+          </GroupedInsetListCard>
+        </View>
 
         {/* Unread */}
         <View className="mt-8">

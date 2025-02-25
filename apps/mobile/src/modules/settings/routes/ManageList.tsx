@@ -16,7 +16,7 @@ import {
   GroupedInsetListSectionHeader,
 } from "@/src/components/ui/grouped/GroupedList"
 import { FeedIcon } from "@/src/components/ui/icon/feed-icon"
-import { ItemPressable } from "@/src/components/ui/pressable/item-pressable"
+import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { CheckLineIcon } from "@/src/icons/check_line"
 import { getBizFetchErrorMessage } from "@/src/lib/api-fetch"
 import { toast } from "@/src/lib/toast"
@@ -35,6 +35,7 @@ import type { SettingsStackParamList } from "../types"
 const ManageListContext = createContext<{
   nextSelectedFeedIdRef: MutableRefObject<Set<string>>
 }>(null!)
+
 export const ManageListScreen = ({
   route,
 }: {
@@ -139,7 +140,7 @@ const FeedCell = (props: { feedId: string; isSelected: boolean }) => {
               <FeedIcon feed={feed} size={24} />
             </View>
           </View>
-          <Text className="flex-1" ellipsizeMode="middle" numberOfLines={1}>
+          <Text className="text-label ml-2 flex-1" ellipsizeMode="middle" numberOfLines={1}>
             {feed?.title || "Untitled Feed"}
           </Text>
         </View>
