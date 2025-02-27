@@ -40,6 +40,7 @@ export const SearchHeader: FC<{
       onLayout={onLayout}
     >
       <BlurEffect />
+
       <View style={styles.header}>
         <ComposeSearchBar />
       </View>
@@ -48,6 +49,17 @@ export const SearchHeader: FC<{
   )
 }
 
+const DynamicBlurEffect = () => {
+  const { animatedY } = useContext(DiscoverContext)
+  const blurStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, Math.min(1, animatedY.value / 50)),
+  }))
+  return (
+    <Animated.View className="absolute inset-0 flex-1" style={blurStyle} pointerEvents={"none"}>
+      <BlurEffect />
+    </Animated.View>
+  )
+}
 export const DiscoverHeader = () => {
   return <DiscoverHeaderImpl />
 }
@@ -67,7 +79,8 @@ const DiscoverHeaderImpl = () => {
         setHeaderHeight(e.nativeEvent.layout.height)
       }}
     >
-      <BlurEffect />
+      <DynamicBlurEffect />
+
       <View style={[styles.header, styles.discoverHeader]}>
         <PlaceholerSearchBar />
 
@@ -86,6 +99,7 @@ const DiscoverHeaderImpl = () => {
         onTabItemPress={(index) => {
           setCurrentTab(index)
         }}
+        tabbarClassName="border-b border-b-quaternary-system-fill"
       />
     </View>
   )
@@ -133,7 +147,7 @@ const ComposeSearchBar = () => {
           }
         }}
       >
-        <Text className="ml-2 text-accent">Cancel</Text>
+        <Text className="ml-3 text-lg font-medium text-accent">Cancel</Text>
       </TouchableOpacity>
     </>
   )
@@ -251,9 +265,8 @@ const styles = StyleSheet.create({
   header: {
     flex: 1,
     alignItems: "center",
-    marginTop: -3,
     flexDirection: "row",
-    marginBottom: 6,
+    marginBottom: 14,
     marginHorizontal: 16,
     position: "relative",
   },
@@ -269,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 50,
-    height: 32,
+    height: 40,
     position: "relative",
   },
   searchInput: {
