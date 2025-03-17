@@ -2,12 +2,11 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs"
 import { getLabel } from "@react-navigation/elements"
 import { CommonActions, NavigationContext, NavigationRouteContext } from "@react-navigation/native"
 import type { FC } from "react"
-import { memo, useContext, useEffect } from "react"
+import { Fragment, memo, useContext, useEffect } from "react"
 import type { StyleProp, TextStyle } from "react-native"
-import { Platform, Pressable, StyleSheet, View } from "react-native"
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native"
 import Animated, {
   cancelAnimation,
-  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -15,13 +14,12 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { SetBottomTabBarHeightContext } from "@/src/components/layouts/tabbar/contexts/BottomTabBarHeightContext"
-import { quickSpringPreset, softSpringPreset } from "@/src/constants/spring"
+import { gentleSpringPreset, quickSpringPreset, softSpringPreset } from "@/src/constants/spring"
 import { PlayerTabBar } from "@/src/modules/player/PlayerTabBar"
-import { accentColor, useColor } from "@/src/theme/colors"
+import { accentColor } from "@/src/theme/colors"
 
 import { ThemedBlurView } from "../../common/ThemedBlurView"
 import { Grid } from "../../ui/grid"
-import { ScaleFadeRotateIn } from "../../ux/animations/ScaleFadeRotate"
 import { BottomTabBarBackgroundContext } from "./contexts/BottomTabBarBackgroundContext"
 import { BottomTabBarVisibleContext } from "./contexts/BottomTabBarVisibleContext"
 
@@ -44,7 +42,7 @@ export const Tabbar: FC<BottomTabBarProps> = (props) => {
   return (
     <Animated.View
       accessibilityRole="tablist"
-      className="absolute inset-x-0 bottom-0 z-10 py-[7]"
+      className="absolute inset-x-0 bottom-0 z-10"
       style={{
         paddingBottom: insets.bottom,
         transform: [{ translateY }],
@@ -55,7 +53,7 @@ export const Tabbar: FC<BottomTabBarProps> = (props) => {
     >
       <TabBarBackground />
       <PlayerTabBar />
-      <Grid columns={routes.length} gap={10}>
+      <Grid columns={routes.length} gap={10} className="mt-[7]">
         {routes.map((route, index) => {
           const focused = index === state.index
           const { options } = descriptors[route.key]!
@@ -75,6 +73,7 @@ export const Tabbar: FC<BottomTabBarProps> = (props) => {
               })
             }
           }
+          const tabButton = options?.tabBarButton
           const label =
             typeof options?.tabBarLabel === "function"
               ? options?.tabBarLabel
@@ -130,17 +129,19 @@ export const Tabbar: FC<BottomTabBarProps> = (props) => {
             )
           }
 
+          const TabButton = tabButton ?? Fragment
           return (
-            <TabItem
-              key={route.key}
-              route={route}
-              focused={focused}
-              descriptors={descriptors}
-              onPress={onPress}
-              originalRenderIcon={renderIcon}
-              originalRenderLabel={renderLabel}
-              accessibilityLabel={accessibilityLabel}
-            />
+            <TabButton key={route.key}>
+              <TabItem
+                route={route}
+                focused={focused}
+                descriptors={descriptors}
+                onPress={onPress}
+                originalRenderIcon={renderIcon}
+                originalRenderLabel={renderLabel}
+                accessibilityLabel={accessibilityLabel}
+              />
+            </TabButton>
           )
         })}
       </Grid>
@@ -157,24 +158,15 @@ const TextLabel = (props: {
 }) => {
   const { focused, accessibilityLabel, label, inactiveTintColor, style } = props
 
-  const focusedValue = useSharedValue(focused ? 1 : 0)
-  const animatedStyle = useAnimatedStyle(() => ({
-    ...styles.labelBeneath,
-    color: interpolateColor(focusedValue.value, [0, 1], [inactiveTintColor, accentColor]),
-  }))
-  useEffect(() => {
-    cancelAnimation(focusedValue)
-    focusedValue.value = withSpring(focused ? 1 : 0, { duration: 100 })
-  }, [focused, focusedValue])
   return (
-    <Animated.Text
+    <Text
       numberOfLines={1}
       accessibilityLabel={accessibilityLabel}
-      style={StyleSheet.flatten([style, animatedStyle])}
+      style={StyleSheet.flatten([style, { color: focused ? accentColor : inactiveTintColor }])}
       allowFontScaling
     >
       {label}
-    </Animated.Text>
+    </Text>
   )
 }
 const TabIcon = ({
@@ -190,13 +182,34 @@ const TabIcon = ({
 }) => {
   const activeOpacity = focused ? 1 : 0
   const inactiveOpacity = focused ? 0 : 1
+
+  const opacity = useSharedValue(focused ? 1 : 0.8)
+  const scale = useSharedValue(focused ? 1 : 0.92)
+  const rotate = useSharedValue(focused ? 0 : 0.2)
+
+  useEffect(() => {
+    if (focused) {
+      opacity.value = withSpring(1)
+      scale.value = withSpring(1)
+      rotate.value = withSpring(0)
+    } else {
+      opacity.value = 0.8
+      scale.value = 0.92
+      rotate.value = 0.2
+    }
+  }, [focused, opacity, scale, rotate])
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{ scale: scale.value }, { rotate: `${rotate.value}rad` }],
+    }
+  })
+
   return (
     <View style={styles.wrapperUikit}>
       {focused && (
-        <Animated.View
-          entering={ScaleFadeRotateIn}
-          style={[styles.icon, { opacity: activeOpacity }]}
-        >
+        <Animated.View style={[styles.icon, { opacity: activeOpacity }, animatedStyle]}>
           {renderIcon({
             focused: true,
             size: iconSize,
@@ -205,10 +218,7 @@ const TabIcon = ({
         </Animated.View>
       )}
       {!focused && (
-        <Animated.View
-          entering={ScaleFadeRotateIn}
-          style={[styles.icon, { opacity: inactiveOpacity }]}
-        >
+        <Animated.View style={[styles.icon, { opacity: inactiveOpacity }]}>
           {renderIcon({
             focused: false,
             size: iconSize,
@@ -232,7 +242,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
     backgroundColor: "transparent",
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   icon: {
     // We render the icon twice at the same position on top of each other:
@@ -259,12 +268,26 @@ const TabBarBackground = () => {
     opacity: opacity.value,
     ...styles.blurEffect,
   }))
-  const borderColor = useColor("opaqueSeparator")
-  return <AnimatedThemedBlurView style={[styles.blurEffect, animatedStyle, { borderColor }]} />
+  const separatorStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }))
+  return (
+    <View style={styles.blurEffect}>
+      <AnimatedThemedBlurView style={[styles.blurEffect, animatedStyle]} />
+      <Animated.View
+        className="bg-opaque-separator absolute top-0 w-full"
+        style={[
+          separatorStyle,
+          {
+            height: StyleSheet.hairlineWidth,
+          },
+        ]}
+      />
+    </View>
+  )
 }
 
 const TabItem = memo(
-  // eslint-disable-next-line @eslint-react/no-unstable-context-value
   ({
     route,
     focused,
@@ -298,10 +321,10 @@ const TabItem = memo(
           <Pressable
             onPress={onPress}
             onPressIn={() => {
-              pressed.value = withSpring(1, { damping: 15, stiffness: 150 })
+              pressed.value = withSpring(1, gentleSpringPreset)
             }}
             onPressOut={() => {
-              pressed.value = withSpring(0, { damping: 15, stiffness: 150 })
+              pressed.value = withSpring(0, gentleSpringPreset)
             }}
             className="flex-1 flex-col items-center justify-center"
             accessibilityLabel={accessibilityLabel}

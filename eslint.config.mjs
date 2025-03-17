@@ -42,6 +42,7 @@ export default defineConfig(
       "no-debug/no-debug-stack": "error",
       "@eslint-react/no-clone-element": 0,
       "@eslint-react/hooks-extra/no-direct-set-state-in-use-effect": 0,
+      "@eslint-react/dom/no-flush-sync": 1,
       // NOTE: Disable this temporarily
       "react-compiler/react-compiler": 0,
       "no-restricted-syntax": 0,
@@ -56,11 +57,19 @@ export default defineConfig(
       ],
     },
   },
+  // use correct tailwind config for eslint
   {
-    files: ["apps/server/**/*"],
     settings: {
       tailwindcss: {
-        config: path.join(import.meta.dirname, "apps/server/tailwind.config.ts"),
+        config: path.join(import.meta.dirname, "apps/desktop/tailwind.config.ts"),
+      },
+    },
+  },
+  {
+    files: ["apps/ssr/**/*"],
+    settings: {
+      tailwindcss: {
+        config: path.join(import.meta.dirname, "apps/ssr/tailwind.config.ts"),
       },
     },
   },

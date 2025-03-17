@@ -3,15 +3,15 @@ import { useEffect, useMemo } from "react"
 import { Animated, StyleSheet } from "react-native"
 import PagerView from "react-native-pager-view"
 
-import { views } from "@/src/constants/views"
 import { selectTimeline, useSelectedFeed, useSelectedView } from "@/src/modules/screen/atoms"
 import {
   useEntryIdsByCategory,
   useEntryIdsByFeedId,
   useEntryIdsByInboxId,
+  useEntryIdsByListId,
   useEntryIdsByView,
 } from "@/src/store/entry/hooks"
-import { useListEntryIds } from "@/src/store/list/hooks"
+import { useViewWithSubscription } from "@/src/store/subscription/hooks"
 
 import { TimelineSelectorProvider } from "../screen/TimelineSelectorProvider"
 import { EntryListSelector } from "./EntryListSelector"
@@ -48,17 +48,19 @@ export function EntryList() {
 const AnimatedPagerView = Animated.createAnimatedComponent<typeof PagerView>(PagerView)
 
 function ViewPagerList({ viewId }: { viewId: FeedViewType }) {
+  const activeViews = useViewWithSubscription()
+  const viewIdIndex = activeViews.findIndex((view) => view.view === viewId)
   const { page, pagerRef, ...rest } = usePagerView({
-    initialPage: viewId,
+    initialPage: viewIdIndex,
     onIndexChange: (index) => {
-      selectTimeline({ type: "view", viewId: index })
+      selectTimeline({ type: "view", viewId: activeViews[index]!.view })
     },
   })
 
   useEffect(() => {
-    if (page === viewId) return
-    pagerRef.current?.setPage(viewId)
-  }, [page, pagerRef, viewId])
+    if (page === viewIdIndex) return
+    pagerRef.current?.setPage(viewIdIndex)
+  }, [page, pagerRef, viewIdIndex])
 
   return (
     <AnimatedPagerView
@@ -76,10 +78,10 @@ function ViewPagerList({ viewId }: { viewId: FeedViewType }) {
     >
       {useMemo(
         () =>
-          views.map((view) => (
-            <ViewEntryList key={view.view} viewId={view.view} active={page === view.view} />
+          activeViews.map((view, index) => (
+            <ViewEntryList key={view.view} viewId={view.view} active={page === index} />
           )),
-        [page],
+        [activeViews, page],
       )}
     </AnimatedPagerView>
   )
@@ -104,7 +106,7 @@ function CategoryEntryList({ categoryName }: { categoryName: string }) {
 
 function ListEntryList({ listId }: { listId: string }) {
   const view = useSelectedView() ?? FeedViewType.Articles
-  const entryIds = useListEntryIds(listId)
+  const entryIds = useEntryIdsByListId(listId)
   if (!entryIds) return null
   return <EntryListSelector entryIds={entryIds} viewId={view} />
 }

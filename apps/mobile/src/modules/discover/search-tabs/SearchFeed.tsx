@@ -1,6 +1,5 @@
 import { FeedViewType } from "@follow/constants"
 import { useQuery } from "@tanstack/react-query"
-import { Image } from "expo-image"
 import { router } from "expo-router"
 import { useAtomValue } from "jotai"
 import type { FC } from "react"
@@ -10,9 +9,9 @@ import { ScrollView } from "react-native-gesture-handler"
 import Animated, { FadeInUp } from "react-native-reanimated"
 
 import { FeedIcon } from "@/src/components/ui/icon/feed-icon"
+import { Image } from "@/src/components/ui/image/Image"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { apiClient } from "@/src/lib/api-fetch"
-import { getImageHeaders } from "@/src/lib/image"
 import { useSubscriptionByFeedId } from "@/src/store/subscription/hooks"
 
 import { useSearchPageContext } from "../ctx"
@@ -161,12 +160,11 @@ const PreviewItem = ({ entry }: { entry: NonNullable<SearchResultItem["entries"]
       {!!firstMedia && (
         <View className="bg-gray-6 ml-auto size-[52px] shrink-0 overflow-hidden rounded-lg">
           <Image
-            source={{ uri: firstMedia.url, headers: getImageHeaders(firstMedia.url) }}
+            source={{ uri: firstMedia.url }}
             className="size-full rounded-lg"
             contentFit="cover"
-            transition={500}
             placeholder={{
-              blurHash: firstMedia.blurhash,
+              blurhash: firstMedia.blurhash,
             }}
           />
         </View>

@@ -1,9 +1,7 @@
-import { router, Stack, useNavigation } from "expo-router"
-import { TouchableOpacity, View } from "react-native"
-import { useColor } from "react-native-uikit-colors"
+import { ScrollView } from "react-native"
 
+import { NativeNavigationHeader } from "@/src/components/layouts/header/NavigationHeader"
 import { Markdown } from "@/src/components/ui/typography/Markdown"
-import { MingcuteLeftLineIcon } from "@/src/icons/mingcute_left_line"
 
 const txt = `# Terms of Service
 
@@ -86,33 +84,18 @@ export const TermsMarkdown = () => {
   return (
     <Markdown
       value={txt}
-      webViewProps={{ matchContents: true, scrollEnabled: false }}
-      style={{ padding: 16 }}
+      webViewProps={{ scrollEnabled: false, matchContents: true }}
+      style={{ padding: 16, flex: 1 }}
     />
   )
 }
 
 export default function Teams() {
-  const canGoBack = useNavigation().canGoBack()
-  const label = useColor("label")
   return (
-    <View className="flex-1">
-      <Stack.Screen
-        options={{
-          headerBackTitle: "Login",
-          headerTitle: "Terms of Service",
-          headerShown: true,
-          headerLeft: canGoBack
-            ? () => (
-                <TouchableOpacity hitSlop={10} onPress={() => router.back()}>
-                  <MingcuteLeftLineIcon height={20} width={20} color={label} />
-                </TouchableOpacity>
-              )
-            : undefined,
-        }}
-      />
+    <ScrollView className="bg-system-background" contentInsetAdjustmentBehavior="always">
+      <NativeNavigationHeader headerTitle="Terms of Service" />
 
       <TermsMarkdown />
-    </View>
+    </ScrollView>
   )
 }

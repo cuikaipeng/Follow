@@ -34,14 +34,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
-    supportsTablet: false,
+    supportsTablet: true,
     bundleIdentifier: "is.follow",
     usesAppleSignIn: true,
     infoPlist: {
       LSApplicationCategoryType: "public.app-category.news",
       ITSAppUsesNonExemptEncryption: false,
       UIBackgroundModes: ["audio"],
+      LSApplicationQueriesSchemes: ["bilibili", "youtube"],
     },
+    googleServicesFile: "./build/GoogleService-Info.plist",
   },
   android: {
     package: "is.follow",
@@ -49,6 +51,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: adaptiveIconPath,
       backgroundColor: "#FF5C00",
     },
+    googleServicesFile: "./build/google-services.json",
   },
   web: {
     bundler: "metro",
@@ -78,7 +81,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    "expo-build-properties",
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          useFrameworks: "static",
+        },
+      },
+    ],
     "expo-sqlite",
     [
       "expo-media-library",
@@ -99,6 +109,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     [require("./scripts/with-follow-app-delegate.js")],
     "expo-secure-store",
+    "@react-native-firebase/app",
+    "@react-native-firebase/crashlytics",
+    "@react-native-firebase/app-check",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Allow $(PRODUCT_NAME) to access your photos.",
+      },
+    ],
+    "react-native-video",
   ],
   experiments: {
     typedRoutes: true,

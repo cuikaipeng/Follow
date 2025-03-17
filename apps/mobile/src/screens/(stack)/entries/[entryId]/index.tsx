@@ -1,7 +1,7 @@
 import { FeedViewType } from "@follow/constants"
 import { useLocalSearchParams } from "expo-router"
-import { atom } from "jotai"
-import { useMemo } from "react"
+import { atom, useAtomValue } from "jotai"
+import { useEffect, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -11,10 +11,13 @@ import { SafeNavigationScrollView } from "@/src/components/layouts/views/SafeNav
 import { EntryContentWebView } from "@/src/components/native/webview/EntryContentWebView"
 import { PortalHost } from "@/src/components/ui/portal"
 import { openLink } from "@/src/lib/native"
-import { EntryContentContext } from "@/src/modules/entry-content/ctx"
+import { EntryContentContext, useEntryContentContext } from "@/src/modules/entry-content/ctx"
 import { EntryAISummary } from "@/src/modules/entry-content/EntryAISummary"
 import { useEntry, usePrefetchEntryContent } from "@/src/store/entry/hooks"
+import { entrySyncServices } from "@/src/store/entry/store"
+import type { EntryModel } from "@/src/store/entry/types"
 import { useFeed } from "@/src/store/feed/hooks"
+import { summarySyncService } from "@/src/store/summary/store"
 import { useAutoMarkAsRead } from "@/src/store/unread/hooks"
 
 import { EntrySocialTitle, EntryTitle } from "../../../../modules/entry-content/EntryTitle"
@@ -33,10 +36,23 @@ export default function EntryDetailPage() {
   const insets = useSafeAreaInsets()
   const ctxValue = useMemo(
     () => ({
-      showAISummaryAtom: atom(false),
+      showAISummaryAtom: atom(entry?.settings?.summary || false),
+      showReadabilityAtom: atom(entry?.settings?.readability || false),
     }),
-    [],
+    [entry?.settings?.readability, entry?.settings?.summary],
   )
+
+  useEffect(() => {
+    if (entry?.settings?.readability) {
+      entrySyncServices.fetchEntryReadabilityContent(entryId)
+    }
+  }, [entry?.settings?.readability, entryId])
+
+  useEffect(() => {
+    if (entry?.settings?.summary) {
+      summarySyncService.generateSummary(entryId)
+    }
+  }, [entry?.settings?.summary, entryId])
 
   return (
     <EntryContentContext.Provider value={ctxValue}>
@@ -46,7 +62,7 @@ export default function EntryDetailPage() {
             automaticallyAdjustContentInsets={false}
             className="bg-system-background"
           >
-            <Pressable onPress={() => entry?.url && openLink(entry.url)} className="relative py-3">
+            <Pressable onPress={() => entry?.url && openLink(entry.url)} className="relative py-4">
               {({ pressed }) => (
                 <>
                   {pressed && (
@@ -70,7 +86,7 @@ export default function EntryDetailPage() {
             <EntryAISummary entryId={entryId as string} />
             {entry && (
               <View className="mt-3">
-                <EntryContentWebView entry={entry} />
+                <EntryContentWebViewWithContext entry={entry} />
               </View>
             )}
             {viewType === FeedViewType.SocialMedia && (
@@ -85,6 +101,12 @@ export default function EntryDetailPage() {
   )
 }
 
+const EntryContentWebViewWithContext = ({ entry }: { entry: EntryModel }) => {
+  const { showReadabilityAtom } = useEntryContentContext()
+  const showReadability = useAtomValue(showReadabilityAtom)
+  return <EntryContentWebView entry={entry} showReadability={showReadability} />
+}
+
 const EntryInfo = ({ entryId }: { entryId: string }) => {
   const entry = useEntry(entryId)
 
@@ -93,9 +115,9 @@ const EntryInfo = ({ entryId }: { entryId: string }) => {
   const { publishedAt } = entry
 
   return (
-    <View className="mt-3 px-4">
+    <View className="mt-4 px-4">
       <FeedInfo feedId={entry.feedId as string} />
-      <Text className="text-secondary-label">
+      <Text className="text-label text-sm leading-tight">
         {publishedAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
       </Text>
     </View>
@@ -121,7 +143,7 @@ const FeedInfo = ({ feedId }: { feedId: string }) => {
   if (!feed) return null
   return (
     <View className="mb-2">
-      <Text className="text-secondary-label">{feed.title?.trim()}</Text>
+      <Text className="text-label text-sm leading-tight">{feed.title?.trim()}</Text>
     </View>
   )
 }

@@ -1,24 +1,28 @@
 import { useTypeScriptHappyCallback } from "@follow/hooks"
-import { getDefaultHeaderHeight } from "@react-navigation/elements"
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack"
-import { router, Stack, useNavigation } from "expo-router"
+import { Stack } from "expo-router"
 import type { FC, PropsWithChildren } from "react"
 import { useContext, useEffect, useMemo, useRef, useState } from "react"
-import type { ScrollView, ScrollViewProps } from "react-native"
-import { Animated as RNAnimated, TouchableOpacity, useAnimatedValue, View } from "react-native"
+import type {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  ScrollViewProps,
+} from "react-native"
+import { Animated as RNAnimated, useAnimatedValue, View } from "react-native"
+import type { SharedValue } from "react-native-reanimated"
 import type { ReanimatedScrollEvent } from "react-native-reanimated/lib/typescript/hook/commonTypes"
 import { useSafeAreaFrame, useSafeAreaInsets } from "react-native-safe-area-context"
-import { useColor } from "react-native-uikit-colors"
 
 import {
   AttachNavigationScrollViewContext,
   SetAttachNavigationScrollViewContext,
 } from "@/src/components/layouts/tabbar/contexts/AttachNavigationScrollViewContext"
 import { useBottomTabBarHeight } from "@/src/components/layouts/tabbar/hooks"
-import { MingcuteLeftLineIcon } from "@/src/icons/mingcute_left_line"
 
 import { AnimatedScrollView } from "../../common/AnimatedComponents"
-import { NavigationHeader } from "../header/NavigationHeader"
+import { InternalNavigationHeader } from "../header/NavigationHeader"
+import { getDefaultHeaderHeight } from "../utils"
 import { NavigationContext } from "./NavigationContext"
 import {
   NavigationHeaderHeightContext,
@@ -32,6 +36,9 @@ type SafeNavigationScrollViewProps = Omit<ScrollViewProps, "onScroll"> & {
   // For scroll view content adjustment behavior
   withTopInset?: boolean
   withBottomInset?: boolean
+
+  // to sharedValue
+  reanimatedScrollY?: SharedValue<number>
 } & PropsWithChildren
 
 export const SafeNavigationScrollView: FC<SafeNavigationScrollViewProps> = ({
@@ -42,6 +49,7 @@ export const SafeNavigationScrollView: FC<SafeNavigationScrollViewProps> = ({
 
   withBottomInset = false,
   withTopInset = false,
+  reanimatedScrollY,
 
   ...props
 }) => {
@@ -72,6 +80,11 @@ export const SafeNavigationScrollView: FC<SafeNavigationScrollViewProps> = ({
             ref={scrollViewRef}
             onScroll={RNAnimated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
               useNativeDriver: true,
+              listener(event: NativeSyntheticEvent<NativeScrollEvent>) {
+                if (reanimatedScrollY) {
+                  reanimatedScrollY.value = event.nativeEvent.contentOffset.y
+                }
+              },
             })}
             automaticallyAdjustContentInsets={false}
             automaticallyAdjustsScrollIndicatorInsets={false}
@@ -104,8 +117,6 @@ export const NavigationBlurEffectHeader = ({
   headerHideableBottom?: () => React.ReactNode
   headerTitleAbsolute?: boolean
 }) => {
-  const canBack = useNavigation().canGoBack()
-
   const navigationContext = useContext(NavigationContext)!
 
   const setHeaderHeight = useContext(SetNavigationHeaderHeightContext)
@@ -119,13 +130,14 @@ export const NavigationBlurEffectHeader = ({
         headerTransparent: true,
 
         headerShown: true,
-        headerLeft: headerLeft ?? (canBack ? () => <NavigationHeaderBackButton /> : undefined),
+        headerLeft,
 
         header: useTypeScriptHappyCallback(
           ({ options }) => (
             <NavigationContext.Provider value={navigationContext}>
               <SetNavigationHeaderHeightContext.Provider value={setHeaderHeight}>
-                <NavigationHeader
+                <InternalNavigationHeader
+                  {...options}
                   modal={options.presentation === "modal" || options.presentation === "formSheet"}
                   title={options.title}
                   headerRight={options.headerRight}
@@ -145,17 +157,5 @@ export const NavigationBlurEffectHeader = ({
         ...rest,
       }}
     />
-  )
-}
-
-export const NavigationHeaderBackButton = () => {
-  return <NavigationHeaderBackButtonImpl />
-}
-const NavigationHeaderBackButtonImpl = () => {
-  const label = useColor("label")
-  return (
-    <TouchableOpacity hitSlop={10} onPress={() => router.back()}>
-      <MingcuteLeftLineIcon height={20} width={20} color={label} />
-    </TouchableOpacity>
   )
 }

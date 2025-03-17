@@ -1,7 +1,7 @@
 import { useIsFocused } from "@react-navigation/native"
 import * as FileSystem from "expo-file-system"
 import type { FC, RefObject } from "react"
-import { Fragment, useContext, useEffect } from "react"
+import { Fragment, useContext, useEffect, useMemo } from "react"
 import type { ScrollView } from "react-native"
 import { Alert, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -24,9 +24,9 @@ import { RadaCuteFiIcon } from "@/src/icons/rada_cute_fi"
 import { SafeLockFilledIcon } from "@/src/icons/safe_lock_filled"
 import { Settings1CuteFiIcon } from "@/src/icons/settings_1_cute_fi"
 import { StarCuteFiIcon } from "@/src/icons/star_cute_fi"
-import { TrophyCuteFiIcon } from "@/src/icons/trophy_cute_fi"
 import { UserSettingCuteFiIcon } from "@/src/icons/user_setting_cute_fi"
 import { signOut } from "@/src/lib/auth"
+import { useWhoami } from "@/src/store/user/hooks"
 
 import { useSettingsNavigation } from "./hooks"
 
@@ -39,31 +39,9 @@ interface GroupNavigationLink {
   ) => void
   iconBackgroundColor: string
 
+  anonymous?: boolean
   todo?: boolean
 }
-const UserGroupNavigationLinks: GroupNavigationLink[] = [
-  // {
-  //   label: "Profile",
-  //   icon: User3CuteFiIcon,
-  //   onPress: (navigation, scrollRef) => {
-  //     scrollRef.current?.scrollTo({ y: 0, animated: true })
-  //     setTimeout(() => {
-  //       navigation.navigate("Profile")
-  //     }, 100)
-  //   },
-  //   iconBackgroundColor: "#4F46E5",
-  // },
-  {
-    label: "Achievement",
-    icon: TrophyCuteFiIcon,
-    onPress: (navigation) => {
-      navigation.navigate("Achievement")
-    },
-    iconBackgroundColor: "#6366F1",
-    todo: true,
-  },
-]
-
 const SettingGroupNavigationLinks: GroupNavigationLink[] = [
   {
     label: "General",
@@ -81,6 +59,7 @@ const SettingGroupNavigationLinks: GroupNavigationLink[] = [
     },
     iconBackgroundColor: "#FBBF24",
     todo: true,
+    anonymous: false,
   },
   {
     label: "Appearance",
@@ -97,6 +76,7 @@ const SettingGroupNavigationLinks: GroupNavigationLink[] = [
       navigation.navigate("Data")
     },
     iconBackgroundColor: "#CBAD6D",
+    anonymous: false,
   },
   {
     label: "Account",
@@ -105,6 +85,7 @@ const SettingGroupNavigationLinks: GroupNavigationLink[] = [
       navigation.navigate("Account")
     },
     iconBackgroundColor: "#d08700",
+    anonymous: false,
   },
 ]
 
@@ -116,7 +97,7 @@ const DataGroupNavigationLinks: GroupNavigationLink[] = [
       navigation.navigate("Actions")
     },
     iconBackgroundColor: "#059669",
-    todo: true,
+    anonymous: false,
   },
 
   {
@@ -127,6 +108,7 @@ const DataGroupNavigationLinks: GroupNavigationLink[] = [
     },
     iconBackgroundColor: "#10B981",
     todo: true,
+    anonymous: false,
   },
   {
     label: "Lists",
@@ -136,6 +118,7 @@ const DataGroupNavigationLinks: GroupNavigationLink[] = [
     },
     iconBackgroundColor: "#34D399",
     // todo: true,
+    anonymous: false,
   },
 ]
 
@@ -179,6 +162,7 @@ const ActionGroupNavigationLinks: GroupNavigationLink[] = [
       ])
     },
     iconBackgroundColor: "#F87181",
+    anonymous: false,
   },
 ]
 
@@ -188,29 +172,29 @@ const NavigationLinkGroup: FC<{
   scrollRef: RefObject<ScrollView>
 }> = ({ links, navigation, scrollRef }) => (
   <GroupedInsetListCard>
-    {links.map((link) => (
-      <GroupedInsetListNavigationLink
-        key={link.label}
-        label={link.label + (link.todo ? " (Coming Soon)" : "")}
-        disabled={link.todo}
-        icon={
-          <GroupedInsetListNavigationLinkIcon backgroundColor={link.iconBackgroundColor}>
-            <link.icon height={18} width={18} color="#fff" />
-          </GroupedInsetListNavigationLinkIcon>
-        }
-        onPress={() => {
-          if (link.todo) {
-            return
+    {links.map((link) => {
+      if (link.todo) {
+        return null
+      }
+      return (
+        <GroupedInsetListNavigationLink
+          key={link.label}
+          label={link.label}
+          icon={
+            <GroupedInsetListNavigationLinkIcon backgroundColor={link.iconBackgroundColor}>
+              <link.icon height={18} width={18} color="#fff" />
+            </GroupedInsetListNavigationLinkIcon>
           }
-          link.onPress(navigation, scrollRef)
-        }}
-      />
-    ))}
+          onPress={() => {
+            link.onPress(navigation, scrollRef)
+          }}
+        />
+      )
+    })}
   </GroupedInsetListCard>
 )
 
 const navigationGroups = [
-  UserGroupNavigationLinks,
   DataGroupNavigationLinks,
   SettingGroupNavigationLinks,
   PrivacyGroupNavigationLinks,
@@ -230,12 +214,26 @@ export const SettingsList: FC<{ scrollRef: RefObject<ScrollView> }> = ({ scrollR
 
   const insets = useSafeAreaInsets()
   const tabBarHeight = useBottomTabBarHeight()
+
+  const whoami = useWhoami()
+
+  const filteredNavigationGroups = useMemo(() => {
+    if (whoami) return navigationGroups
+
+    return navigationGroups
+      .map((group) => {
+        const filteredGroup = group.filter((link) => link.anonymous !== false)
+        if (filteredGroup.length === 0) return false
+        return filteredGroup
+      })
+      .filter((group) => group !== false)
+  }, [whoami])
   return (
     <View
       className="bg-system-grouped-background flex-1 py-4"
       style={{ paddingBottom: insets.bottom + tabBarHeight }}
     >
-      {navigationGroups.map((group, index) => (
+      {filteredNavigationGroups.map((group, index) => (
         <Fragment key={`nav-group-${index}`}>
           <NavigationLinkGroup
             key={`nav-group-${index}`}
@@ -243,7 +241,7 @@ export const SettingsList: FC<{ scrollRef: RefObject<ScrollView> }> = ({ scrollR
             navigation={navigation}
             scrollRef={scrollRef}
           />
-          {index < navigationGroups.length - 1 && <View className="h-8" />}
+          {index < filteredNavigationGroups.length - 1 && <View className="h-8" />}
         </Fragment>
       ))}
     </View>

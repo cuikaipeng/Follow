@@ -5,7 +5,7 @@ import { Share, Text, View } from "react-native"
 
 import {
   EntryContentWebView,
-  setWebViewEntry,
+  preloadWebViewEntry,
 } from "@/src/components/native/webview/EntryContentWebView"
 import { ContextMenu } from "@/src/components/ui/context-menu"
 import { PortalHost } from "@/src/components/ui/portal"
@@ -25,7 +25,7 @@ export const EntryItemContextMenu = ({ id, children }: PropsWithChildren<{ id: s
 
   const handlePressPreview = useCallback(() => {
     if (!entry) return
-    setWebViewEntry(entry)
+    preloadWebViewEntry(entry)
     router.push(`/entries/${id}`)
   }, [entry, id])
 
@@ -41,7 +41,7 @@ export const EntryItemContextMenu = ({ id, children }: PropsWithChildren<{ id: s
             <PortalHost>
               <View className="bg-system-background flex-1">
                 <Text className="text-label mt-5 p-4 text-2xl font-semibold" numberOfLines={2}>
-                  {entry.title}
+                  {entry.title?.trim()}
                 </Text>
                 <EntryContentWebView entry={entry} />
               </View>

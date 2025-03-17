@@ -58,11 +58,11 @@ export function Select<T>({
           style={wrapperStyle}
         >
           <Text
-            className="flex-1 text-right font-semibold text-accent"
+            className="text-accent flex-1 text-right font-semibold"
             ellipsizeMode="middle"
             numberOfLines={1}
           >
-            {valueToLabelMap.get(currentValue)}
+            {valueToLabelMap.get(currentValue) || "Select"}
           </Text>
           <View className="ml-auto shrink-0 pl-1">
             <MingcuteDownLineIcon color={accentColor} height={18} width={18} />

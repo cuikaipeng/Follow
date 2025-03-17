@@ -1,16 +1,22 @@
-import type { FeedViewType } from "@follow/constants"
+import { FeedViewType } from "@follow/constants"
+import { router } from "expo-router"
 import type { FC, PropsWithChildren } from "react"
-import { useCallback } from "react"
-import { Alert, Clipboard } from "react-native"
+import { useCallback, useMemo } from "react"
+import type { ListRenderItemInfo } from "react-native"
+import { Alert, Clipboard, FlatList, View } from "react-native"
 
 import { ContextMenu } from "@/src/components/ui/context-menu"
 import { views } from "@/src/constants/views"
 import { toast } from "@/src/lib/toast"
+import { useEntryIdsByFeedId } from "@/src/store/entry/hooks"
 import { getFeed } from "@/src/store/feed/getter"
 import { getSubscription } from "@/src/store/subscription/getter"
-import { useListSubscriptionCategory } from "@/src/store/subscription/hooks"
+import { useSubscriptionCategory } from "@/src/store/subscription/hooks"
 import { subscriptionSyncService } from "@/src/store/subscription/store"
 import { unreadSyncService } from "@/src/store/unread/store"
+
+import { ItemSeparator } from "../entry-list/ItemSeparator"
+import { EntryNormalItem } from "../entry-list/templates/EntryNormalItem"
 
 export const SubscriptionFeedItemContextMenu: FC<
   PropsWithChildren & {
@@ -18,13 +24,23 @@ export const SubscriptionFeedItemContextMenu: FC<
     view?: FeedViewType
   }
 > = ({ id, children, view }) => {
-  const allCategories = useListSubscriptionCategory(view)
+  const allCategories = useSubscriptionCategory(view)
 
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
 
       <ContextMenu.Content>
+        {view === FeedViewType.Articles && (
+          <ContextMenu.Preview
+            size="STRETCH"
+            onPress={() => {
+              router.push(`/feeds/${id}`)
+            }}
+          >
+            {() => <PreviewFeeds id={id} view={view!} />}
+          </ContextMenu.Preview>
+        )}
         <ContextMenu.Item
           key="MarkAllAsRead"
           onSelect={useCallback(() => {
@@ -39,23 +55,23 @@ export const SubscriptionFeedItemContextMenu: FC<
           />
         </ContextMenu.Item>
 
-        <ContextMenu.Item key="Claim">
+        {/* <ContextMenu.Item key="Claim">
           <ContextMenu.ItemTitle>Claim</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "checkmark.seal",
             }}
           />
-        </ContextMenu.Item>
+        </ContextMenu.Item> */}
 
-        <ContextMenu.Item key="Boost">
+        {/* <ContextMenu.Item key="Boost">
           <ContextMenu.ItemTitle>Boost</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "bolt",
             }}
           />
-        </ContextMenu.Item>
+        </ContextMenu.Item> */}
 
         <ContextMenu.Sub key="AddToCategory">
           <ContextMenu.SubTrigger key="SubTrigger/AddToCategory">
@@ -241,5 +257,27 @@ export const SubscriptionFeedCategoryContextMenu = ({
         </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Root>
+  )
+}
+
+const PreviewFeeds = (props: { id: string; view: FeedViewType }) => {
+  const { id: feedId } = props
+  const entryIds = useEntryIdsByFeedId(feedId)
+
+  const renderItem = useCallback(
+    ({ item: id }: ListRenderItemInfo<string>) => (
+      <EntryNormalItem key={id} entryId={id} extraData="" />
+    ),
+    [],
+  )
+  return (
+    <View className="bg-system-background size-full flex-1">
+      <FlatList
+        scrollEnabled={false}
+        data={useMemo(() => entryIds.slice(0, 5), [entryIds])}
+        renderItem={renderItem}
+        ItemSeparatorComponent={ItemSeparator}
+      />
+    </View>
   )
 }

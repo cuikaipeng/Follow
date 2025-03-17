@@ -4,14 +4,14 @@ import { FetchError, ofetch } from "ofetch"
 
 import { userActions } from "../store/user/store"
 import { getCookie } from "./auth"
-import { getApiUrl } from "./env"
+import { proxyEnv } from "./proxy-env"
 
 const { hc } = require("hono/dist/cjs/client/client") as typeof import("hono/client")
 
 export const apiFetch = ofetch.create({
   retry: false,
 
-  baseURL: getApiUrl(),
+  baseURL: proxyEnv.VITE_API_URL,
   onRequest: async (ctx) => {
     const { options, request } = ctx
     if (__DEV__) {
@@ -47,7 +47,7 @@ export const apiFetch = ofetch.create({
   },
 })
 
-export const apiClient = hc<AppType>(getApiUrl(), {
+export const apiClient = hc<AppType>(proxyEnv.VITE_API_URL, {
   fetch: async (input: any, options = {}) =>
     apiFetch(input.toString(), options).catch((err) => {
       throw err

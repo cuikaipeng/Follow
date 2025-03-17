@@ -40,15 +40,20 @@ type Subscription = Awaited<ReturnType<typeof apiClient.subscriptions.$get>>["da
  */
 export const ProfileScreen = () => {
   const scrollY = useSharedValue(0)
-  const { data: subscriptions, isLoading, isError } = useShareSubscription()
+  const whoami = useWhoami()
+  const {
+    data: subscriptions,
+    isLoading,
+    isError,
+  } = useShareSubscription({
+    userId: whoami?.id!,
+  })
 
   const headerOpacity = useSharedValue(0)
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y
     headerOpacity.value = scrollY.value / 100
   })
-
-  const whoami = useWhoami()
 
   useEffect(() => {
     if (isError) {
@@ -75,7 +80,7 @@ export const ProfileScreen = () => {
         onScroll={scrollHandler}
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
-        <UserHeaderBanner scrollY={scrollY} />
+        {!!whoami?.id && <UserHeaderBanner scrollY={scrollY} userId={whoami.id} />}
 
         <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
 
@@ -101,7 +106,7 @@ export const ProfileScreen = () => {
       {/* Header */}
       <Animated.View
         pointerEvents="none"
-        className="border-b-hairline border-opaque-separator absolute inset-x-0 top-0 flex-row items-center px-4 pb-2 pt-safe"
+        className="border-b-hairline border-opaque-separator pt-safe absolute inset-x-0 top-0 flex-row items-center px-4 pb-2"
         style={{ opacity: headerOpacity }}
       >
         <BlurEffect />

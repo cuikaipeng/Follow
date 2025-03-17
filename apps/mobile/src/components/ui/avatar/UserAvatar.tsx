@@ -1,39 +1,70 @@
 import { cn } from "@follow/utils/src/utils"
 import { Text, View } from "react-native"
 
-import { ProxiedImage } from "../image/ProxiedImage"
+import { User4CuteReIcon } from "@/src/icons/user_4_cute_re"
+
+import { Galeria } from "../image/galeria"
+import { Image } from "../image/Image"
 
 interface UserAvatarProps {
   image?: string | null
   size?: number
-  name: string
+  name?: string | null
   className?: string
+  color?: string
+  noPreview?: boolean
 }
-export const UserAvatar = ({ image, size = 24, name, className }: UserAvatarProps) => {
+
+export const UserAvatar = ({
+  image,
+  size = 24,
+  name,
+  className,
+  color,
+  noPreview,
+}: UserAvatarProps) => {
   if (!image) {
     return (
       <View
         className={cn(
-          "bg-secondary-system-background items-center justify-center rounded-full",
+          "items-center justify-center rounded-full",
+          name && "bg-secondary-system-background",
           className,
         )}
         style={{ width: size, height: size }}
       >
-        <Text className="text-secondary-label text-xs">{name.slice(0, 2)}</Text>
+        {name ? (
+          <Text
+            className="text-secondary-label p-2 text-center uppercase"
+            style={{ fontSize: size }}
+            adjustsFontSizeToFit
+          >
+            {name.slice(0, 2)}
+          </Text>
+        ) : (
+          <User4CuteReIcon width={size} height={size} color={color} />
+        )}
       </View>
     )
   }
 
-  return (
-    <ProxiedImage
+  const imageContent = (
+    <Image
       source={{ uri: image }}
       className={cn("rounded-full", className)}
       style={{ width: size, height: size }}
-      resizeMode="cover"
       proxy={{
         width: size,
         height: size,
       }}
     />
+  )
+
+  return noPreview ? (
+    imageContent
+  ) : (
+    <Galeria urls={[image]}>
+      <Galeria.Image index={0}>{imageContent}</Galeria.Image>
+    </Galeria>
   )
 }

@@ -1,6 +1,7 @@
 import { cn } from "@follow/utils"
 import { router } from "expo-router"
 import type { PropsWithChildren } from "react"
+import { useCallback } from "react"
 import { TouchableOpacity, View } from "react-native"
 
 import { setGeneralSetting, useGeneralSettingKey } from "@/src/atoms/settings/general"
@@ -11,6 +12,7 @@ import { CheckCircleCuteReIcon } from "@/src/icons/check_circle_cute_re"
 import { RoundCuteFiIcon } from "@/src/icons/round_cute_fi"
 import { RoundCuteReIcon } from "@/src/icons/round_cute_re"
 import { Dialog } from "@/src/lib/dialog"
+import { toast } from "@/src/lib/toast"
 import { useWhoami } from "@/src/store/user/hooks"
 import { accentColor, useColor } from "@/src/theme/colors"
 
@@ -23,11 +25,25 @@ const ActionGroup = ({ children, className }: PropsWithChildren<{ className?: st
 
 export function HomeLeftAction() {
   const user = useWhoami()
-  if (!user) return null
+
+  const handlePress = useCallback(() => {
+    if (user) {
+      router.push("/profile")
+    } else {
+      router.push("/login")
+    }
+  }, [user])
+
   return (
     <ActionGroup className="ml-2">
-      <TouchableOpacity onPress={() => router.push("/profile")}>
-        <UserAvatar image={user.image} name={user.name!} size={28} className="rounded-full" />
+      <TouchableOpacity onPress={handlePress}>
+        <UserAvatar
+          image={user?.image}
+          name={user?.name}
+          className="rounded-full"
+          color={accentColor}
+          noPreview
+        />
       </TouchableOpacity>
     </ActionGroup>
   )
@@ -69,6 +85,7 @@ export const UnreadOnlyActionButton = ({ variant = "primary" }: HeaderActionButt
       selectedIcon={<RoundCuteFiIcon height={size} width={size} color={color} />}
       onPress={() => {
         setGeneralSetting("unreadOnly", !unreadOnly)
+        toast.info(`Showing ${unreadOnly ? "all" : "unread"} entries`, { position: "bottom" })
       }}
       selected={unreadOnly}
       overlay={false}

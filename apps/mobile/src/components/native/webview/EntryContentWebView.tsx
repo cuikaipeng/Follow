@@ -1,5 +1,6 @@
 import { clsx } from "@follow/utils"
 import { requireNativeView } from "expo"
+import { useAtom } from "jotai"
 import * as React from "react"
 import { useEffect } from "react"
 import type { ViewProps } from "react-native"
@@ -10,6 +11,7 @@ import { BugCuteReIcon } from "@/src/icons/bug_cute_re"
 import type { EntryModel } from "@/src/store/entry/types"
 
 import { Portal } from "../../ui/portal"
+import { sharedWebViewHeightAtom } from "./atom"
 import { htmlUrl } from "./constants"
 import { prepareEntryRenderWebView, SharedWebViewModule } from "./index"
 
@@ -23,6 +25,7 @@ const NativeView: React.ComponentType<
 type EntryContentWebViewProps = {
   entry: EntryModel
   noMedia?: boolean
+  showReadability?: boolean
 }
 
 const setCodeTheme = (light: string, dark: string) => {
@@ -31,11 +34,12 @@ const setCodeTheme = (light: string, dark: string) => {
   )
 }
 
-export const setWebViewEntry = (entry: EntryModel) => {
+const setWebViewEntry = (entry: EntryModel) => {
   SharedWebViewModule.evaluateJavaScript(
     `setEntry(JSON.parse(${JSON.stringify(JSON.stringify(entry))}))`,
   )
 }
+export { setWebViewEntry as preloadWebViewEntry }
 
 const setNoMedia = (value: boolean) => {
   SharedWebViewModule.evaluateJavaScript(`setNoMedia(${value})`)
@@ -45,15 +49,23 @@ const setReaderRenderInlineStyle = (value: boolean) => {
   SharedWebViewModule.evaluateJavaScript(`setReaderRenderInlineStyle(${value})`)
 }
 
+const setShowReadability = (value: boolean) => {
+  SharedWebViewModule.evaluateJavaScript(`setShowReadability(${value})`)
+}
+
 export function EntryContentWebView(props: EntryContentWebViewProps) {
-  const [contentHeight, setContentHeight] = React.useState(0)
+  const [contentHeight, setContentHeight] = useAtom(sharedWebViewHeightAtom)
 
   const codeThemeLight = useUISettingKey("codeHighlightThemeLight")
   const codeThemeDark = useUISettingKey("codeHighlightThemeDark")
   const readerRenderInlineStyle = useUISettingKey("readerRenderInlineStyle")
-  const { entry, noMedia } = props
+  const { entry, noMedia, showReadability } = props
 
   const [mode, setMode] = React.useState<"normal" | "debug">("normal")
+
+  useEffect(() => {
+    setShowReadability(!!showReadability)
+  }, [showReadability])
 
   useEffect(() => {
     setNoMedia(!!noMedia)
@@ -67,7 +79,7 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
     setCodeTheme(codeThemeLight, codeThemeDark)
   }, [codeThemeLight, codeThemeDark, mode])
 
-  React.useEffect(() => {
+  useEffect(() => {
     setWebViewEntry(entry)
   }, [entry])
 
@@ -94,7 +106,7 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
       </View>
 
       <Portal>
-        {!entry.content && (
+        {(showReadability ? !entry.readabilityContent : !entry.content) && (
           <View className="absolute inset-0 items-center justify-center">
             <ActivityIndicator />
           </View>
@@ -102,7 +114,7 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
       </Portal>
       {__DEV__ && (
         <Portal>
-          <View className="absolute left-4 flex-row gap-4 bottom-safe-offset-2">
+          <View className="bottom-safe-offset-2 absolute left-4 flex-row gap-4">
             <TouchableOpacity
               className={clsx(
                 "flex size-12 items-center justify-center rounded-full",
