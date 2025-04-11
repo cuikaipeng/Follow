@@ -1,31 +1,25 @@
 import { clsx } from "@follow/utils"
-import { requireNativeView } from "expo"
+import { Portal } from "@gorhom/portal"
 import { useAtom } from "jotai"
 import * as React from "react"
 import { useEffect } from "react"
-import type { ViewProps } from "react-native"
-import { ActivityIndicator, TouchableOpacity, View } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 
 import { useUISettingKey } from "@/src/atoms/settings/ui"
 import { BugCuteReIcon } from "@/src/icons/bug_cute_re"
-import type { EntryModel } from "@/src/store/entry/types"
+import type { EntryModel, EntryWithTranslation } from "@/src/store/entry/types"
 
-import { Portal } from "../../ui/portal"
+import { PlatformActivityIndicator } from "../../ui/loading/PlatformActivityIndicator"
 import { sharedWebViewHeightAtom } from "./atom"
 import { htmlUrl } from "./constants"
 import { prepareEntryRenderWebView, SharedWebViewModule } from "./index"
-
-const NativeView: React.ComponentType<
-  ViewProps & {
-    onContentHeightChange?: (e: { nativeEvent: { height: number } }) => void
-    url?: string
-  }
-> = requireNativeView("FOSharedWebView")
+import { NativeWebView } from "./native-webview"
 
 type EntryContentWebViewProps = {
-  entry: EntryModel
+  entry: EntryWithTranslation
   noMedia?: boolean
   showReadability?: boolean
+  showTranslation?: boolean
 }
 
 const setCodeTheme = (light: string, dark: string) => {
@@ -49,23 +43,15 @@ const setReaderRenderInlineStyle = (value: boolean) => {
   SharedWebViewModule.evaluateJavaScript(`setReaderRenderInlineStyle(${value})`)
 }
 
-const setShowReadability = (value: boolean) => {
-  SharedWebViewModule.evaluateJavaScript(`setShowReadability(${value})`)
-}
-
 export function EntryContentWebView(props: EntryContentWebViewProps) {
   const [contentHeight, setContentHeight] = useAtom(sharedWebViewHeightAtom)
 
   const codeThemeLight = useUISettingKey("codeHighlightThemeLight")
   const codeThemeDark = useUISettingKey("codeHighlightThemeDark")
   const readerRenderInlineStyle = useUISettingKey("readerRenderInlineStyle")
-  const { entry, noMedia, showReadability } = props
+  const { entry, noMedia, showReadability, showTranslation } = props
 
   const [mode, setMode] = React.useState<"normal" | "debug">("normal")
-
-  useEffect(() => {
-    setShowReadability(!!showReadability)
-  }, [showReadability])
 
   useEffect(() => {
     setNoMedia(!!noMedia)
@@ -79,9 +65,27 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
     setCodeTheme(codeThemeLight, codeThemeDark)
   }, [codeThemeLight, codeThemeDark, mode])
 
+  const entryInWebview = React.useMemo(() => {
+    if (showReadability) {
+      return {
+        ...entry,
+        content: entry.readabilityContent,
+      }
+    }
+
+    if (showTranslation) {
+      return {
+        ...entry,
+        content: entry.translation?.content || entry.content,
+      }
+    }
+
+    return entry
+  }, [entry, showReadability, showTranslation])
+
   useEffect(() => {
-    setWebViewEntry(entry)
-  }, [entry])
+    setWebViewEntry(entryInWebview)
+  }, [entryInWebview])
 
   const onceRef = React.useRef(false)
   if (!onceRef.current) {
@@ -95,10 +99,10 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
         key={mode}
         style={{ height: contentHeight, transform: [{ translateY: 0 }] }}
         onLayout={() => {
-          setWebViewEntry(entry)
+          setWebViewEntry(entryInWebview)
         }}
       >
-        <NativeView
+        <NativeWebView
           onContentHeightChange={(e) => {
             setContentHeight(e.nativeEvent.height)
           }}
@@ -108,7 +112,7 @@ export function EntryContentWebView(props: EntryContentWebViewProps) {
       <Portal>
         {(showReadability ? !entry.readabilityContent : !entry.content) && (
           <View className="absolute inset-0 items-center justify-center">
-            <ActivityIndicator />
+            <PlatformActivityIndicator />
           </View>
         )}
       </Portal>

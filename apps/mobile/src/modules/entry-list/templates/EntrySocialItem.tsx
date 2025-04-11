@@ -1,5 +1,5 @@
 import { FeedViewType } from "@follow/constants"
-import { router } from "expo-router"
+import { tracker } from "@follow/tracker"
 import { useCallback, useEffect, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
 import ReAnimated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
@@ -13,22 +13,40 @@ import { Image } from "@/src/components/ui/image/Image"
 import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { gentleSpringPreset } from "@/src/constants/spring"
+import { useNavigation } from "@/src/lib/navigation/hooks"
+import { getHorizontalScrolling } from "@/src/modules/screen/atoms"
+import { EntryDetailScreen } from "@/src/screens/(stack)/entries/[entryId]"
+import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]"
 import { useEntry } from "@/src/store/entry/hooks"
 import { useFeed } from "@/src/store/feed/hooks"
+import { useEntryTranslation } from "@/src/store/translation/hooks"
 import { unreadSyncService } from "@/src/store/unread/store"
 
 import { EntryItemContextMenu } from "../../context-menu/entry"
 import { EntryItemSkeleton } from "../EntryListContentSocial"
+import { EntryTranslation } from "./EntryTranslation"
 
 export function EntrySocialItem({ entryId }: { entryId: string }) {
   const entry = useEntry(entryId)
+  const translation = useEntryTranslation(entryId)
 
   const feed = useFeed(entry?.feedId || "")
 
+  const navigation = useNavigation()
   const handlePress = useCallback(() => {
-    unreadSyncService.markEntryAsRead(entryId)
-    router.push(`/entries/${entryId}?view=${FeedViewType.SocialMedia}`)
-  }, [entryId])
+    const isHorizontalScrolling = getHorizontalScrolling()
+    if (!isHorizontalScrolling) {
+      unreadSyncService.markEntryAsRead(entryId)
+      tracker.navigateEntry({
+        feedId: entry?.feedId!,
+        entryId,
+      })
+      navigation.pushControllerView(EntryDetailScreen, {
+        entryId,
+        view: FeedViewType.SocialMedia,
+      })
+    }
+  }, [entry?.feedId, entryId, navigation])
 
   const unreadZoomSharedValue = useSharedValue(entry?.read ? 0 : 1)
 
@@ -57,6 +75,7 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
   const memoedMediaUrlList = useMemo(() => {
     return entry?.media?.map((i) => i.url) ?? []
   }, [entry])
+
   if (!entry) return <EntryItemSkeleton />
 
   const { description, publishedAt, media } = entry
@@ -64,6 +83,7 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
   return (
     <EntryItemContextMenu id={entryId}>
       <ItemPressable
+        touchHighlight={false}
         itemStyle={ItemPressableStyle.Plain}
         className="flex flex-col gap-2 p-4 pl-6"
         onPress={handlePress}
@@ -77,7 +97,10 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
           <Pressable
             hitSlop={10}
             onPress={() => {
-              router.push(`/feeds/${entry.feedId}`)
+              if (!entry.feedId) return
+              navigation.pushControllerView(FeedScreen, {
+                feedId: entry.feedId,
+              })
             }}
           >
             {entry.authorAvatar ? (
@@ -97,12 +120,13 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
         </View>
 
         <View className="relative -mt-4">
-          <Text
+          <EntryTranslation
             numberOfLines={autoExpandLongSocialMedia ? undefined : 7}
             className="text-label ml-12 text-base"
-          >
-            {description}
-          </Text>
+            source={description}
+            target={translation?.description}
+            showTranslation={!!entry.settings?.translation}
+          />
         </View>
 
         {media && media.length > 0 && (

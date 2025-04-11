@@ -6,6 +6,7 @@ import { cp, readdir } from "node:fs/promises"
 import path, { resolve } from "node:path"
 
 import { FuseV1Options, FuseVersion } from "@electron/fuses"
+import { MakerAppX } from "@electron-forge/maker-appx"
 import { MakerDMG } from "@electron-forge/maker-dmg"
 import { MakerPKG } from "@electron-forge/maker-pkg"
 import { MakerSquirrel } from "@electron-forge/maker-squirrel"
@@ -17,7 +18,10 @@ import setLanguages from "electron-packager-languages"
 import yaml from "js-yaml"
 import { rimraf, rimrafSync } from "rimraf"
 
-const platform = process.argv[process.argv.indexOf("--platform") + 1]
+const platform = process.argv.find((arg) => arg.startsWith("--platform"))?.split("=")[1]
+const mode = process.argv.find((arg) => arg.startsWith("--mode"))?.split("=")[1]
+
+const isStaging = mode === "staging"
 
 const artifactRegex = /.*\.(?:exe|dmg|AppImage|zip)$/
 const platformNamesMap = {
@@ -95,11 +99,11 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.news",
     buildVersion: process.env.BUILD_VERSION || undefined,
     appBundleId: "is.follow",
-    icon: "resources/icon",
+    icon: isStaging ? "resources/icon-staging" : "resources/icon",
     extraResource: ["./resources/app-update.yml"],
     protocols: [
       {
-        name: "Follow",
+        name: "Folo",
         schemes: ["follow"],
       },
     ],
@@ -130,7 +134,6 @@ const config: ForgeConfig = {
       keychain: process.env.OSX_SIGN_KEYCHAIN_PATH,
       identity: process.env.OSX_SIGN_IDENTITY,
       provisioningProfile: process.env.OSX_SIGN_PROVISIONING_PROFILE_PATH,
-      preAutoEntitlements: platform !== "mas",
     },
     ...(process.env.APPLE_ID &&
       process.env.APPLE_PASSWORD &&
@@ -177,15 +180,15 @@ const config: ForgeConfig = {
       ["darwin", "mas"],
     ),
     new MakerSquirrel({
-      name: "Follow",
-      setupIcon: "resources/icon.ico",
+      name: "Folo",
+      setupIcon: isStaging ? "resources/icon-staging.ico" : "resources/icon.ico",
       iconUrl: "https://app.follow.is/favicon.ico",
     }),
     new MakerAppImage({
       config: {
         icons: [
           {
-            file: "resources/icon.png",
+            file: isStaging ? "resources/icon-staging.png" : "resources/icon.png",
             size: 256,
           },
         ],
@@ -193,11 +196,21 @@ const config: ForgeConfig = {
     }),
     new MakerPKG(
       {
-        name: "Follow",
+        name: "Folo",
         keychain: process.env.KEYCHAIN_PATH,
       },
       ["mas"],
     ),
+    new MakerAppX({
+      publisher: "CN=7CBBEB6A-9B0E-4387-BAE3-576D0ACA279E",
+      packageDisplayName: "Folo - Follow everything in one place",
+      devCert: "build/dev.pfx",
+      assets: "static/appx",
+      // @ts-ignore
+      publisherDisplayName: "Natural Selection Labs",
+      identityName: "NaturalSelectionLabs.Follow-Yourfavoritesinoneinbo",
+      packageBackgroundColor: "#FF5C00",
+    }),
   ],
   plugins: [
     // Fuses are used to enable/disable various Electron functionality
@@ -237,9 +250,13 @@ const config: ForgeConfig = {
         version: makeResults[0]?.packageJSON?.version,
         files: [],
       }
+      let basePath = ""
       makeResults = makeResults.map((result) => {
         result.artifacts = result.artifacts.map((artifact) => {
           if (artifactRegex.test(artifact)) {
+            if (!basePath) {
+              basePath = path.dirname(artifact)
+            }
             const newArtifact = `${path.dirname(artifact)}/${
               result.packageJSON.productName
             }-${result.packageJSON.version}-${
@@ -269,21 +286,21 @@ const config: ForgeConfig = {
       })
       yml.releaseDate = new Date().toISOString()
 
-      const ymlPath = `${path.dirname(makeResults[0]?.artifacts?.[0]!)}/${
-        ymlMapsMap[makeResults[0]?.platform!]
-      }`
+      if (makeResults[0]?.platform && ymlMapsMap[makeResults[0].platform] && basePath) {
+        const ymlPath = path.join(basePath, ymlMapsMap[makeResults[0].platform])
 
-      const ymlStr = yaml.dump(yml, {
-        lineWidth: -1,
-      })
-      fs.writeFileSync(ymlPath, ymlStr)
+        const ymlStr = yaml.dump(yml, {
+          lineWidth: -1,
+        })
+        fs.writeFileSync(ymlPath, ymlStr)
 
-      makeResults.push({
-        artifacts: [ymlPath],
-        platform: makeResults[0]!.platform,
-        arch: makeResults[0]!.arch,
-        packageJSON: makeResults[0]!.packageJSON,
-      })
+        makeResults.push({
+          artifacts: [ymlPath],
+          platform: makeResults[0]!.platform,
+          arch: makeResults[0]!.arch,
+          packageJSON: makeResults[0]!.packageJSON,
+        })
+      }
 
       return makeResults
     },

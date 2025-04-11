@@ -5,6 +5,7 @@ import { ActionButton } from "@follow/components/ui/button/index.js"
 import { DividerVertical } from "@follow/components/ui/divider/Divider.js"
 import { SegmentGroup, SegmentItem } from "@follow/components/ui/segment/index.js"
 import { Slider } from "@follow/components/ui/slider/index.js"
+import { tracker } from "@follow/tracker"
 import { clsx, cn } from "@follow/utils/utils"
 import {
   HoverCard,
@@ -12,6 +13,7 @@ import {
   HoverCardPortal,
   HoverCardTrigger,
 } from "@radix-ui/react-hover-card"
+import { debounce } from "es-toolkit/compat"
 import type { FC } from "react"
 import * as React from "react"
 import { useTranslation } from "react-i18next"
@@ -23,7 +25,6 @@ import {
   useSetZenMode,
   useUISettingKey,
 } from "~/atoms/settings/ui"
-import { ImpressionView } from "~/components/common/ImpressionTracker"
 import { shortcuts } from "~/constants/shortcuts"
 import { useAIDailyReportModal } from "~/modules/ai/ai-daily/useAIDailyReportModal"
 
@@ -34,19 +35,15 @@ export const DailyReportButton: FC = () => {
   const { t } = useTranslation()
 
   return (
-    <ImpressionView event="Daily Report Modal">
-      <ActionButton
-        onClick={() => {
-          present()
-          window.analytics?.capture("Daily Report Modal", {
-            click: 1,
-          })
-        }}
-        tooltip={t("entry_list_header.daily_report")}
-      >
-        <i className="i-mgc-magic-2-cute-re" />
-      </ActionButton>
-    </ImpressionView>
+    <ActionButton
+      onClick={() => {
+        present()
+        tracker.dailyReportModal()
+      }}
+      tooltip={t("entry_list_header.daily_report")}
+    >
+      <i className="i-mgc-magic-2-cute-re" />
+    </ActionButton>
   )
 }
 
@@ -129,9 +126,9 @@ export const SwitchToMasonryButton = () => {
                     max={6}
                     step={1}
                     defaultValue={[masonryColumnValue]}
-                    onValueCommit={(value) => {
+                    onValueChange={debounce((value) => {
                       setMasonryColumnValue(value[0]!)
-                    }}
+                    }, 300)}
                   />
                 </div>
               )}
@@ -150,44 +147,34 @@ export const WideModeButton = () => {
 
   const setIsZenMode = useSetZenMode()
   return (
-    <ImpressionView
-      event="Switch to Wide Mode"
-      properties={{
-        wideMode: isWideMode ? 1 : 0,
-      }}
-    >
-      <ActionButton
-        shortcut={shortcuts.layout.toggleWideMode.key}
-        onClick={() => {
-          if (isZenMode) {
-            setIsZenMode(false)
-          } else {
-            setUISetting("wideMode", !isWideMode)
-            // TODO: Remove this after useMeasure can get bounds in time
-            window.dispatchEvent(new Event("resize"))
-          }
-          window.analytics?.capture("Switch to Wide Mode", {
-            wideMode: !isWideMode ? 1 : 0,
-            click: 1,
-          })
-        }}
-        tooltip={
-          isZenMode
-            ? t("zen.exit")
-            : !isWideMode
-              ? t("entry_list_header.switch_to_widemode")
-              : t("entry_list_header.switch_to_normalmode")
+    <ActionButton
+      shortcut={shortcuts.layout.toggleWideMode.key}
+      onClick={() => {
+        if (isZenMode) {
+          setIsZenMode(false)
+        } else {
+          setUISetting("wideMode", !isWideMode)
+          // TODO: Remove this after useMeasure can get bounds in time
+          window.dispatchEvent(new Event("resize"))
         }
-      >
-        {isZenMode ? (
-          <MdiMeditation />
-        ) : (
-          <i
-            className={cn(isWideMode ? "i-mgc-align-justify-cute-re" : "i-mgc-align-left-cute-re")}
-          />
-        )}
-      </ActionButton>
-    </ImpressionView>
+        tracker.wideMode({ mode: isWideMode ? "wide" : "normal" })
+      }}
+      tooltip={
+        isZenMode
+          ? t("zen.exit")
+          : !isWideMode
+            ? t("entry_list_header.switch_to_widemode")
+            : t("entry_list_header.switch_to_normalmode")
+      }
+    >
+      {isZenMode ? (
+        <MdiMeditation />
+      ) : (
+        <i
+          className={cn(isWideMode ? "i-mgc-align-justify-cute-re" : "i-mgc-align-left-cute-re")}
+        />
+      )}
+    </ActionButton>
   )
 }
 

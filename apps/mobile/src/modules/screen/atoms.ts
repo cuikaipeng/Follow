@@ -1,18 +1,18 @@
 import { FeedViewType } from "@follow/constants"
 import { jotaiStore } from "@follow/utils"
+import { EventBus } from "@follow/utils/src/event-bus"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import { createContext, useCallback, useContext, useMemo } from "react"
+import { useTranslation } from "react-i18next"
 
 import { views } from "@/src/constants/views"
+import { getFetchEntryPayload } from "@/src/store/entry/getter"
 import { usePrefetchEntries } from "@/src/store/entry/hooks"
-import type { FetchEntriesProps } from "@/src/store/entry/types"
 import { FEED_COLLECTION_LIST } from "@/src/store/entry/utils"
 import { useFeed } from "@/src/store/feed/hooks"
 import { useInbox } from "@/src/store/inbox/hooks"
 import { useList } from "@/src/store/list/hooks"
-import { getSubscriptionByCategory } from "@/src/store/subscription/getter"
 import { useSubscription } from "@/src/store/subscription/hooks"
-
 // drawer open state
 
 const drawerOpenAtom = atom<boolean>(false)
@@ -124,46 +124,6 @@ export function useSelectedView() {
   }
 }
 
-function getFetchEntryPayload(
-  selectedFeed: SelectedTimeline | SelectedFeed,
-): FetchEntriesProps | null {
-  if (!selectedFeed) {
-    return null
-  }
-
-  let payload: FetchEntriesProps = {}
-  switch (selectedFeed.type) {
-    case "view": {
-      payload = { view: selectedFeed.viewId }
-      break
-    }
-    case "feed": {
-      payload = { feedId: selectedFeed.feedId }
-      break
-    }
-    case "category": {
-      payload = { feedId: getSubscriptionByCategory(selectedFeed.categoryName).join(",") }
-      break
-    }
-    case "list": {
-      payload = { listId: selectedFeed.listId }
-      break
-    }
-    case "inbox": {
-      payload = { inboxId: selectedFeed.inboxId }
-      break
-    }
-    // No default
-  }
-  const isCollection =
-    selectedFeed && selectedFeed.type === "feed" && selectedFeed?.feedId === FEED_COLLECTION_LIST
-  if (isCollection) {
-    payload.isCollection = true
-  }
-
-  return payload
-}
-
 export function useSelectedFeed() {
   const entryListContext = useEntryListContext()
 
@@ -174,8 +134,9 @@ export function useSelectedFeed() {
 
 export function useFetchEntriesControls() {
   const selectedFeed = useSelectedFeed()
+  const view = useSelectedView()
 
-  const payload = getFetchEntryPayload(selectedFeed)
+  const payload = getFetchEntryPayload(selectedFeed, view)
   return usePrefetchEntries(payload)
 }
 
@@ -188,6 +149,7 @@ export const useSelectedFeedTitle = () => {
   const feed = useFeed(selectedFeed && selectedFeed.type === "feed" ? selectedFeed.feedId : "")
   const list = useList(selectedFeed && selectedFeed.type === "list" ? selectedFeed.listId : "")
   const inbox = useInbox(selectedFeed && selectedFeed.type === "inbox" ? selectedFeed.inboxId : "")
+  const { t } = useTranslation("common")
 
   if (!selectedFeed) {
     return ""
@@ -195,7 +157,7 @@ export const useSelectedFeedTitle = () => {
 
   switch (selectedFeed.type) {
     case "view": {
-      return viewDef?.name
+      return viewDef?.name ? t(viewDef.name) : ""
     }
     case "feed": {
       return selectedFeed.feedId === FEED_COLLECTION_LIST ? "Collections" : (feed?.title ?? "")
@@ -207,13 +169,26 @@ export const useSelectedFeedTitle = () => {
       return list?.title
     }
     case "inbox": {
-      return inbox?.title ?? "Inbox"
+      return inbox?.title ?? t("words.inbox")
     }
   }
 }
 
-export const selectTimeline = (state: SelectedTimeline) => {
+declare module "@follow/utils/src/event-bus" {
+  export interface CustomEvent {
+    SELECT_TIMELINE: {
+      view: SelectedTimeline
+      manual: boolean
+    }
+  }
+}
+
+export const selectTimeline = (state: SelectedTimeline, manual = true) => {
   jotaiStore.set(selectedTimelineAtom, state)
+  EventBus.dispatch("SELECT_TIMELINE", {
+    view: state,
+    manual,
+  })
 }
 
 export const selectFeed = (state: SelectedFeed) => {
@@ -223,4 +198,17 @@ export const selectFeed = (state: SelectedFeed) => {
 export const useViewDefinition = (view?: FeedViewType) => {
   const viewDef = useMemo(() => views.find((v) => v.view === view), [view])
   return viewDef
+}
+
+// horizontal scrolling state
+
+const horizontalScrollingAtom = atom<boolean>(false)
+
+export const setHorizontalScrolling = (value: boolean) =>
+  jotaiStore.set(horizontalScrollingAtom, value)
+
+export const getHorizontalScrolling = () => jotaiStore.get(horizontalScrollingAtom)
+
+export const useHorizontalScrolling = () => {
+  return useAtomValue(horizontalScrollingAtom)
 }

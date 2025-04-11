@@ -183,7 +183,7 @@ class SubscriptionActions {
     listActions.upsertMany(lists)
     inboxActions.upsertMany(inboxes)
 
-    return res.data
+    return null
   }
 
   upsertMany(subscriptions: SubscriptionFlatModel[]) {
@@ -326,7 +326,13 @@ class SubscriptionActions {
     })
     tx.optimistic(() => {
       if (listId) {
-        feedUnreadActions.updateByFeedId(listId, 0)
+        const listFeedIds = getListById(listId)?.feedIds
+        if (listFeedIds) {
+          for (const feedId of listFeedIds) {
+            feedUnreadActions.updateByFeedId(feedId, 0)
+            entryActions.patchManyByFeedId(feedId, { read: true }, filter)
+          }
+        }
       } else if (inboxId) {
         feedUnreadActions.updateByFeedId(inboxId, 0)
         entryActions.patchManyByFeedId(inboxId, { read: true }, filter)
@@ -409,10 +415,14 @@ class SubscriptionActions {
     await tx.run()
   }
 
-  // TODO
-  async unfollow(feedIds: string[]) {
-    // const feed = getFeedById(feedId)
-    const feeds = feedIds.map((feedId) => getFeedById(feedId))
+  /**
+   * unfollow feed or list
+   */
+  async unfollow(feedIds?: string[]) {
+    if (!feedIds || feedIds.length === 0) return []
+
+    const feedsAndLists = feedIds.map((id) => getFeedById(id) ?? getListById(id))
+
     const tx = createTransaction<
       ReturnType<typeof get>,
       {
@@ -481,15 +491,35 @@ class SubscriptionActions {
       }
     })
     tx.execute(async () => {
-      await apiClient.subscriptions.$delete({
-        json: {
+      let args: Parameters<typeof apiClient.subscriptions.$delete>[0]["json"] = {}
+
+      if (feedIds.length === 1) {
+        const subscription = feedsAndLists[0]
+        if (!subscription) return
+
+        if (subscription.type === "list") {
+          args = {
+            listId: feedIds[0],
+          }
+        } else if (subscription.type === "feed") {
+          args = {
+            feedId: feedIds[0],
+          }
+        }
+      } else {
+        // TODO: unfollow many lists when we have the API and UI for it
+        args = {
           feedIdList: feedIds,
-        },
+        }
+      }
+
+      await apiClient.subscriptions.$delete({
+        json: args,
       })
     })
 
     await tx.run()
-    return feeds
+    return feedsAndLists
   }
 
   async changeCategoryView(

@@ -1,23 +1,27 @@
 import { FeedViewType } from "@follow/constants"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useQuery } from "@tanstack/react-query"
-import { router, useNavigation } from "expo-router"
 import { useEffect } from "react"
 import { Controller, useForm } from "react-hook-form"
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native"
+import { Alert, StyleSheet, Text, View } from "react-native"
 import { z } from "zod"
 
-import { ModalHeaderSubmitButton } from "@/src/components/common/ModalSharedComponents"
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import { HeaderSubmitTextButton } from "@/src/components/layouts/header/HeaderElements"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { FormProvider } from "@/src/components/ui/form/FormProvider"
 import { FormLabel } from "@/src/components/ui/form/Label"
 import { FormSwitch } from "@/src/components/ui/form/Switch"
 import { TextField } from "@/src/components/ui/form/TextField"
 import { GroupedInsetListCard } from "@/src/components/ui/grouped/GroupedList"
 import { IconWithFallback } from "@/src/components/ui/icon/fallback-icon"
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { PowerIcon } from "@/src/icons/power"
 import { apiClient } from "@/src/lib/api-fetch"
+import { useNavigation, useScreenIsInSheetModal } from "@/src/lib/navigation/hooks"
+import { useSetModalScreenOptions } from "@/src/lib/navigation/ScreenOptionsContext"
 import { toast } from "@/src/lib/toast"
 import { useList } from "@/src/store/list/hooks"
 import { listSyncServices } from "@/src/store/list/store"
@@ -38,7 +42,7 @@ export const FollowList = (props: { id: string }) => {
   if (isLoading) {
     return (
       <View className="mt-24 flex-1 flex-row items-start justify-center">
-        <ActivityIndicator />
+        <PlatformActivityIndicator />
       </View>
     )
   }
@@ -65,6 +69,8 @@ const Impl = (props: { id: string }) => {
   })
   const { isValid, isDirty } = form.formState
 
+  const isModal = useScreenIsInSheetModal()
+  const navigation = useNavigation()
   const submit = async () => {
     const payload = form.getValues()
 
@@ -81,7 +87,11 @@ const Impl = (props: { id: string }) => {
       await $method({
         json: body,
       })
-      router.dismiss()
+      if (isModal) {
+        navigation.dismiss()
+      } else {
+        navigation.back()
+      }
       toast.success(isSubscribed ? "List updated" : "List followed")
     }
     if (list.fee && !isSubscribed) {
@@ -109,28 +119,30 @@ const Impl = (props: { id: string }) => {
 
   const isLoading = false
 
-  const navigation = useNavigation()
+  const setModalOptions = useSetModalScreenOptions()
   useEffect(() => {
-    navigation.setOptions({
+    setModalOptions({
       gestureEnabled: !isDirty,
     })
-  }, [isDirty, navigation])
+  }, [isDirty, setModalOptions])
   return (
-    <SafeModalScrollView
+    <SafeNavigationScrollView
       className="bg-system-grouped-background"
-      contentContainerClassName="gap-y-4 mt-2"
+      contentViewClassName="gap-y-4 mt-2"
+      Header={
+        <NavigationBlurEffectHeaderView
+          title={`${isSubscribed ? "Edit" : "Follow"} - ${list?.title}`}
+          headerRight={
+            <HeaderSubmitTextButton
+              isValid={isValid}
+              onPress={form.handleSubmit(submit)}
+              isLoading={isLoading}
+              label={isSubscribed ? "Save" : "Follow"}
+            />
+          }
+        />
+      }
     >
-      <ModalHeader
-        headerTitle={`${isSubscribed ? "Edit" : "Follow"} - ${list?.title}`}
-        headerRight={
-          <ModalHeaderSubmitButton
-            isValid={isValid}
-            onPress={form.handleSubmit(submit)}
-            isLoading={isLoading}
-          />
-        }
-      />
-
       <GroupedInsetListCard className="px-5 py-4">
         <View className="flex flex-row gap-4">
           <View className="size-[50px] overflow-hidden rounded-lg">
@@ -205,7 +217,7 @@ const Impl = (props: { id: string }) => {
           )}
         </FormProvider>
       </GroupedInsetListCard>
-    </SafeModalScrollView>
+    </SafeNavigationScrollView>
   )
 }
 

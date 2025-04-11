@@ -20,7 +20,7 @@ export function Component() {
   const [search] = useSearchParams()
   const view = Number.parseInt(search.get("view") || "0")
 
-  const { t } = useTranslation("external")
+  const { t } = useTranslation()
 
   const feed = useFeed({
     id: id!,
@@ -35,11 +35,7 @@ export function Component() {
   useTitle(feed.data?.feed.title)
 
   if (feed.isLoading || !feed.data?.feed || !feedData) {
-    return (
-      <>
-        <LoadingCircle size="large" className="center fixed inset-0" />
-      </>
-    )
+    return <LoadingCircle size="large" className="center fixed inset-0" />
   }
 
   return (
@@ -89,7 +85,7 @@ export function Component() {
           variant={isSubscribed ? "outline" : undefined}
           onClick={() => {
             askOpenInFollowApp(`add?id=${id}`, () => {
-              return `/timeline/view-${view}/${id}/pending`
+              return `/timeline/view-${view}/all/pending?follow=${id}&follow_type=feed`
             })
           }}
         >

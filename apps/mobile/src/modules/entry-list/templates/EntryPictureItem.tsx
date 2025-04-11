@@ -1,3 +1,4 @@
+import { tracker } from "@follow/tracker"
 import { uniqBy } from "es-toolkit/compat"
 import { useMemo } from "react"
 import { Text, View } from "react-native"
@@ -22,7 +23,7 @@ export function EntryPictureItem({ id }: { id: string }) {
 
   if (!hasMedia) {
     return (
-      <View className="aspect-video w-full items-center justify-center">
+      <View className="w-full items-center justify-center" style={{ aspectRatio: 16 / 9 }}>
         <Text className="text-label text-center">No media available</Text>
       </View>
     )
@@ -38,6 +39,10 @@ export function EntryPictureItem({ id }: { id: string }) {
           if (!feed) {
             return
           }
+          tracker.navigateEntry({
+            feedId: item.feedId!,
+            entryId: id,
+          })
 
           showEntryGaleriaAccessory({
             author: item.author || "",

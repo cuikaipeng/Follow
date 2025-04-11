@@ -2,7 +2,7 @@
   "name": "@follow/shared",
   "type": "module",
   "private": true,
-  "author": "Follow Team",
+  "author": "Folo Team",
   "license": "GPL-3.0-only",
   "homepage": "https://github.com/RSSNext",
   "repository": {
@@ -34,12 +34,12 @@
   "dependencies": {
     "@electron-toolkit/preload": "3.0.1",
     "@electron-toolkit/tsconfig": "1.0.1",
-    "@hono/node-server": "1.13.8",
+    "@hono/node-server": "1.14.0",
     "@t3-oss/env-core": "0.12.0",
-    "better-auth": "1.2.4",
-    "drizzle-orm": "0.40.0",
-    "hono": "4.7.4",
-    "sonner": "2.0.1",
+    "better-auth": "1.2.6-beta.2",
+    "drizzle-orm": "0.41.0",
+    "hono": "4.7.5",
+    "sonner": "2.0.3",
     "zod": "3.24.2"
   }
 }

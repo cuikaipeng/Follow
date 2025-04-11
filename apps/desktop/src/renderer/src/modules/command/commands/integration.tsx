@@ -1,4 +1,5 @@
 import {
+  SimpleIconsCubox,
   SimpleIconsEagle,
   SimpleIconsInstapaper,
   SimpleIconsObsidian,
@@ -7,6 +8,7 @@ import {
   SimpleIconsReadwise,
 } from "@follow/components/ui/platform-icon/icons.js"
 import { IN_ELECTRON } from "@follow/shared/constants"
+import { tracker } from "@follow/tracker"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import type { FetchError } from "ofetch"
 import { ofetch } from "ofetch"
@@ -32,6 +34,7 @@ export const useRegisterIntegrationCommands = () => {
   useRegisterObsidianCommands()
   useRegisterOutlineCommands()
   useRegisterReadeckCommands()
+  useRegisterCuboxCommands()
 }
 
 const useRegisterEagleCommands = () => {
@@ -123,7 +126,7 @@ const useRegisterReadwiseCommands = () => {
               return
             }
             try {
-              window.analytics?.capture("integration", {
+              tracker.integration({
                 type: "readwise",
                 event: "save",
               })
@@ -163,7 +166,7 @@ const useRegisterReadwiseCommands = () => {
           },
         }),
     {
-      deps: [isReadwiseAvailable],
+      deps: [isReadwiseAvailable, readwiseToken],
     },
   )
 }
@@ -194,7 +197,7 @@ const useRegisterInstapaperCommands = () => {
             }
 
             try {
-              window.analytics?.capture("integration", {
+              tracker.integration({
                 type: "instapaper",
                 event: "save",
               })
@@ -233,7 +236,7 @@ const useRegisterInstapaperCommands = () => {
           },
         }),
     {
-      deps: [isInstapaperAvailable],
+      deps: [isInstapaperAvailable, instapaperUsername, instapaperPassword],
     },
   )
 }
@@ -300,7 +303,7 @@ const useRegisterObsidianCommands = () => {
               return
             }
             const markdownContent = await getEntryContentAsMarkdown(entry)
-            window.analytics?.capture("integration", {
+            tracker.integration({
               type: "obsidian",
               event: "save",
             })
@@ -315,7 +318,7 @@ const useRegisterObsidianCommands = () => {
           },
         }),
     {
-      deps: [isObsidianAvailable],
+      deps: [isObsidianAvailable, obsidianVaultPath],
     },
   )
 }
@@ -380,7 +383,7 @@ const useRegisterOutlineCommands = () => {
           },
         }),
     {
-      deps: [outlineAvailable],
+      deps: [outlineAvailable, outlineToken, outlineEndpoint, outlineCollection],
     },
   )
 }
@@ -407,7 +410,7 @@ const useRegisterReadeckCommands = () => {
               return
             }
             try {
-              window.analytics?.capture("integration", {
+              tracker.integration({
                 type: "readeck",
                 event: "save",
               })
@@ -448,7 +451,91 @@ const useRegisterReadeckCommands = () => {
           },
         }),
     {
-      deps: [readeckAvailable],
+      deps: [readeckAvailable, readeckToken, readeckEndpoint],
+    },
+  )
+}
+
+const useRegisterCuboxCommands = () => {
+  const { t } = useTranslation()
+
+  const enableCubox = useIntegrationSettingKey("enableCubox")
+  const cuboxToken = useIntegrationSettingKey("cuboxToken")
+  const enableCuboxAutoMemo = useIntegrationSettingKey("enableCuboxAutoMemo")
+  const cuboxAvailable = enableCubox && !!cuboxToken
+
+  const buildUrlRequestBody = (entry: FlatEntryModel) => {
+    return {
+      type: "url",
+      content: entry.entries.url || "",
+      title: entry.entries.title || "",
+      description: entry.entries.description || "",
+      tags: [],
+      folder: "",
+    }
+  }
+
+  const buildMemoRequestBody = (entry: FlatEntryModel, selectedText: string) => {
+    return {
+      type: "memo",
+      content: selectedText,
+      title: entry.entries.title || "",
+      description: entry.entries.description || "",
+      tags: [],
+      folder: "",
+      source_url: entry.entries.url,
+    }
+  }
+
+  useRegisterCommandEffect(
+    !cuboxAvailable
+      ? []
+      : defineFollowCommand({
+          id: COMMAND_ID.integration.saveToCubox,
+          label: t("entry_actions.save_to_cubox"),
+          icon: <SimpleIconsCubox />,
+          run: async ({ entryId }) => {
+            const entry = useEntryStore.getState().flatMapEntries[entryId]
+            if (!entry) {
+              toast.error("Failed to save to Cubox: entry is not available", { duration: 3000 })
+              return
+            }
+            try {
+              tracker.integration({
+                type: "cubox",
+                event: "save",
+              })
+
+              const selectedText = window.getSelection()?.toString() || ""
+
+              const requestBody =
+                selectedText && enableCuboxAutoMemo
+                  ? buildMemoRequestBody(entry, selectedText)
+                  : buildUrlRequestBody(entry)
+
+              await ofetch(cuboxToken, {
+                method: "POST",
+                body: requestBody,
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              })
+
+              toast.success(t("entry_actions.saved_to_cubox"), {
+                duration: 3000,
+              })
+            } catch (error) {
+              toast.error(
+                `${t("entry_actions.failed_to_save_to_cubox")}: ${(error as FetchError)?.message || ""}`,
+                {
+                  duration: 3000,
+                },
+              )
+            }
+          },
+        }),
+    {
+      deps: [cuboxAvailable, cuboxToken, enableCuboxAutoMemo],
     },
   )
 }

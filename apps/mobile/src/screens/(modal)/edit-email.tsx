@@ -1,24 +1,29 @@
 import { useMutation } from "@tanstack/react-query"
-import { useRouter } from "expo-router"
 import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { View } from "react-native"
 
-import { ModalHeaderSubmitButton } from "@/src/components/common/ModalSharedComponents"
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import { HeaderSubmitTextButton } from "@/src/components/layouts/header/HeaderElements"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { PlainTextField } from "@/src/components/ui/form/TextField"
 import {
   GroupedInsetListCard,
   GroupedInsetListCell,
-  GroupedInsetListSectionHeader,
   GroupedOutlineDescription,
   GroupedPlainButtonCell,
 } from "@/src/components/ui/grouped/GroupedList"
+import { useNavigation } from "@/src/lib/navigation/hooks"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { toast } from "@/src/lib/toast"
 import { useWhoami } from "@/src/store/user/hooks"
 import { userSyncService } from "@/src/store/user/store"
 
-const EditEmailScreen = () => {
+export const EditEmailScreen: NavigationControllerView = () => {
+  const { t } = useTranslation("settings")
+
   const whoami = useWhoami()
 
   const [email, setEmail] = useState(whoami?.email ?? "")
@@ -30,7 +35,7 @@ const EditEmailScreen = () => {
     return email.match(/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/)
   }, [email])
 
-  const navigation = useRouter()
+  const navigation = useNavigation()
   const { mutate: updateEmail, isPending } = useMutation({
     mutationFn: async () => {
       await userSyncService.updateEmail(email)
@@ -41,25 +46,33 @@ const EditEmailScreen = () => {
     },
   })
 
-  return (
-    <SafeModalScrollView className="bg-system-grouped-background">
-      <ModalHeader
-        headerTitle="Edit Email"
-        headerRight={
-          <ModalHeaderSubmitButton
-            isLoading={isPending}
-            isValid={!!(email && newEmailIsValid && isDirty)}
-            onPress={() => {
-              updateEmail()
-            }}
-          />
-        }
-      />
+  const [isSendingVerificationEmail, setIsSendingVerificationEmail] = useState(false)
 
-      <View className="mt-8 w-full">
-        <GroupedInsetListSectionHeader label="Email" />
+  return (
+    <SafeNavigationScrollView
+      Header={
+        <NavigationBlurEffectHeaderView
+          title={t("profile.edit_email")}
+          headerRight={
+            <HeaderSubmitTextButton
+              isLoading={isPending}
+              isValid={!!(email && newEmailIsValid && isDirty)}
+              onPress={() => {
+                updateEmail()
+              }}
+            />
+          }
+        />
+      }
+      className="bg-system-grouped-background"
+    >
+      <View className="mt-4 w-full">
         <GroupedInsetListCard>
-          <GroupedInsetListCell label="Email" rightClassName="flex-1" leftClassName="flex-none">
+          <GroupedInsetListCell
+            label={t("profile.email.label")}
+            rightClassName="flex-1"
+            leftClassName="flex-none"
+          >
             <PlainTextField
               autoCapitalize="none"
               value={email}
@@ -73,18 +86,28 @@ const EditEmailScreen = () => {
           </GroupedInsetListCell>
         </GroupedInsetListCard>
         <GroupedOutlineDescription
-          description={`Your email is ${isValidate ? "verified" : "not verified"}. \n\nIf you want to change your email, you should verify your new email.`}
+          description={`${t("profile.email.verify_status", {
+            status: isValidate ? t("profile.email.verified") : t("profile.email.unverified"),
+          })}\n\n${t("profile.email.change_note")}`}
         />
 
         {/* Buttons */}
 
         {!isValidate && (
           <GroupedInsetListCard className="mt-6">
-            <GroupedPlainButtonCell label="Send Verification Email" />
+            <GroupedPlainButtonCell
+              disabled={isSendingVerificationEmail}
+              label={
+                isSendingVerificationEmail ? "Verification Email Sent" : "Send Verification Email"
+              }
+              onPress={() => {
+                setIsSendingVerificationEmail(true)
+                userSyncService.sendVerificationEmail()
+              }}
+            />
           </GroupedInsetListCard>
         )}
       </View>
-    </SafeModalScrollView>
+    </SafeNavigationScrollView>
   )
 }
-export default EditEmailScreen

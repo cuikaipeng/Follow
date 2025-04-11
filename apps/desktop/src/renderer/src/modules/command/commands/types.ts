@@ -25,6 +25,11 @@ export type CopyLinkCommand = Command<{
   fn: (data: { entryId: string }) => void
 }>
 
+export type ExportAsPDFCommand = Command<{
+  id: typeof COMMAND_ID.entry.exportAsPDF
+  fn: (data: { entryId: string }) => void
+}>
+
 export type CopyTitleCommand = Command<{
   id: typeof COMMAND_ID.entry.copyTitle
   fn: (data: { entryId: string }) => void
@@ -65,6 +70,7 @@ export type EntryCommand =
   | StarCommand
   | DeleteCommand
   | CopyLinkCommand
+  | ExportAsPDFCommand
   | CopyTitleCommand
   | OpenInBrowserCommand
   | ViewSourceContentCommand
@@ -114,6 +120,11 @@ export type SaveToReadeckCommand = Command<{
   fn: (payload: { entryId: string }) => void
 }>
 
+export type SaveToCuboxCommand = Command<{
+  id: typeof COMMAND_ID.integration.saveToCubox
+  fn: (payload: { entryId: string }) => void
+}>
+
 export type IntegrationCommand =
   | SaveToEagleCommand
   | SaveToReadwiseCommand
@@ -121,5 +132,6 @@ export type IntegrationCommand =
   | SaveToObsidianCommand
   | SaveToOutlineCommand
   | SaveToReadeckCommand
+  | SaveToCuboxCommand
 
 export type BasicCommand = EntryCommand | SettingsCommand | IntegrationCommand

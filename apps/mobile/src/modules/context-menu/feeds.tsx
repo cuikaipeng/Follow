@@ -1,15 +1,19 @@
 import { FeedViewType } from "@follow/constants"
-import { router } from "expo-router"
-import type { FC, PropsWithChildren } from "react"
+import dayjs from "dayjs"
+import type { CSSProperties, FC, PropsWithChildren } from "react"
 import { useCallback, useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import type { ListRenderItemInfo } from "react-native"
 import { Alert, Clipboard, FlatList, View } from "react-native"
 
 import { ContextMenu } from "@/src/components/ui/context-menu"
 import { views } from "@/src/constants/views"
+import { useNavigation } from "@/src/lib/navigation/hooks"
 import { toast } from "@/src/lib/toast"
-import { useEntryIdsByFeedId } from "@/src/store/entry/hooks"
+import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]"
+import { useEntryIdsByFeedId, usePrefetchEntries } from "@/src/store/entry/hooks"
 import { getFeed } from "@/src/store/feed/getter"
+import { useFeed } from "@/src/store/feed/hooks"
 import { getSubscription } from "@/src/store/subscription/getter"
 import { useSubscriptionCategory } from "@/src/store/subscription/hooks"
 import { subscriptionSyncService } from "@/src/store/subscription/store"
@@ -24,22 +28,47 @@ export const SubscriptionFeedItemContextMenu: FC<
     view?: FeedViewType
   }
 > = ({ id, children, view }) => {
+  const feed = useFeed(id)
+  const { t } = useTranslation()
   const allCategories = useSubscriptionCategory(view)
-
+  const navigation = useNavigation()
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
 
       <ContextMenu.Content>
         {view === FeedViewType.Articles && (
           <ContextMenu.Preview
             size="STRETCH"
             onPress={() => {
-              router.push(`/feeds/${id}`)
+              navigation.pushControllerView(FeedScreen, {
+                feedId: id,
+              })
             }}
           >
             {() => <PreviewFeeds id={id} view={view!} />}
           </ContextMenu.Preview>
+        )}
+
+        {!!feed?.errorAt && (
+          <ContextMenu.Item
+            key="ShowErrorMessage"
+            onSelect={() => {
+              Alert.alert(
+                `${t("operation.error_since")} ${dayjs
+                  .duration(dayjs(feed.errorAt).diff(dayjs(), "minute"), "minute")
+                  .humanize(true)}`,
+                feed.errorMessage ?? undefined,
+              )
+            }}
+          >
+            <ContextMenu.ItemTitle>{t("operation.show_error_message")}</ContextMenu.ItemTitle>
+            <ContextMenu.ItemIcon
+              ios={{
+                name: "exclamationmark.triangle",
+              }}
+            />
+          </ContextMenu.Item>
         )}
         <ContextMenu.Item
           key="MarkAllAsRead"
@@ -47,10 +76,10 @@ export const SubscriptionFeedItemContextMenu: FC<
             unreadSyncService.markFeedAsRead(id)
           }, [id])}
         >
-          <ContextMenu.ItemTitle>Mark All As Read</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.mark_all_as_read")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
-              name: "checklist.checked",
+              name: "checkmark.circle",
             }}
           />
         </ContextMenu.Item>
@@ -75,7 +104,7 @@ export const SubscriptionFeedItemContextMenu: FC<
 
         <ContextMenu.Sub key="AddToCategory">
           <ContextMenu.SubTrigger key="SubTrigger/AddToCategory">
-            <ContextMenu.ItemTitle>Add To Category</ContextMenu.ItemTitle>
+            <ContextMenu.ItemTitle>{t("operation.add_feeds_to_category")}</ContextMenu.ItemTitle>
           </ContextMenu.SubTrigger>
 
           <ContextMenu.SubContent>
@@ -123,7 +152,7 @@ export const SubscriptionFeedItemContextMenu: FC<
         </ContextMenu.Sub>
 
         <ContextMenu.Item key="Edit">
-          <ContextMenu.ItemTitle>Edit</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.edit")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "square.and.pencil",
@@ -143,13 +172,13 @@ export const SubscriptionFeedItemContextMenu: FC<
                 const feed = getFeed(subscription.feedId)
                 if (!feed) return
                 Clipboard.setString(feed.url)
-                toast.info("Link copied to clipboard")
+                toast.success("Link copied to clipboard")
                 return
               }
             }
           }, [id])}
         >
-          <ContextMenu.ItemTitle>Copy Link</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.copy_link")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "link",
@@ -168,16 +197,16 @@ export const SubscriptionFeedItemContextMenu: FC<
                 style: "cancel",
               },
               {
-                text: "Unsubscribe",
+                text: t("operation.unfollow"),
                 style: "destructive",
                 onPress: () => {
                   subscriptionSyncService.unsubscribe(id)
                 },
               },
             ])
-          }, [id])}
+          }, [id, t])}
         >
-          <ContextMenu.ItemTitle>Unsubscribe</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.unfollow")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "xmark",
@@ -194,14 +223,21 @@ export const SubscriptionFeedCategoryContextMenu = ({
   feedIds,
   view: currentView,
   children,
+  asChild,
+  style,
 }: PropsWithChildren<{
   category: string
   feedIds: string[]
   view: FeedViewType
+  asChild?: boolean
+  style?: CSSProperties
 }>) => {
+  const { t } = useTranslation()
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger asChild={asChild} style={style}>
+        {children}
+      </ContextMenu.Trigger>
 
       <ContextMenu.Content>
         <ContextMenu.Item
@@ -210,17 +246,17 @@ export const SubscriptionFeedCategoryContextMenu = ({
             unreadSyncService.markFeedAsRead(feedIds)
           }, [feedIds])}
         >
-          <ContextMenu.ItemTitle>Mark All As Read</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.mark_all_as_read")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
-              name: "checklist.checked",
+              name: "checkmark.circle",
             }}
           />
         </ContextMenu.Item>
 
         <ContextMenu.Sub key="ChangeToOtherView">
           <ContextMenu.SubTrigger key="SubTrigger/ChangeToOtherView">
-            <ContextMenu.ItemTitle>Change To Other View</ContextMenu.ItemTitle>
+            <ContextMenu.ItemTitle>{t("operation.change_to_other_view")}</ContextMenu.ItemTitle>
           </ContextMenu.SubTrigger>
 
           <ContextMenu.SubContent>
@@ -240,7 +276,7 @@ export const SubscriptionFeedCategoryContextMenu = ({
         </ContextMenu.Sub>
 
         <ContextMenu.Item key="EditCategory">
-          <ContextMenu.ItemTitle>Edit Category</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.rename_category")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "square.and.pencil",
@@ -248,7 +284,7 @@ export const SubscriptionFeedCategoryContextMenu = ({
           />
         </ContextMenu.Item>
         <ContextMenu.Item key="DeleteCategory" destructive>
-          <ContextMenu.ItemTitle>Delete Category</ContextMenu.ItemTitle>
+          <ContextMenu.ItemTitle>{t("operation.delete_category")}</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "trash",
@@ -263,6 +299,7 @@ export const SubscriptionFeedCategoryContextMenu = ({
 const PreviewFeeds = (props: { id: string; view: FeedViewType }) => {
   const { id: feedId } = props
   const entryIds = useEntryIdsByFeedId(feedId)
+  usePrefetchEntries({ feedId, limit: 5 })
 
   const renderItem = useCallback(
     ({ item: id }: ListRenderItemInfo<string>) => (
@@ -274,7 +311,7 @@ const PreviewFeeds = (props: { id: string; view: FeedViewType }) => {
     <View className="bg-system-background size-full flex-1">
       <FlatList
         scrollEnabled={false}
-        data={useMemo(() => entryIds.slice(0, 5), [entryIds])}
+        data={useMemo(() => entryIds?.slice(0, 5), [entryIds])}
         renderItem={renderItem}
         ItemSeparatorComponent={ItemSeparator}
       />

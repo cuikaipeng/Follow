@@ -6,32 +6,26 @@ import { useQuery } from "@tanstack/react-query"
 import { useAtomValue } from "jotai"
 import type { FC } from "react"
 import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import type { ScrollView } from "react-native"
-import {
-  ActivityIndicator,
-  Animated,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from "react-native"
+import { Animated, Text, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import type { PanGestureHandlerGestureEvent } from "react-native-gesture-handler"
 import { PanGestureHandler } from "react-native-gesture-handler"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AnimatedScrollView } from "@/src/components/common/AnimatedComponents"
 import {
   useBottomTabBarHeight,
   useRegisterNavigationScrollView,
 } from "@/src/components/layouts/tabbar/hooks"
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import type { TabComponent } from "@/src/components/ui/tabview/TabView"
 import { apiClient } from "@/src/lib/api-fetch"
 
-import { RSSHubCategoryCopyMap } from "./copy"
 import { DiscoverContext } from "./DiscoverContext"
 import { RecommendationListItem } from "./RecommendationListItem"
 
 export const Recommendations = () => {
+  const { t } = useTranslation("common")
   const { animatedX, currentTabAtom } = useContext(DiscoverContext)
   const currentTab = useAtomValue(currentTabAtom)
 
@@ -66,7 +60,7 @@ export const Recommendations = () => {
           {loadedTabIndex.has(index) && (
             <Tab
               key={category}
-              tab={{ name: RSSHubCategoryCopyMap[category], value: category }}
+              tab={{ name: t(`discover.category.${category}`), value: category }}
               isSelected={currentTab === index}
             />
           )}
@@ -192,8 +186,6 @@ const Tab: TabComponent = ({ tab, isSelected, ...rest }) => {
   const { headerHeightAtom } = useContext(DiscoverContext)
   const headerHeight = useAtomValue(headerHeightAtom)
 
-  const insets = useSafeAreaInsets()
-
   const scrollOffsetRef = useRef(0)
   const { animatedY } = useContext(DiscoverContext)
 
@@ -202,8 +194,9 @@ const Tab: TabComponent = ({ tab, isSelected, ...rest }) => {
       animatedY.value = scrollOffsetRef.current
     }
   }, [animatedY, isSelected])
+
   if (isLoading) {
-    return <ActivityIndicator className="flex-1 items-center justify-center" />
+    return <PlatformActivityIndicator className="flex-1 items-center justify-center" />
   }
 
   return (
@@ -220,10 +213,11 @@ const Tab: TabComponent = ({ tab, isSelected, ...rest }) => {
         keyExtractor={keyExtractor}
         getItemType={getItemType}
         renderItem={ItemRenderer}
+        automaticallyAdjustsScrollIndicatorInsets={false}
         scrollIndicatorInsets={{
           right: -2,
-          top: headerHeight - insets.top,
-          bottom: tabHeight - insets.bottom,
+          top: headerHeight,
+          bottom: tabHeight,
         }}
         contentContainerStyle={{ paddingBottom: tabHeight, paddingTop: headerHeight }}
         removeClippedSubviews

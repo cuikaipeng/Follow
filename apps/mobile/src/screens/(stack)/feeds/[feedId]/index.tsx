@@ -1,9 +1,10 @@
 import { FeedViewType } from "@follow/constants"
-import { useLocalSearchParams } from "expo-router"
 import { useMemo } from "react"
+import { RootSiblingParent } from "react-native-root-siblings"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { BottomTabBarHeightContext } from "@/src/components/layouts/tabbar/contexts/BottomTabBarHeightContext"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { EntryListSelector } from "@/src/modules/entry-list/EntryListSelector"
 import { EntryListContext, useSelectedView } from "@/src/modules/screen/atoms"
 import { TimelineSelectorProvider } from "@/src/modules/screen/TimelineSelectorProvider"
@@ -15,11 +16,13 @@ import {
   useEntryIdsByListId,
 } from "@/src/store/entry/hooks"
 import { FEED_COLLECTION_LIST } from "@/src/store/entry/utils"
+import { useFeed } from "@/src/store/feed/hooks"
 
-export default function Feed() {
+export const FeedScreen: NavigationControllerView<{
+  feedId: string
+}> = ({ feedId: feedIdentifier }) => {
   const insets = useSafeAreaInsets()
-  const { feedId } = useLocalSearchParams()
-  const feedIdentifier = feedId as string
+  const feed = useFeed(feedIdentifier)
 
   const isCollection = feedIdentifier === FEED_COLLECTION_LIST
   const view = useSelectedView() ?? FeedViewType.Articles
@@ -41,15 +44,17 @@ export default function Feed() {
 
   return (
     <EntryListContext.Provider value={useMemo(() => ({ type: "feed" }), [])}>
-      <BottomTabBarHeightContext.Provider value={insets.bottom}>
-        <TimelineSelectorProvider>
-          <EntryListSelector entryIds={entryIds} viewId={view} />
-        </TimelineSelectorProvider>
-      </BottomTabBarHeightContext.Provider>
+      <RootSiblingParent>
+        <BottomTabBarHeightContext.Provider value={insets.bottom}>
+          <TimelineSelectorProvider feedId={feed?.id}>
+            <EntryListSelector entryIds={entryIds} viewId={view} />
+          </TimelineSelectorProvider>
+        </BottomTabBarHeightContext.Provider>
+      </RootSiblingParent>
     </EntryListContext.Provider>
   )
 }
 
-function getEntryIdsFromMultiplePlace(...entryIds: Array<string[] | undefined>) {
+function getEntryIdsFromMultiplePlace(...entryIds: Array<string[] | undefined | null>) {
   return entryIds.find((ids) => ids?.length) ?? []
 }

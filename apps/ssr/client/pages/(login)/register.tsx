@@ -11,6 +11,7 @@ import {
 } from "@follow/components/ui/form/index.jsx"
 import { Input } from "@follow/components/ui/input/index.js"
 import { env } from "@follow/shared/env"
+import { tracker } from "@follow/tracker"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRef } from "react"
 import ReCAPTCHA from "react-google-recaptcha"
@@ -41,7 +42,7 @@ const formSchema = z
   })
 
 function RegisterForm() {
-  const { t } = useTranslation("external")
+  const { t } = useTranslation()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,6 +68,9 @@ function RegisterForm() {
       callbackURL: "/",
       fetchOptions: {
         onSuccess() {
+          tracker.register({
+            type: "email",
+          })
           navigate("/login")
         },
         onError(context) {
@@ -86,7 +90,6 @@ function RegisterForm() {
       </h1>
       <div className="text-muted-foreground mt-2 text-center">
         <Trans
-          ns="external"
           i18nKey="register.note"
           components={{
             LoginLink: (

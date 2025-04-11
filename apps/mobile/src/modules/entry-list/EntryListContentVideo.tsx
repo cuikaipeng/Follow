@@ -5,32 +5,39 @@ import { forwardRef, useMemo } from "react"
 import { View } from "react-native"
 
 import { useFetchEntriesControls } from "@/src/modules/screen/atoms"
+import { usePrefetchEntryTranslation } from "@/src/store/translation/hooks"
 
 import { TimelineSelectorMasonryList } from "../screen/TimelineSelectorList"
+import { GridEntryListFooter } from "./EntryListFooter"
 import { useOnViewableItemsChanged } from "./hooks"
 import { EntryVideoItem } from "./templates/EntryVideoItem"
 
 export const EntryListContentVideo = forwardRef<
   ElementRef<typeof TimelineSelectorMasonryList>,
-  { entryIds: string[]; active?: boolean } & Omit<
+  { entryIds: string[] | null; active?: boolean } & Omit<
     MasonryFlashListProps<string>,
     "data" | "renderItem"
   >
 >(({ entryIds, active, ...rest }, ref) => {
-  const { fetchNextPage, refetch, isRefetching, isFetching } = useFetchEntriesControls()
-  const { onViewableItemsChanged, onScroll } = useOnViewableItemsChanged({
+  const { fetchNextPage, refetch, isRefetching, isFetching, hasNextPage } =
+    useFetchEntriesControls()
+  const { onViewableItemsChanged, onScroll, viewableItems } = useOnViewableItemsChanged({
     disabled: active === false || isFetching,
   })
 
+  usePrefetchEntryTranslation(active ? viewableItems.map((item) => item.key) : [])
+
   const ListFooterComponent = useMemo(
     () =>
-      isFetching ? (
+      hasNextPage ? (
         <View className="flex flex-row justify-between">
           <EntryItemSkeleton />
           <EntryItemSkeleton />
         </View>
-      ) : null,
-    [isFetching],
+      ) : (
+        <GridEntryListFooter />
+      ),
+    [hasNextPage],
   )
 
   return (
@@ -62,7 +69,10 @@ export function EntryItemSkeleton() {
   return (
     <View className="m-1 overflow-hidden rounded-md">
       {/* Video thumbnail */}
-      <View className="bg-system-fill aspect-video h-32 w-full animate-pulse rounded-md" />
+      <View
+        className="bg-system-fill h-32 w-full animate-pulse rounded-md"
+        style={{ aspectRatio: 16 / 9 }}
+      />
 
       {/* Description and footer */}
       <View className="my-2 px-2">

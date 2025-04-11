@@ -1,10 +1,11 @@
 import { getRendererHandlers } from "@egoist/tipc/main"
+import { DEV } from "@follow/shared/constants"
 import { autoUpdater as defaultAutoUpdater } from "electron-updater"
 
 import { GITHUB_OWNER, GITHUB_REPO } from "~/constants/app"
 import { canUpdateRender, CanUpdateRenderState, hotUpdateRender } from "~/updater/hot-updater"
 
-import { channel, isDev, isWindows } from "../env"
+import { channel, isWindows } from "../env"
 import { logger } from "../logger"
 import type { RendererHandlers } from "../renderer-handlers"
 import { destroyMainWindow, getMainWindow } from "../window"
@@ -13,7 +14,7 @@ import { CustomGitHubProvider } from "./custom-github-provider"
 import { WindowsUpdater } from "./windows-updater"
 
 // skip auto update in dev mode
-// const disabled = isDev
+// const disabled = DEV
 const disabled = !appUpdaterConfig.enableAppUpdate
 
 const autoUpdater = isWindows ? new WindowsUpdater() : defaultAutoUpdater
@@ -57,7 +58,9 @@ export const checkForAppUpdates = async () => {
         return
       }
     }
-    return autoUpdater.checkForUpdates()
+    if (appUpdaterConfig.enableCoreUpdate) {
+      return autoUpdater.checkForUpdates()
+    }
   } catch (e) {
     logger.error("Error checking for updates", e)
   } finally {
@@ -124,7 +127,7 @@ export const registerUpdater = async () => {
       }
     }
 
-    if (appUpdaterConfig.app.autoDownloadUpdate) {
+    if (appUpdaterConfig.app.autoDownloadUpdate && appUpdaterConfig.enableCoreUpdate) {
       downloadAppUpdate().catch((err) => {
         logger.error(err)
       })
@@ -149,7 +152,7 @@ export const registerUpdater = async () => {
   autoUpdater.on("error", (e) => {
     logger.error("Error while updating client", e)
   })
-  autoUpdater.forceDevUpdateConfig = isDev
+  autoUpdater.forceDevUpdateConfig = DEV
 
   setInterval(() => {
     if (appUpdaterConfig.app.autoCheckUpdate) {

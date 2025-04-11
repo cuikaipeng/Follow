@@ -1,21 +1,28 @@
+import { useTypeScriptHappyCallback } from "@follow/hooks"
+import { nextFrame } from "@follow/utils"
 import type {
   FlashListProps,
   MasonryFlashListProps,
   MasonryFlashListRef,
 } from "@shopify/flash-list"
 import { FlashList, MasonryFlashList } from "@shopify/flash-list"
+import * as Haptics from "expo-haptics"
 import type { ElementRef, RefObject } from "react"
-import { forwardRef, useCallback, useContext } from "react"
+import { forwardRef, useCallback, useContext, useImperativeHandle, useRef } from "react"
 import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native"
-import { RefreshControl } from "react-native"
+import { findNodeHandle, RefreshControl } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useColor } from "react-native-uikit-colors"
 
+import { BottomTabBarBackgroundContext } from "@/src/components/layouts/tabbar/contexts/BottomTabBarBackgroundContext"
 import { useBottomTabBarHeight } from "@/src/components/layouts/tabbar/hooks"
-import { NavigationContext } from "@/src/components/layouts/views/NavigationContext"
+import { isScrollToEnd } from "@/src/lib/native"
+import { ScreenItemContext } from "@/src/lib/navigation/ScreenItemContext"
 import { useHeaderHeight } from "@/src/modules/screen/hooks/useHeaderHeight"
 import { usePrefetchSubscription } from "@/src/store/subscription/hooks"
 import { usePrefetchUnread } from "@/src/store/unread/hooks"
+
+import { EntryListEmpty } from "../entry-list/EntryListEmpty"
 
 type Props = {
   onRefresh: () => void
@@ -25,35 +32,64 @@ type Props = {
 export const TimelineSelectorList = forwardRef<
   FlashList<any>,
   Props & Omit<FlashListProps<any>, "onRefresh">
->(({ onRefresh, isRefetching, ...props }, ref) => {
+>(({ onRefresh, isRefetching, ...props }, forwardedRef) => {
+  const ref = useRef<FlashList<any>>(null)
+  useImperativeHandle(forwardedRef, () => ref.current!)
   const { refetch: unreadRefetch } = usePrefetchUnread()
   const { refetch: subscriptionRefetch } = usePrefetchSubscription()
 
   const headerHeight = useHeaderHeight()
-  const { scrollY } = useContext(NavigationContext)!
-
+  const { reAnimatedScrollY, scrollViewHeight, scrollViewContentHeight } =
+    useContext(ScreenItemContext)!
+  const { opacity } = useContext(BottomTabBarBackgroundContext)
+  const checkScrollToBottom = useCallback(() => {
+    const handle = findNodeHandle(ref.current!)
+    if (!handle) {
+      return
+    }
+    isScrollToEnd(handle).then((isEnd) => {
+      opacity.value = isEnd ? 0 : 1
+    })
+  }, [opacity])
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       props.onScroll?.(e)
 
-      scrollY?.setValue(e.nativeEvent.contentOffset.y)
+      reAnimatedScrollY.value = e.nativeEvent.contentOffset.y
+      checkScrollToBottom()
     },
-    [scrollY, props.onScroll],
+    [props, reAnimatedScrollY, checkScrollToBottom],
   )
 
   const tabBarHeight = useBottomTabBarHeight()
 
   const systemFill = useColor("secondaryLabel")
 
-  // const listRef = useRef<FlashList<any>>(null)
+  const onLayout = useTypeScriptHappyCallback(
+    (e) => {
+      scrollViewHeight.value = e.nativeEvent.layout.height - headerHeight - tabBarHeight
+    },
+    [scrollViewHeight],
+  ) as FlashListProps<any>["onLayout"]
 
-  // useImperativeHandle(ref, () => listRef.current!)
+  const onContentSizeChange = useTypeScriptHappyCallback(
+    (w, h) => {
+      scrollViewContentHeight.value = h
+    },
+    [scrollViewContentHeight],
+  ) as FlashListProps<any>["onContentSizeChange"]
+
+  if (props.data?.length === 0) {
+    return <EntryListEmpty />
+  }
 
   return (
     <FlashList
       automaticallyAdjustsScrollIndicatorInsets={false}
       automaticallyAdjustContentInsets={false}
       ref={ref}
+      onLayout={onLayout}
+      onContentSizeChange={onContentSizeChange}
       refreshControl={
         <RefreshControl
           progressViewOffset={headerHeight}
@@ -62,6 +98,7 @@ export const TimelineSelectorList = forwardRef<
           onRefresh={() => {
             unreadRefetch()
             subscriptionRefetch()
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
             onRefresh()
           }}
           refreshing={isRefetching}
@@ -77,6 +114,11 @@ export const TimelineSelectorList = forwardRef<
       }}
       {...props}
       onScroll={onScroll}
+      onEndReached={() => {
+        nextFrame(() => {
+          props.onEndReached?.()
+        })
+      }}
     />
   )
 })
@@ -91,19 +133,24 @@ export const TimelineSelectorMasonryList = forwardRef<
   const insets = useSafeAreaInsets()
 
   const headerHeight = useHeaderHeight()
-  const scrollY = useContext(NavigationContext)?.scrollY
+
+  const { reAnimatedScrollY } = useContext(ScreenItemContext)!
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       props.onScroll?.(e)
-      scrollY?.setValue(e.nativeEvent.contentOffset.y)
+      reAnimatedScrollY.value = e.nativeEvent.contentOffset.y
     },
-    [scrollY, props.onScroll],
+    [props, reAnimatedScrollY],
   )
 
   const tabBarHeight = useBottomTabBarHeight()
 
   const systemFill = useColor("secondaryLabel")
+
+  if (props.data?.length === 0) {
+    return <EntryListEmpty />
+  }
 
   return (
     <MasonryFlashList

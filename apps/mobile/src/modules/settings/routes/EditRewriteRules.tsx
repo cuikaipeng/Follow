@@ -1,8 +1,10 @@
-import type { RouteProp } from "@react-navigation/native"
+import { useTranslation } from "react-i18next"
 import { Text } from "react-native"
 
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { PlainTextField } from "@/src/components/ui/form/TextField"
 import {
   GroupedInsetListBaseCell,
@@ -10,27 +12,27 @@ import {
   GroupedInsetListSectionHeader,
   GroupedPlainButtonCell,
 } from "@/src/components/ui/grouped/GroupedList"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { useActionRule } from "@/src/store/action/hooks"
 import { actionActions } from "@/src/store/action/store"
 
-import type { SettingsStackParamList } from "../types"
-
-export const EditRewriteRulesScreen = ({
-  route,
-}: {
-  route: RouteProp<SettingsStackParamList, "EditRewriteRules">
-}) => {
-  const { index } = route.params
+export const EditRewriteRulesScreen: NavigationControllerView<{ index: number }> = ({ index }) => {
+  const { t } = useTranslation("settings")
   const rule = useActionRule(index)
 
   return (
-    <SafeModalScrollView className="bg-system-grouped-background">
-      <ModalHeader headerTitle="Edit Rewrite Rules" />
-      <GroupedInsetListSectionHeader label="Rewrite Rules" />
+    <SafeNavigationScrollView
+      className="bg-system-grouped-background"
+      Header={<NavigationBlurEffectHeaderView title={t("actions.edit_rewrite_rule")} />}
+    >
+      <GroupedInsetListSectionHeader
+        label={t("actions.action_card.rewrite_rules")}
+        marginSize="small"
+      />
       {rule?.result.rewriteRules?.map((rewriteRule, rewriteRuleIndex) => (
         <GroupedInsetListCard key={rewriteRuleIndex} className="mb-4">
           <GroupedInsetListBaseCell className="flex-row">
-            <Text>From</Text>
+            <Text className="text-label">{t("actions.action_card.from")}</Text>
             <PlainTextField
               className="w-full flex-1 text-right"
               value={rewriteRule.from}
@@ -45,7 +47,7 @@ export const EditRewriteRulesScreen = ({
             />
           </GroupedInsetListBaseCell>
           <GroupedInsetListBaseCell className="flex-row">
-            <Text>To</Text>
+            <Text className="text-label">{t("actions.action_card.to")}</Text>
             <PlainTextField
               className="w-full flex-1 text-right"
               value={rewriteRule.to}
@@ -63,13 +65,13 @@ export const EditRewriteRulesScreen = ({
       ))}
       <GroupedInsetListCard>
         <GroupedPlainButtonCell
-          label="Add"
+          label={t("actions.action_card.add")}
           onPress={() => {
             actionActions.addRewriteRule(index)
           }}
         />
       </GroupedInsetListCard>
       {__DEV__ && <Text>{JSON.stringify(rule?.result.rewriteRules, null, 2)}</Text>}
-    </SafeModalScrollView>
+    </SafeNavigationScrollView>
   )
 }

@@ -1,11 +1,9 @@
 import { useMutation } from "@tanstack/react-query"
 import { useCallback, useState } from "react"
-import { View } from "react-native"
 import { useColor } from "react-native-uikit-colors"
 
-import { RotateableLoading } from "@/src/components/common/RotateableLoading"
 import {
-  NavigationBlurEffectHeader,
+  NavigationBlurEffectHeaderView,
   SafeNavigationScrollView,
 } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { UIBarButton } from "@/src/components/ui/button/UIBarButton"
@@ -15,6 +13,7 @@ import {
   GroupedInsetListCard,
   GroupedInsetListSectionHeader,
 } from "@/src/components/ui/grouped/GroupedList"
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { CheckLineIcon } from "@/src/icons/check_line"
 import { changePassword } from "@/src/lib/auth"
 
@@ -40,33 +39,36 @@ export const ResetPassword = () => {
   }, [changePasswordAsync])
 
   return (
-    <SafeNavigationScrollView className="bg-system-grouped-background flex-1">
-      <NavigationBlurEffectHeader
-        title="Reset Password"
-        headerRight={useCallback(
-          () => (
-            <UIBarButton
-              label="Save"
-              normalIcon={
-                isPending ? (
-                  <RotateableLoading color={labelColor} />
-                ) : (
-                  <CheckLineIcon height={18} width={18} color={labelColor} />
-                )
-              }
-              disabled={
-                !currentPassword ||
-                !newPassword ||
-                !confirmNewPassword ||
-                newPassword !== confirmNewPassword
-              }
-              onPress={handleSave}
-            />
-          ),
-          [confirmNewPassword, currentPassword, handleSave, isPending, labelColor, newPassword],
-        )}
-      />
-      <View className="h-4" />
+    <SafeNavigationScrollView
+      className="bg-system-grouped-background flex-1"
+      Header={
+        <NavigationBlurEffectHeaderView
+          title="Reset Password"
+          headerRight={useCallback(
+            () => (
+              <UIBarButton
+                label="Save"
+                normalIcon={
+                  isPending ? (
+                    <PlatformActivityIndicator size="small" color={labelColor} />
+                  ) : (
+                    <CheckLineIcon height={18} width={18} color={labelColor} />
+                  )
+                }
+                disabled={
+                  !currentPassword ||
+                  !newPassword ||
+                  !confirmNewPassword ||
+                  newPassword !== confirmNewPassword
+                }
+                onPress={handleSave}
+              />
+            ),
+            [confirmNewPassword, currentPassword, handleSave, isPending, labelColor, newPassword],
+          )}
+        />
+      }
+    >
       <GroupedInsetListSectionHeader label="Current Password" />
       <GroupedInsetListCard>
         <GroupedInsetListBaseCell className="py-3">
@@ -83,8 +85,7 @@ export const ResetPassword = () => {
         </GroupedInsetListBaseCell>
       </GroupedInsetListCard>
 
-      <View className="h-4" />
-      <GroupedInsetListSectionHeader label="New Password" />
+      <GroupedInsetListSectionHeader marginSize="small" label="New Password" />
       <GroupedInsetListCard>
         <GroupedInsetListBaseCell className="py-3">
           <PlainTextField
@@ -99,8 +100,7 @@ export const ResetPassword = () => {
         </GroupedInsetListBaseCell>
       </GroupedInsetListCard>
 
-      <View className="h-4" />
-      <GroupedInsetListSectionHeader label="Confirm New Password" />
+      <GroupedInsetListSectionHeader marginSize="small" label="Confirm New Password" />
       <GroupedInsetListCard>
         <GroupedInsetListBaseCell className="py-3">
           <PlainTextField

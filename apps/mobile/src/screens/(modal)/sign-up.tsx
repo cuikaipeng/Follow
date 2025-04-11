@@ -1,6 +1,6 @@
+import { tracker } from "@follow/tracker"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
-import { router } from "expo-router"
 import type { Control } from "react-hook-form"
 import { useController, useForm } from "react-hook-form"
 import type { TextInputProps } from "react-native"
@@ -9,9 +9,12 @@ import { KeyboardController } from "react-native-keyboard-controller"
 import { z } from "zod"
 
 import { SubmitButton } from "@/src/components/common/SubmitButton"
+import { HeaderCloseOnly } from "@/src/components/layouts/header/HeaderElements"
 import { PlainTextField } from "@/src/components/ui/form/TextField"
 import { Logo } from "@/src/components/ui/logo"
 import { signUp } from "@/src/lib/auth"
+import { Navigation } from "@/src/lib/navigation/Navigation"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { useScaleHeight } from "@/src/lib/responsive"
 import { toast } from "@/src/lib/toast"
 import { getTokenHeaders } from "@/src/lib/token"
@@ -47,7 +50,8 @@ async function onSubmit(values: FormValue) {
         toast.error(res.error.message)
       } else {
         toast.success("Sign up successful")
-        router.back()
+        tracker.register({ type: "email" })
+        Navigation.rootNavigation.back()
       }
     })
 }
@@ -157,13 +161,15 @@ function EmailSignUp() {
   )
 }
 
-export default function SignUpModal() {
-  const logoSize = useScaleHeight()(80)
-  const gapSize = useScaleHeight()(28)
-  const fontSize = useScaleHeight()(28)
-  const lineHeight = useScaleHeight()(32)
+export const SignUpScreen: NavigationControllerView = () => {
+  const scaledHeight = useScaleHeight()
+  const logoSize = scaledHeight(80)
+  const gapSize = scaledHeight(28)
+  const fontSize = scaledHeight(28)
+  const lineHeight = scaledHeight(32)
   return (
     <View className="p-safe flex-1">
+      <HeaderCloseOnly />
       <TouchableWithoutFeedback
         onPress={() => {
           KeyboardController.dismiss()
@@ -184,7 +190,7 @@ export default function SignUpModal() {
               lineHeight,
             }}
           >
-            Sign up to <Text className="font-bold">Follow</Text>
+            Sign up to <Text className="font-bold">Folo</Text>
           </Text>
           <EmailSignUp />
         </View>

@@ -1,26 +1,16 @@
-import { withOpacity } from "@follow/utils/src/color"
 import { useMutation } from "@tanstack/react-query"
-import { router } from "expo-router"
 import type { FC } from "react"
-import { useCallback, useState } from "react"
-import {
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native"
+import { useState } from "react"
+import { useTranslation } from "react-i18next"
+import { Text, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native"
 import { KeyboardController } from "react-native-keyboard-controller"
 
-import { RotateableLoading } from "@/src/components/common/RotateableLoading"
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import { HeaderSubmitTextButton } from "@/src/components/layouts/header/HeaderElements"
 import {
-  NavigationBlurEffectHeader,
+  NavigationBlurEffectHeaderView,
   SafeNavigationScrollView,
 } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { UserAvatar } from "@/src/components/ui/avatar/UserAvatar"
-import { UIBarButton } from "@/src/components/ui/button/UIBarButton"
 import { PlainTextField } from "@/src/components/ui/form/TextField"
 import {
   GroupedInsetListCard,
@@ -28,80 +18,23 @@ import {
   GroupedInsetListNavigationLink,
   GroupedOutlineDescription,
 } from "@/src/components/ui/grouped/GroupedList"
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { CheckCircleCuteReIcon } from "@/src/icons/check_circle_cute_re"
-import { CheckLineIcon } from "@/src/icons/check_line"
 import { CloseCircleFillIcon } from "@/src/icons/close_circle_fill"
+import { useNavigation } from "@/src/lib/navigation/hooks"
 import { toast } from "@/src/lib/toast"
+import { EditEmailScreen } from "@/src/screens/(modal)/edit-email"
 import { useWhoami } from "@/src/store/user/hooks"
 import type { MeModel } from "@/src/store/user/store"
 import { userSyncService } from "@/src/store/user/store"
 import type { UserProfileEditable } from "@/src/store/user/types"
-import { accentColor, useColor } from "@/src/theme/colors"
+import { accentColor } from "@/src/theme/colors"
 
 import { setAvatar } from "../utils"
 
 export const EditProfileScreen = () => {
   const whoami = useWhoami()
-
-  if (!whoami) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
-    )
-  }
-
-  return (
-    <SafeNavigationScrollView className="bg-system-grouped-background">
-      <AvatarSection whoami={whoami} />
-      <ProfileForm whoami={whoami} />
-    </SafeNavigationScrollView>
-  )
-}
-
-export const EditProfileModal = () => {
-  const whoami = useWhoami()
-
-  if (!whoami) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
-    )
-  }
-
-  return (
-    <SafeModalScrollView className="bg-system-grouped-background">
-      <ModalHeader headerTitle="111Edit Profile" />
-      <AvatarSection whoami={whoami} />
-      <ProfileForm layout="modal" whoami={whoami} />
-    </SafeModalScrollView>
-  )
-}
-
-const AvatarSection: FC<{
-  whoami: MeModel
-}> = ({ whoami }) => {
-  return (
-    <View className="mt-6 items-center justify-center">
-      <UserAvatar
-        image={whoami?.image}
-        name={whoami?.name}
-        size={80}
-        className={!whoami?.name || !whoami.image ? "bg-system-background" : ""}
-      />
-
-      <TouchableOpacity className="mt-2" hitSlop={10} onPress={setAvatar}>
-        <Text className="text-accent text-lg">Set Avatar</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-const ProfileForm: FC<{
-  whoami: MeModel
-  layout?: "modal" | "screen"
-}> = ({ whoami, layout = "screen" }) => {
+  const { t } = useTranslation("settings")
   const [dirtyFields, setDirtyFields] = useState<Partial<UserProfileEditable>>({})
 
   const { mutateAsync: updateProfile, isPending } = useMutation({
@@ -116,38 +49,68 @@ const ProfileForm: FC<{
     },
   })
 
-  const label = useColor("label")
-  const headerRight = useCallback(
-    () => (
-      <UIBarButton
-        label="Save"
-        disabled={isPending || Object.keys(dirtyFields).length === 0}
-        normalIcon={
-          isPending ? (
-            <RotateableLoading size={20} color={withOpacity(label, 0.5)} />
-          ) : (
-            <CheckLineIcon height={20} width={20} />
-          )
-        }
-        onPress={() => {
-          updateProfile()
-        }}
-      />
-    ),
-    [dirtyFields, isPending, label, updateProfile],
-  )
-
-  const Header =
-    layout === "modal" ? (
-      <ModalHeader headerRight={headerRight()} headerTitle="Edit Profile" />
-    ) : (
-      <NavigationBlurEffectHeader headerRight={headerRight} title="Edit Profile" />
+  if (!whoami) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <PlatformActivityIndicator />
+      </View>
     )
+  }
 
   return (
-    <View className="mt-4">
-      {Header}
+    <SafeNavigationScrollView
+      Header={
+        <NavigationBlurEffectHeaderView
+          headerRight={
+            <HeaderSubmitTextButton
+              label={t("words.save", { ns: "common" })}
+              isValid={isPending || Object.keys(dirtyFields).length === 0}
+              onPress={() => {
+                updateProfile()
+              }}
+            />
+          }
+          title={t("profile.edit_profile")}
+        />
+      }
+      className="bg-system-grouped-background"
+    >
+      <AvatarSection whoami={whoami} />
+      <ProfileForm whoami={whoami} dirtyFields={dirtyFields} setDirtyFields={setDirtyFields} />
+    </SafeNavigationScrollView>
+  )
+}
 
+const AvatarSection: FC<{
+  whoami: MeModel
+}> = ({ whoami }) => {
+  const { t } = useTranslation("settings")
+  return (
+    <View className="mt-6 items-center justify-center">
+      <UserAvatar
+        image={whoami?.image}
+        name={whoami?.name}
+        size={80}
+        className={!whoami?.name || !whoami.image ? "bg-system-background" : ""}
+      />
+
+      <TouchableOpacity className="mt-2" hitSlop={10} onPress={setAvatar}>
+        <Text className="text-accent text-lg">{t("profile.set_avatar")}</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+const ProfileForm: FC<{
+  whoami: MeModel
+  dirtyFields: Partial<UserProfileEditable>
+  setDirtyFields: (dirtyFields: Partial<UserProfileEditable>) => void
+}> = ({ whoami, dirtyFields, setDirtyFields }) => {
+  const { t } = useTranslation("settings")
+
+  const navigation = useNavigation()
+  return (
+    <View className="mt-4">
       <TouchableWithoutFeedback
         onPress={() => {
           KeyboardController.dismiss()
@@ -156,7 +119,7 @@ const ProfileForm: FC<{
         <View className="w-full">
           <GroupedInsetListCard>
             <GroupedInsetListCell
-              label="Display Name"
+              label={t("profile.name.label")}
               leftClassName="flex-none"
               rightClassName="flex-1"
             >
@@ -173,11 +136,15 @@ const ProfileForm: FC<{
               </View>
             </GroupedInsetListCell>
           </GroupedInsetListCard>
-          <GroupedOutlineDescription description="This is the name that will be displayed to other users." />
+          <GroupedOutlineDescription description={t("profile.name.description")} />
 
           {/* User name */}
           <GroupedInsetListCard className="mt-4">
-            <GroupedInsetListCell label="Handle" leftClassName="flex-none" rightClassName="flex-1">
+            <GroupedInsetListCell
+              label={t("profile.handle.label")}
+              leftClassName="flex-none"
+              rightClassName="flex-1"
+            >
               <View className="flex-1">
                 <PlainTextField
                   className="text-secondary-label w-full flex-1 text-right"
@@ -191,14 +158,14 @@ const ProfileForm: FC<{
               </View>
             </GroupedInsetListCell>
           </GroupedInsetListCard>
-          <GroupedOutlineDescription description="Your handle is used to identify you on Follow." />
+          <GroupedOutlineDescription description={t("profile.handle.description")} />
 
           {/* Email */}
           <GroupedInsetListCard className="mt-4">
             <GroupedInsetListNavigationLink
-              label="Email"
+              label={t("profile.email.label")}
               onPress={() => {
-                router.push("/edit-email")
+                navigation.presentControllerView(EditEmailScreen)
               }}
               leftClassName="flex-none"
               rightClassName="flex-1"

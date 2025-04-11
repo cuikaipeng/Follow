@@ -7,7 +7,12 @@
       "ToasterModule",
       "AppleIntelligenceGlowEffectModule",
       "FollowNative.GaleriaModule",
-      "GaleriaAccessoryModule"
+      "GaleriaAccessoryModule",
+      "TabBarModule",
+      "TabScreenModule",
+      "TabBarPortalModule",
+      "EnhancePagerViewModule",
+      "EnhancePageViewModule"
     ]
   },
   "android": {

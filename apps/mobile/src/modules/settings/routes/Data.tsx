@@ -1,9 +1,10 @@
 import * as FileSystem from "expo-file-system"
-import { Alert, View } from "react-native"
+import { useTranslation } from "react-i18next"
+import { Alert } from "react-native"
 
 import { setDataSetting, useDataSettingKey } from "@/src/atoms/settings/data"
 import {
-  NavigationBlurEffectHeader,
+  NavigationBlurEffectHeaderView,
   SafeNavigationScrollView,
 } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import {
@@ -19,81 +20,88 @@ import { toast } from "@/src/lib/toast"
 import { exportLocalDatabase, importOpml } from "../utils"
 
 export const DataScreen = () => {
+  const { t } = useTranslation("settings")
   const sendAnonymousData = useDataSettingKey("sendAnonymousData")
   return (
-    <SafeNavigationScrollView className="bg-system-grouped-background">
-      <NavigationBlurEffectHeader title="Data" />
-      <View className="mt-6">
-        <GroupedInsetListSectionHeader label="Privacy" />
+    <SafeNavigationScrollView
+      className="bg-system-grouped-background"
+      Header={<NavigationBlurEffectHeaderView title={t("titles.data_control")} />}
+    >
+      <GroupedInsetListSectionHeader label={t("general.privacy")} marginSize="small" />
 
-        <GroupedInsetListCard>
-          <GroupedInsetListCell
-            label="Send anonymous data"
-            description="By opting to send anonymized telemetry data, you contribute to improving the overall user experience of Follow."
-          >
-            <Switch
-              size="sm"
-              value={sendAnonymousData}
-              onValueChange={(val) => {
-                setDataSetting("sendAnonymousData", val)
-              }}
-            />
-          </GroupedInsetListCell>
-        </GroupedInsetListCard>
-      </View>
+      <GroupedInsetListCard>
+        <GroupedInsetListCell
+          label={t("general.send_anonymous_data.label")}
+          description={t("general.send_anonymous_data.description")}
+        >
+          <Switch
+            size="sm"
+            value={sendAnonymousData}
+            onValueChange={(val) => {
+              setDataSetting("sendAnonymousData", val)
+            }}
+          />
+        </GroupedInsetListCell>
+      </GroupedInsetListCard>
 
       {/* Data Sources */}
-      <View className="mt-6">
-        <GroupedInsetListSectionHeader label="Data Sources" />
-        <GroupedInsetListCard>
-          <GroupedInsetListActionCell onPress={importOpml} label="Import subscriptions from OPML" />
 
-          <GroupedInsetListActionCell onPress={exportLocalDatabase} label="Export local database" />
-        </GroupedInsetListCard>
-      </View>
+      <GroupedInsetListSectionHeader label={t("data_control.data_sources")} />
+      <GroupedInsetListCard>
+        <GroupedInsetListActionCell
+          onPress={importOpml}
+          label={t("data_control.import_opml.label")}
+        />
+
+        <GroupedInsetListActionCell
+          onPress={exportLocalDatabase}
+          label={t("data_control.export_local_database.label")}
+        />
+      </GroupedInsetListCard>
 
       {/* Utils */}
 
-      <View className="mt-6">
-        <GroupedInsetListSectionHeader label="Utils" />
+      <GroupedInsetListSectionHeader label={t("data_control.utils")} />
 
-        <GroupedInsetListCard>
-          <GroupedInsetListActionCell
-            onPress={() => {
-              Alert.alert(
-                "Rebuild database?",
-                "This will delete all your offline cached data and rebuild the database, and after that the app will reload.",
-                [
-                  {
-                    text: "Cancel",
-                    style: "cancel",
-                  },
-                  {
-                    text: "Rebuild",
-                    style: "destructive",
-                    onPress: async () => {
-                      const dbPath = getDbPath()
-                      await FileSystem.deleteAsync(dbPath)
-                      await expo.reloadAppAsync("Clear Sqlite Data")
-                    },
-                  },
-                ],
-              )
-            }}
-            label="Rebuild database"
-            description="If you are experiencing rendering issues, rebuilding the database may solve them."
-          />
-
-          <GroupedInsetListActionCell
-            onPress={() => {
-              Alert.alert("Clear cache?", "This will clear all temporary files and cached data.", [
+      <GroupedInsetListCard>
+        <GroupedInsetListActionCell
+          onPress={() => {
+            Alert.alert(
+              t("general.rebuild_database.title"),
+              t("general.rebuild_database.warning.line1"),
+              [
                 {
-                  text: "Cancel",
+                  text: t("general.rebuild_database.cancel"),
                   style: "cancel",
                 },
                 {
-                  text: "Clear",
+                  text: t("general.rebuild_database.button"),
+                  style: "destructive",
+                  onPress: async () => {
+                    const dbPath = getDbPath()
+                    await FileSystem.deleteAsync(dbPath)
+                    await expo.reloadAppAsync("Clear Sqlite Data")
+                  },
+                },
+              ],
+            )
+          }}
+          label={t("general.rebuild_database.label")}
+          description={t("general.rebuild_database.description")}
+        />
 
+        <GroupedInsetListActionCell
+          onPress={() => {
+            Alert.alert(
+              t("data_control.clean_cache.button"),
+              t("data_control.clean_cache.description"),
+              [
+                {
+                  text: t("data_control.clean_cache.cancel"),
+                  style: "cancel",
+                },
+                {
+                  text: t("data_control.clean_cache.clear"),
                   isPreferred: true,
                   onPress: async () => {
                     const cacheDir = FileSystem.cacheDirectory
@@ -103,13 +111,13 @@ export const DataScreen = () => {
                     toast.success("Cache cleared")
                   },
                 },
-              ])
-            }}
-            label="Clear cache"
-            description="Clear temporary files and cached data to free up storage space."
-          />
-        </GroupedInsetListCard>
-      </View>
+              ],
+            )
+          }}
+          label={t("data_control.clean_cache.button")}
+          description={t("data_control.clean_cache.description")}
+        />
+      </GroupedInsetListCard>
     </SafeNavigationScrollView>
   )
 }

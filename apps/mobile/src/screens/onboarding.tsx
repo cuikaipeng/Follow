@@ -1,10 +1,12 @@
-import { router } from "expo-router"
-import { useCallback, useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { SheetScreen } from "react-native-sheet-transitions"
+import { tracker } from "@follow/tracker"
+import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { SafeAreaView, Text, TouchableOpacity, View } from "react-native"
+import Animated, { FadeInRight, FadeOutLeft } from "react-native-reanimated"
 
 import { kv } from "../lib/kv"
+import { useNavigation } from "../lib/navigation/hooks"
+import type { NavigationControllerView } from "../lib/navigation/types"
 import { queryClient } from "../lib/query-client"
 import { StepFinished } from "../modules/onboarding/step-finished"
 import { StepInterests } from "../modules/onboarding/step-interests"
@@ -12,66 +14,73 @@ import { StepPreferences } from "../modules/onboarding/step-preferences"
 import { StepWelcome } from "../modules/onboarding/step-welcome"
 import { isNewUserQueryKey, isOnboardingFinishedStorageKey } from "../store/user/constants"
 
-export default function Onboarding() {
-  const insets = useSafeAreaInsets()
+export const OnboardingScreen: NavigationControllerView = () => {
+  const { t } = useTranslation("common")
+
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 4
 
+  const navigation = useNavigation()
   const handleNext = useCallback(() => {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1)
+      tracker.onBoarding({ step: currentStep, done: false })
     } else {
       // Complete onboarding
+      tracker.onBoarding({ step: currentStep, done: true })
       kv.set(isOnboardingFinishedStorageKey, "true")
       queryClient.invalidateQueries({ queryKey: isNewUserQueryKey }).then(() => {
-        router.back()
+        navigation.back()
       })
     }
-  }, [currentStep])
+  }, [currentStep, navigation])
+  useEffect(() => {
+    tracker.onBoarding({ step: 0, done: false })
+  }, [])
 
   return (
-    <SheetScreen
-      onClose={() => {
-        router.back()
-      }}
-    >
-      <View
-        style={{ paddingTop: insets.top }}
-        className="p-safe bg-system-grouped-background flex-1 px-6"
-      >
+    <View className="bg-system-grouped-background flex-1 px-6">
+      <SafeAreaView className="flex-1">
         <ProgressIndicator
           currentStep={currentStep}
           totalSteps={totalSteps}
           setCurrentStep={setCurrentStep}
         />
 
-        {/* Content */}
-        {currentStep === 1 && <StepWelcome />}
-        {currentStep === 2 && <StepPreferences />}
-        {currentStep === 3 && <StepInterests />}
-        {currentStep === 4 && <StepFinished />}
+        <Animated.View
+          className={"flex-1"}
+          key={`step-${currentStep}`}
+          exiting={FadeOutLeft}
+          entering={FadeInRight}
+        >
+          {/* Content */}
+          {currentStep === 1 && <StepWelcome />}
+          {currentStep === 2 && <StepPreferences />}
+          {currentStep === 3 && <StepInterests />}
+          {currentStep === 4 && <StepFinished />}
+        </Animated.View>
 
         {/* Navigation buttons */}
-        <View className="mb-6 px-6" style={{ marginBottom: insets.bottom || 24 }}>
+        <View className="mb-6 px-6">
           <TouchableOpacity
             onPress={handleNext}
             className="bg-accent w-full items-center rounded-xl py-4"
           >
             <Text className="text-lg font-bold text-white">
               {currentStep < totalSteps - 1
-                ? "Next"
+                ? t("words.next")
                 : currentStep === totalSteps - 1
-                  ? "Finish Setup"
-                  : "Let's Go!"}
+                  ? t("words.finishSetup")
+                  : t("words.letsGo")}
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </SheetScreen>
+      </SafeAreaView>
+    </View>
   )
 }
 
-export function ProgressIndicator({
+function ProgressIndicator({
   currentStep,
   totalSteps,
   setCurrentStep,

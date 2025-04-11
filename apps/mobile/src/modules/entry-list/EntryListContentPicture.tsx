@@ -2,27 +2,32 @@ import { useTypeScriptHappyCallback } from "@follow/hooks"
 import type { MasonryFlashListProps } from "@shopify/flash-list"
 import type { ElementRef } from "react"
 import { forwardRef } from "react"
-import { ActivityIndicator, View } from "react-native"
+import { View } from "react-native"
 
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { useFetchEntriesControls } from "@/src/modules/screen/atoms"
+import { usePrefetchEntryTranslation } from "@/src/store/translation/hooks"
 
 import { TimelineSelectorMasonryList } from "../screen/TimelineSelectorList"
+import { GridEntryListFooter } from "./EntryListFooter"
 import { useOnViewableItemsChanged } from "./hooks"
 // import type { MasonryItem } from "./templates/EntryGridItem"
 import { EntryPictureItem } from "./templates/EntryPictureItem"
 
 export const EntryListContentPicture = forwardRef<
   ElementRef<typeof TimelineSelectorMasonryList>,
-  { entryIds: string[]; active?: boolean } & Omit<
+  { entryIds: string[] | null; active?: boolean } & Omit<
     MasonryFlashListProps<string>,
     "data" | "renderItem"
   >
 >(({ entryIds, active, ...rest }, ref) => {
   const { fetchNextPage, refetch, isRefetching, hasNextPage, isFetching } =
     useFetchEntriesControls()
-  const { onViewableItemsChanged, onScroll } = useOnViewableItemsChanged({
+  const { onViewableItemsChanged, onScroll, viewableItems } = useOnViewableItemsChanged({
     disabled: active === false || isFetching,
   })
+
+  usePrefetchEntryTranslation(active ? viewableItems.map((item) => item.key) : [])
 
   return (
     <TimelineSelectorMasonryList
@@ -41,9 +46,11 @@ export const EntryListContentPicture = forwardRef<
       ListFooterComponent={
         hasNextPage ? (
           <View className="h-20 items-center justify-center">
-            <ActivityIndicator />
+            <PlatformActivityIndicator />
           </View>
-        ) : null
+        ) : (
+          <GridEntryListFooter />
+        )
       }
       {...rest}
       onRefresh={refetch}

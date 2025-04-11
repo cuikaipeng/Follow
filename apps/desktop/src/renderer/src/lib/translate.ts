@@ -1,40 +1,15 @@
 import { parseHtml } from "@follow/components/ui/markdown/parse-html.js"
 import { views } from "@follow/constants"
-import type { SupportedLanguages } from "@follow/models/types"
+import type { SupportedActionLanguage } from "@follow/shared"
+import { ACTION_LANGUAGE_MAP } from "@follow/shared"
 import { franc } from "franc-min"
 
 import type { FlatEntryModel } from "~/store/entry"
 
 import { apiClient } from "./api-fetch"
 
-export const LanguageMap: Record<
-  SupportedLanguages,
-  {
-    label: string
-    value: string
-    code: string
-  }
-> = {
-  en: {
-    value: "en",
-    label: "English",
-    code: "eng",
-  },
-  ja: {
-    value: "ja",
-    label: "Japanese",
-    code: "jpn",
-  },
-  "zh-CN": {
-    value: "zh-CN",
-    label: "Simplified Chinese",
-    code: "cmn",
-  },
-  "zh-TW": {
-    value: "zh-TW",
-    label: "Traditional Chinese (Taiwan)",
-    code: "cmn",
-  },
+function duplicateIfLengthLessThan(text: string, length: number) {
+  return text.length < length ? text.repeat(Math.ceil(length / text.length)) : text
 }
 
 export const checkLanguage = ({
@@ -42,20 +17,22 @@ export const checkLanguage = ({
   language,
 }: {
   content: string
-  language: SupportedLanguages
+  language: SupportedActionLanguage
 }) => {
   if (!content) return true
   const pureContent = parseHtml(content)
     .toText()
     .replaceAll(/https?:\/\/\S+|www\.\S+/g, " ")
-  const sourceLanguage = franc(pureContent, {
-    only: [LanguageMap[language].code],
-  })
-  if (sourceLanguage === LanguageMap[language].code) {
-    return true
-  } else {
+  const { code } = ACTION_LANGUAGE_MAP[language]
+  if (!code) {
     return false
   }
+
+  const sourceLanguage = franc(duplicateIfLengthLessThan(pureContent, 20), {
+    only: [code],
+  })
+
+  return sourceLanguage === code
 }
 
 export async function translate({
@@ -65,13 +42,13 @@ export async function translate({
   extraFields,
   part,
 }: {
-  entry: FlatEntryModel
+  entry?: FlatEntryModel | null
   view?: number
-  language?: SupportedLanguages
+  language?: SupportedActionLanguage
   extraFields?: string[]
   part?: string
 }) {
-  if (!language) {
+  if (!language || !entry) {
     return null
   }
   let fields = language && view !== undefined ? views[view!]!.translation.split(",") : []
@@ -91,17 +68,17 @@ export async function translate({
     }
   })
 
-  if (fields.length > 0) {
-    const res = await apiClient.ai.translation.$get({
-      query: {
-        id: entry.entries.id,
-        language,
-        fields: fields?.join(",") || "title",
-        part,
-      },
-    })
-    return res.data
-  } else {
+  if (fields.length === 0) {
     return null
   }
+
+  const res = await apiClient.ai.translation.$get({
+    query: {
+      id: entry.entries.id,
+      language,
+      fields: fields?.join(",") || "title",
+      part,
+    },
+  })
+  return res.data
 }

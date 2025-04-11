@@ -162,7 +162,7 @@ export function Recommendations({
 
       <div
         className={cn(
-          "z-[9] my-3 flex w-full flex-col items-end gap-4 sm:flex-row sm:items-center",
+          "bg-background z-[9] my-3 flex w-full flex-col items-end gap-4 sm:flex-row sm:items-center",
           headerClassName,
         )}
       >
@@ -176,7 +176,7 @@ export function Recommendations({
             <TabsList>
               {RSSHubCategories.map((category) => (
                 <TabsTrigger data-value={category} key={category} value={category}>
-                  {t(`discover.category.${category}`)}
+                  {t(`discover.category.${category}`, { ns: "common" })}
                 </TabsTrigger>
               ))}
             </TabsList>

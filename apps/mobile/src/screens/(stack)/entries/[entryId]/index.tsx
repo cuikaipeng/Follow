@@ -1,45 +1,53 @@
 import { FeedViewType } from "@follow/constants"
-import { useLocalSearchParams } from "expo-router"
+import { PortalProvider } from "@gorhom/portal"
 import { atom, useAtomValue } from "jotai"
 import { useEffect, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { useGeneralSettingKey } from "@/src/atoms/settings/general"
 import { BottomTabBarHeightContext } from "@/src/components/layouts/tabbar/contexts/BottomTabBarHeightContext"
 import { SafeNavigationScrollView } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { EntryContentWebView } from "@/src/components/native/webview/EntryContentWebView"
-import { PortalHost } from "@/src/components/ui/portal"
 import { openLink } from "@/src/lib/native"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { EntryContentContext, useEntryContentContext } from "@/src/modules/entry-content/ctx"
 import { EntryAISummary } from "@/src/modules/entry-content/EntryAISummary"
-import { useEntry, usePrefetchEntryContent } from "@/src/store/entry/hooks"
+import { useEntry, usePrefetchEntryDetail } from "@/src/store/entry/hooks"
 import { entrySyncServices } from "@/src/store/entry/store"
-import type { EntryModel } from "@/src/store/entry/types"
+import type { EntryWithTranslation } from "@/src/store/entry/types"
 import { useFeed } from "@/src/store/feed/hooks"
-import { summarySyncService } from "@/src/store/summary/store"
+import { useEntryTranslation, usePrefetchEntryTranslation } from "@/src/store/translation/hooks"
 import { useAutoMarkAsRead } from "@/src/store/unread/hooks"
 
 import { EntrySocialTitle, EntryTitle } from "../../../../modules/entry-content/EntryTitle"
 
-export default function EntryDetailPage() {
-  const { entryId, view } = useLocalSearchParams<{
-    entryId: string
-    view: string
-  }>()
-
-  const viewType = Number.parseInt(view) as FeedViewType
-  usePrefetchEntryContent(entryId as string)
-  useAutoMarkAsRead(entryId as string)
-  const entry = useEntry(entryId as string)
+export const EntryDetailScreen: NavigationControllerView<{
+  entryId: string
+  view: FeedViewType
+}> = ({ entryId, view: viewType }) => {
+  usePrefetchEntryDetail(entryId)
+  usePrefetchEntryTranslation([entryId], true)
+  useAutoMarkAsRead(entryId)
+  const entry = useEntry(entryId)
+  const translation = useEntryTranslation(entryId)
+  const entryWithTranslation = useMemo(() => {
+    if (!entry) return entry
+    return {
+      ...entry,
+      translation,
+    } as EntryWithTranslation
+  }, [entry, translation])
 
   const insets = useSafeAreaInsets()
   const ctxValue = useMemo(
     () => ({
       showAISummaryAtom: atom(entry?.settings?.summary || false),
+      showAITranslationAtom: atom(!!entry?.settings?.translation || false),
       showReadabilityAtom: atom(entry?.settings?.readability || false),
     }),
-    [entry?.settings?.readability, entry?.settings?.summary],
+    [entry?.settings?.readability, entry?.settings?.summary, entry?.settings?.translation],
   )
 
   useEffect(() => {
@@ -48,15 +56,9 @@ export default function EntryDetailPage() {
     }
   }, [entry?.settings?.readability, entryId])
 
-  useEffect(() => {
-    if (entry?.settings?.summary) {
-      summarySyncService.generateSummary(entryId)
-    }
-  }, [entry?.settings?.summary, entryId])
-
   return (
     <EntryContentContext.Provider value={ctxValue}>
-      <PortalHost>
+      <PortalProvider>
         <BottomTabBarHeightContext.Provider value={insets.bottom}>
           <SafeNavigationScrollView
             automaticallyAdjustContentInsets={false}
@@ -84,9 +86,9 @@ export default function EntryDetailPage() {
               )}
             </Pressable>
             <EntryAISummary entryId={entryId as string} />
-            {entry && (
+            {entryWithTranslation && (
               <View className="mt-3">
-                <EntryContentWebViewWithContext entry={entry} />
+                <EntryContentWebViewWithContext entry={entryWithTranslation} />
               </View>
             )}
             {viewType === FeedViewType.SocialMedia && (
@@ -96,15 +98,23 @@ export default function EntryDetailPage() {
             )}
           </SafeNavigationScrollView>
         </BottomTabBarHeightContext.Provider>
-      </PortalHost>
+      </PortalProvider>
     </EntryContentContext.Provider>
   )
 }
 
-const EntryContentWebViewWithContext = ({ entry }: { entry: EntryModel }) => {
-  const { showReadabilityAtom } = useEntryContentContext()
+const EntryContentWebViewWithContext = ({ entry }: { entry: EntryWithTranslation }) => {
+  const { showReadabilityAtom, showAITranslationAtom } = useEntryContentContext()
   const showReadability = useAtomValue(showReadabilityAtom)
-  return <EntryContentWebView entry={entry} showReadability={showReadability} />
+  const translationSetting = useGeneralSettingKey("translation")
+  const showTranslation = useAtomValue(showAITranslationAtom)
+  return (
+    <EntryContentWebView
+      entry={entry}
+      showReadability={showReadability}
+      showTranslation={translationSetting || showTranslation}
+    />
+  )
 }
 
 const EntryInfo = ({ entryId }: { entryId: string }) => {

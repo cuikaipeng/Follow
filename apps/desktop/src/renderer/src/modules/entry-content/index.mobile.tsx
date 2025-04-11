@@ -1,35 +1,33 @@
 import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.js"
 import { ScrollElementContext } from "@follow/components/ui/scroll-area/ctx.js"
 import { useTitle } from "@follow/hooks"
-import type { FeedModel, InboxModel, SupportedLanguages } from "@follow/models/types"
+import type { FeedModel, InboxModel } from "@follow/models/types"
 import { nextFrame, stopPropagation } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
 import { ErrorBoundary } from "@sentry/react"
 import { useEffect, useMemo, useState } from "react"
 
-import { useShowAITranslation } from "~/atoms/ai-translation"
 import { useAudioPlayerAtomSelector } from "~/atoms/player"
-import { useGeneralSettingSelector } from "~/atoms/settings/general"
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { ShadowDOM } from "~/components/common/ShadowDOM"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { useAuthQuery, usePreventOverscrollBounce } from "~/hooks/common"
-import { checkLanguage } from "~/lib/translate"
 import { WrappedElementProvider } from "~/providers/wrapped-element-provider"
 import { Queries } from "~/queries"
+import { useEntryTranslation } from "~/store/ai/hook"
 import { useEntry } from "~/store/entry"
 import { useFeedById } from "~/store/feed"
 import { useInboxById } from "~/store/inbox"
 
 import { CornerPlayer } from "../player/corner-player"
 import { EntryContentHTMLRenderer } from "../renderer/html"
-import { getTranslationCache, setTranslationCache } from "./atoms"
+import { AISummary } from "./AISummary"
 import { EntryReadHistory } from "./components/EntryReadHistory"
 import { EntryTitle } from "./components/EntryTitle"
 import { SupportCreator } from "./components/SupportCreator"
 import { EntryHeader } from "./header"
-import { AISummary, NoContent, RenderError, TitleMetaHandler } from "./index.shared"
+import { NoContent, RenderError, TitleMetaHandler } from "./index.shared"
 import { EntryContentLoading } from "./loading"
 
 export interface EntryContentClassNames {
@@ -103,10 +101,8 @@ export const EntryContent: Component<{
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
 
   const customCSS = useUISettingKey("customCSS")
-  const showAITranslation = useShowAITranslation()
-  const translationLanguage = useGeneralSettingSelector(
-    (s) => s.translationLanguage,
-  ) as SupportedLanguages
+
+  const contentTranslated = useEntryTranslation({ entry, extraFields: ["content"] })
 
   const contentLineHeight = useUISettingKey("contentLineHeight")
   const contentFontSize = useUISettingKey("contentFontSize")
@@ -126,39 +122,9 @@ export const EntryContent: Component<{
 
   if (!entry) return null
 
-  const content = entry?.entries.content ?? data?.entries.content
-
-  const translate = async (html: HTMLElement | null) => {
-    if (!html || !entry) return
-
-    const fullText = html.textContent ?? ""
-    if (!fullText) return
-
-    const translation =
-      entry.settings?.translation ?? (showAITranslation ? translationLanguage : undefined)
-
-    if (translation) {
-      const isLanguageMatch = checkLanguage({
-        content: fullText,
-        language: translation,
-      })
-      if (isLanguageMatch) {
-        return
-      }
-    }
-
-    const { immersiveTranslate } = await import("~/lib/immersive-translate")
-    immersiveTranslate({
-      html,
-      entry,
-      targetLanguage: translation as SupportedLanguages,
-      cache: {
-        get: (key: string) => getTranslationCache()[key],
-        set: (key: string, value: string) =>
-          setTranslationCache({ ...getTranslationCache(), [key]: value }),
-      },
-    })
-  }
+  const entryContent = entry?.entries.content ?? data?.entries.content
+  const translatedContent = contentTranslated.data?.content
+  const content = translatedContent || entryContent
 
   const isInbox = !!inbox
 
@@ -217,7 +183,6 @@ export const EntryContent: Component<{
                           view={view}
                           feedId={feed?.id}
                           entryId={entryId}
-                          handleTranslate={translate}
                           mediaInfo={mediaInfo}
                           noMedia={noMedia}
                           as="article"
@@ -236,7 +201,7 @@ export const EntryContent: Component<{
                   <div className="center mt-16 min-w-0">
                     {isPending ? (
                       <EntryContentLoading
-                        icon={!isInbox ? (feed as FeedModel)?.siteUrl! : undefined}
+                        icon={!isInbox ? (feed as FeedModel)?.siteUrl : undefined}
                       />
                     ) : error ? (
                       <div className="center flex min-w-0 flex-col gap-2">

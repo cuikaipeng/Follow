@@ -1,8 +1,10 @@
-import type { RouteProp } from "@react-navigation/native"
+import { useTranslation } from "react-i18next"
 import { Text, View } from "react-native"
 
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { Select } from "@/src/components/ui/form/Select"
 import { PlainTextField } from "@/src/components/ui/form/TextField"
 import {
@@ -11,29 +13,32 @@ import {
   GroupedInsetListSectionHeader,
 } from "@/src/components/ui/grouped/GroupedList"
 import { views } from "@/src/constants/views"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { useActionRuleCondition } from "@/src/store/action/hooks"
 import { actionActions } from "@/src/store/action/store"
 import type { ConditionIndex } from "@/src/store/action/types"
 import { accentColor } from "@/src/theme/colors"
 
 import { filterFieldOptions, filterOperatorOptions } from "../actions/constant"
-import type { SettingsStackParamList } from "../types"
 
-export function EditConditionScreen({
-  route,
-}: {
-  route: RouteProp<SettingsStackParamList, "EditCondition">
-}) {
+export const EditConditionScreen: NavigationControllerView<{
+  ruleIndex: number
+  groupIndex: number
+  conditionIndex: number
+}> = (params) => {
+  const { t } = useTranslation("settings")
   return (
-    <SafeModalScrollView className="bg-system-grouped-background">
-      <ModalHeader headerTitle="Edit Condition" />
-
-      <ConditionForm index={route.params} />
-    </SafeModalScrollView>
+    <SafeNavigationScrollView
+      className="bg-system-grouped-background"
+      Header={<NavigationBlurEffectHeaderView title={t("actions.edit_condition")} />}
+    >
+      <ConditionForm index={params} />
+    </SafeNavigationScrollView>
   )
 }
 
 function ConditionForm({ index }: { index: ConditionIndex }) {
+  const { t } = useTranslation("settings")
   const item = useActionRuleCondition(index)!
   const currentField = filterFieldOptions.find((field) => field.value === item.field)
   const currentOperator = filterOperatorOptions.find((field) => field.value === item.operator)
@@ -41,15 +46,16 @@ function ConditionForm({ index }: { index: ConditionIndex }) {
     currentField?.type === "view"
       ? views.find((view) => view.view === Number(item.value))
       : undefined
+  const { t: tCommon } = useTranslation("common")
 
   return (
-    <View className="mt-6">
-      <GroupedInsetListSectionHeader label="Condition" />
+    <>
+      <GroupedInsetListSectionHeader label={t("actions.condition")} />
       <GroupedInsetListCard>
         <GroupedInsetListBaseCell className="flex flex-row justify-between">
-          <Text className="text-label">Field</Text>
+          <Text className="text-label">{t("actions.action_card.field")}</Text>
           <Select
-            options={filterFieldOptions}
+            options={filterFieldOptions.map((i) => ({ ...i, label: t(i.label) }))}
             value={currentField?.value}
             onValueChange={(value) => {
               actionActions.pathCondition(index, {
@@ -61,11 +67,11 @@ function ConditionForm({ index }: { index: ConditionIndex }) {
         </GroupedInsetListBaseCell>
 
         <GroupedInsetListBaseCell className="flex flex-row justify-between">
-          <Text className="text-label">Operator</Text>
+          <Text className="text-label">{t("actions.action_card.operator")}</Text>
           <Select
-            options={filterOperatorOptions.filter((operator) =>
-              operator.types.includes(currentField?.type ?? "text"),
-            )}
+            options={filterOperatorOptions
+              .map((i) => ({ ...i, label: t(i.label) }))
+              .filter((operator) => operator.types.includes(currentField?.type ?? "text"))}
             value={currentOperator?.value}
             onValueChange={(value) => {
               actionActions.pathCondition(index, {
@@ -77,11 +83,11 @@ function ConditionForm({ index }: { index: ConditionIndex }) {
         </GroupedInsetListBaseCell>
 
         <GroupedInsetListBaseCell className="flex flex-row justify-between">
-          <Text className="text-label">Value</Text>
+          <Text className="text-label">{t("actions.action_card.value")}</Text>
           {currentField?.type === "view" ? (
             <Select
               options={views.map((field) => ({
-                label: field.name,
+                label: tCommon(field.name),
                 value: String(field.view),
               }))}
               value={currentView?.view ? String(currentView.view) : undefined}
@@ -109,6 +115,6 @@ function ConditionForm({ index }: { index: ConditionIndex }) {
           <Text className="text-label">{JSON.stringify(item)}</Text>
         </View>
       )}
-    </View>
+    </>
   )
 }

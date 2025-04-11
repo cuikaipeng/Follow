@@ -19,6 +19,7 @@ export function useOnViewableItemsChanged({
 
   const markAsReadWhenScrolling = useGeneralSettingKey("scrollMarkUnread")
   const markAsReadWhenRendering = useGeneralSettingKey("renderMarkUnread")
+  const [viewableItems, setViewableItems] = useState<ViewToken[]>([])
   const [lastViewableItems, setLastViewableItems] = useState<ViewToken[] | null>()
   const [lastRemovedItems, setLastRemovedItems] = useState<ViewToken[] | null>(null)
 
@@ -28,11 +29,22 @@ export function useOnViewableItemsChanged({
     viewableItems: ViewToken[]
     changed: ViewToken[]
   }) => void = useNonReactiveCallback(({ viewableItems, changed }) => {
+    setViewableItems(viewableItems)
+
     debouncedFetchEntryContentByStream(viewableItems.map((item) => stableIdExtractor(item)))
+    const removed = changed.filter((item) => !item.isViewable)
 
     if (orientation.current === "down") {
       setLastViewableItems(viewableItems)
-      setLastRemovedItems(changed.filter((item) => !item.isViewable))
+      if (removed.length > 0) {
+        setLastRemovedItems((prev) => {
+          if (prev) {
+            return prev.concat(removed)
+          } else {
+            return removed
+          }
+        })
+      }
     } else {
       setLastRemovedItems(null)
       setLastViewableItems(null)
@@ -40,18 +52,26 @@ export function useOnViewableItemsChanged({
   })
 
   useEffect(() => {
-    if (!disabled) {
-      if (markAsReadWhenScrolling && lastRemovedItems) {
-        lastRemovedItems.forEach((item) => {
-          unreadSyncService.markEntryAsRead(stableIdExtractor(item))
-        })
-      }
+    if (disabled) return
 
-      if (markAsReadWhenRendering && lastViewableItems) {
-        lastViewableItems.forEach((item) => {
-          unreadSyncService.markEntryAsRead(stableIdExtractor(item))
+    if (markAsReadWhenScrolling && lastRemovedItems) {
+      lastRemovedItems.forEach((item) => {
+        unreadSyncService.markEntryAsRead(stableIdExtractor(item)).then(() => {
+          setLastRemovedItems((prev) => {
+            if (prev) {
+              return prev.filter((prevItem) => prevItem.key !== item.key)
+            } else {
+              return null
+            }
+          })
         })
-      }
+      })
+    }
+
+    if (markAsReadWhenRendering && lastViewableItems) {
+      lastViewableItems.forEach((item) => {
+        unreadSyncService.markEntryAsRead(stableIdExtractor(item))
+      })
     }
   }, [
     disabled,
@@ -69,7 +89,10 @@ export function useOnViewableItemsChanged({
     lastOffset.current = currentOffset
   }, [])
 
-  return useMemo(() => ({ onViewableItemsChanged, onScroll }), [onScroll, onViewableItemsChanged])
+  return useMemo(
+    () => ({ onViewableItemsChanged, onScroll, viewableItems }),
+    [onScroll, onViewableItemsChanged, viewableItems],
+  )
 }
 
 function useNonReactiveCallback<T extends (...args: any[]) => any>(fn: T): T {

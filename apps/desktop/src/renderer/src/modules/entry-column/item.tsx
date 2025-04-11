@@ -5,8 +5,7 @@ import { cn } from "@follow/utils/utils"
 import type { FC } from "react"
 import { memo } from "react"
 
-import { useAuthQuery } from "~/hooks/common"
-import { Queries } from "~/queries"
+import { useEntryTranslation } from "~/store/ai/hook"
 import type { FlatEntryModel } from "~/store/entry"
 import { useEntry } from "~/store/entry/hooks"
 
@@ -20,21 +19,7 @@ interface EntryItemProps {
   view?: number
 }
 function EntryItemImpl({ entry, view }: { entry: FlatEntryModel; view?: number }) {
-  const translation = useAuthQuery(
-    Queries.ai.translation({
-      entry,
-      view,
-      language: entry.settings?.translation,
-    }),
-    {
-      enabled: !!entry.settings?.translation,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      meta: {
-        persist: true,
-      },
-    },
-  )
+  const translation = useEntryTranslation({ entry })
 
   const Item: EntryListItemFC = getItemComponentByView(view as FeedViewType)
 
@@ -61,26 +46,23 @@ const LoadingCircleFallback = (
 export const EntryItemSkeleton: FC<{
   view: FeedViewType
   count?: number
-}> = memo(({ view, count }) => {
+}> = memo(({ view, count = 10 }) => {
   const SkeletonItem = getSkeletonItemComponentByView(view)
+
+  if (!SkeletonItem) {
+    return LoadingCircleFallback
+  }
+
   if (count === 1) {
     return SkeletonItem
   }
 
-  return SkeletonItem ? (
+  return (
     <div className={cn(views[view]!.gridMode ? girdClassNames : "flex flex-col")}>
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
-      {SkeletonItem}
+      {Array.from({ length: count }).map((_, index) => (
+        // eslint-disable-next-line @eslint-react/no-array-index-key -- index is unique
+        <div key={index}>{SkeletonItem}</div>
+      ))}
     </div>
-  ) : (
-    LoadingCircleFallback
   )
 })

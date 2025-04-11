@@ -10,7 +10,7 @@ import {
 } from "@follow/components/ui/select/index.jsx"
 import { ResponsiveSelect } from "@follow/components/ui/select/responsive.js"
 import { useIsDark, useThemeAtomValue } from "@follow/hooks"
-import { IN_ELECTRON } from "@follow/shared/constants"
+import { ELECTRON_BUILD, IN_ELECTRON } from "@follow/shared/constants"
 import { capitalizeFirstLetter, getOS } from "@follow/utils/utils"
 import dayjs from "dayjs"
 import { useForceUpdate } from "framer-motion"
@@ -28,8 +28,8 @@ import {
   useUISettingValue,
 } from "~/atoms/settings/ui"
 import { useCurrentModal, useModalStack } from "~/components/ui/modal/stacked/hooks"
-import { isElectronBuild } from "~/constants"
 import { useSetTheme } from "~/hooks/common"
+import { useShowCustomizeToolbarModal } from "~/modules/customize-toolbar/modal"
 
 import { SETTING_MODAL_ID } from "../constants"
 import {
@@ -40,15 +40,20 @@ import {
 } from "../control"
 import { createDefineSettingItem } from "../helper/builder"
 import { createSettingBuilder } from "../helper/setting-builder"
+import {
+  useWrapEnhancedSettingItem,
+  WrapEnhancedSettingTab,
+} from "../hooks/useWrapEnhancedSettingItem"
 import { SettingItemGroup } from "../section"
 import { ContentFontSelector, UIFontSelector } from "../sections/fonts"
 
 const SettingBuilder = createSettingBuilder(useUISettingValue)
-const defineItem = createDefineSettingItem(useUISettingValue, setUISetting)
+const _defineItem = createDefineSettingItem(useUISettingValue, setUISetting)
 
 export const SettingAppearance = () => {
   const { t } = useTranslation("settings")
   const isMobile = useMobile()
+  const defineItem = useWrapEnhancedSettingItem(_defineItem, WrapEnhancedSettingTab.Appearance)
   return (
     <div className="mt-4">
       <SettingBuilder
@@ -66,16 +71,16 @@ export const SettingAppearance = () => {
 
           {
             type: "title",
-            value: t("appearance.unread_count"),
+            value: t("appearance.unread_count.label"),
           },
 
           defineItem("showDockBadge", {
-            label: t("appearance.show_dock_badge.label"),
+            label: t("appearance.unread_count.badge.label"),
             hide: !IN_ELECTRON || !["macOS", "Linux"].includes(getOS()) || isMobile,
           }),
 
           defineItem("sidebarShowUnreadCount", {
-            label: t("appearance.sidebar_show_unread_count.label"),
+            label: t("appearance.unread_count.view_and_subscription.label"),
           }),
 
           {
@@ -94,7 +99,6 @@ export const SettingAppearance = () => {
           {
             type: "title",
             value: t("appearance.fonts"),
-            disabled: isMobile,
           },
           !isMobile && UIFontSelector,
           !isMobile && TextSize,
@@ -112,7 +116,7 @@ export const SettingAppearance = () => {
 
           defineItem("guessCodeLanguage", {
             label: t("appearance.guess_code_language.label"),
-            hide: !isElectronBuild,
+            hide: !ELECTRON_BUILD,
             description: t("appearance.guess_code_language.description"),
           }),
 
@@ -145,6 +149,7 @@ export const SettingAppearance = () => {
             description: t("appearance.use_pointer_cursor.description"),
             hide: isMobile,
           }),
+          CustomizeToolbar,
         ]}
       />
     </div>
@@ -495,5 +500,26 @@ const DateFormat = () => {
         size="sm"
       />
     </div>
+  )
+}
+
+/**
+ * @description customize the toolbar actions
+ */
+const CustomizeToolbar = () => {
+  const { t } = useTranslation("settings")
+  const showModal = useShowCustomizeToolbarModal()
+
+  return (
+    <SettingItemGroup>
+      <SettingActionItem
+        label={<span className="flex items-center gap-1">{t("customizeToolbar.title")}</span>}
+        action={async () => {
+          showModal()
+        }}
+        buttonText={t("customizeToolbar.title")}
+      />
+      <SettingDescription>{t("customizeToolbar.quick_actions.description")}</SettingDescription>
+    </SettingItemGroup>
   )
 }

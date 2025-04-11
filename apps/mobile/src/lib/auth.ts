@@ -41,7 +41,7 @@ const serverPlugins = [
 ] satisfies BetterAuthClientPlugin[]
 
 const authClient = createAuthClient({
-  baseURL: `${proxyEnv.VITE_API_URL}/better-auth`,
+  baseURL: `${proxyEnv.API_URL}/better-auth`,
   plugins: [
     twoFactorClient(),
     {
@@ -97,4 +97,10 @@ export const useAuthProviders = () => {
     queryKey: ["providers"],
     queryFn: async () => (await getProviders()).data,
   })
+}
+
+export function isAuthCodeValid(authCode: string) {
+  return (
+    authCode.length === 6 && !Array.from(authCode).some((c) => Number.isNaN(Number.parseInt(c)))
+  )
 }

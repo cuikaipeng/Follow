@@ -1,3 +1,4 @@
+import { DEV } from "@follow/shared/constants"
 import { env } from "@follow/shared/env.desktop"
 import type { AppType } from "@follow/shared/hono"
 import PKG from "@pkg"
@@ -8,9 +9,10 @@ import { toast } from "sonner"
 
 import { NetworkStatus, setApiStatus } from "~/atoms/network"
 import { setLoginModalShow } from "~/atoms/user"
-import { isDev } from "~/constants"
 import { NeedActivationToast } from "~/modules/activation/NeedActivationToast"
 import { DebugRegistry } from "~/modules/debug/registry"
+
+import { isInMAS } from "./utils"
 
 export const apiFetch = ofetch.create({
   baseURL: env.VITE_API_URL,
@@ -20,10 +22,13 @@ export const apiFetch = ofetch.create({
     const header = new Headers(options.headers)
 
     header.set("x-app-version", PKG.version)
-    if (isDev) {
+    if (DEV) {
       header.set("X-App-Dev", "1")
     }
-    header.set("X-App-Name", "Follow Web")
+    header.set("X-App-Name", "Folo Web")
+    if (isInMAS()) {
+      header.set("X-MAS", "1")
+    }
     options.headers = header
   },
   onResponse() {
@@ -85,12 +90,12 @@ export const apiClient = hc<AppType>(env.VITE_API_URL, {
   headers() {
     return {
       "X-App-Version": PKG.version,
-      "X-App-Name": "Follow Web",
+      "X-App-Name": "Folo Web",
     }
   },
 })
 
-if (isDev) {
+if (DEV) {
   DebugRegistry.add("Activation Toast", () => {
     setTimeout(() => {
       const toastId = toast.error(

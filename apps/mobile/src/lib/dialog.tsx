@@ -1,4 +1,5 @@
 import { cn } from "@follow/utils"
+import { t } from "i18next"
 import type { Dispatch, FC, ReactElement, ReactNode, SetStateAction } from "react"
 import {
   cloneElement,
@@ -18,6 +19,8 @@ import { useColor } from "react-native-uikit-colors"
 
 import { FullWindowOverlay } from "../components/common/FullWindowOverlay"
 import { Overlay } from "../components/ui/overlay/Overlay"
+import { Navigation } from "./navigation/Navigation"
+import { NavigationInstanceContext } from "./navigation/NavigationInstanceContext"
 
 export interface DialogProps<Ctx> {
   title?: string
@@ -192,39 +195,41 @@ class DialogStatic {
 
     const siblings = new RootSiblings(
       (
-        <FullWindowOverlay>
-          <Overlay onPress={handleClose} />
-          <Animated.View
-            className="bg-secondary-system-background absolute inset-x-0 -top-8 pt-8"
-            entering={entering}
-            exiting={exiting}
-          >
-            <SafeInsetTop />
-            <DialogDynamicButtonActionProvider>
-              {Header}
-              <View className={cn("px-6 pb-4", Header ? "pt-4" : "pt-0")}>
-                <DialogContext.Provider value={reactCtx}>{children}</DialogContext.Provider>
-              </View>
+        <NavigationInstanceContext.Provider value={Navigation.rootNavigation}>
+          <FullWindowOverlay>
+            <Overlay onPress={handleClose} />
+            <Animated.View
+              className="bg-secondary-system-background absolute inset-x-0 -top-8 pt-8"
+              entering={entering}
+              exiting={exiting}
+            >
+              <SafeInsetTop />
+              <DialogDynamicButtonActionProvider>
+                {Header}
+                <View className={cn("px-6 pb-4", Header ? "pt-4" : "pt-0")}>
+                  <DialogContext.Provider value={reactCtx}>{children}</DialogContext.Provider>
+                </View>
 
-              <View className="flex-row gap-4 px-6 pb-4">
-                <DialogDynamicButtonAction
-                  fallbackCaller={handleClose}
-                  text={override?.cancelText ?? props.cancelText ?? "Cancel"}
-                  type="cancel"
-                  textClassName={cn(props.variant === "destructive" && "font-bold")}
-                />
+                <View className="flex-row gap-4 px-6 pb-4">
+                  <DialogDynamicButtonAction
+                    fallbackCaller={handleClose}
+                    text={override?.cancelText ?? props.cancelText ?? t("common:words.cancel")}
+                    type="cancel"
+                    textClassName={cn(props.variant === "destructive" && "font-bold")}
+                  />
 
-                <DialogDynamicButtonAction
-                  fallbackCaller={handleConfirm}
-                  text={override?.confirmText ?? props.confirmText ?? "Confirm"}
-                  type="confirm"
-                  className={props.variant === "destructive" ? "bg-red" : "bg-accent"}
-                  textClassName={cn("text-white", props.variant !== "destructive" && "font-bold")}
-                />
-              </View>
-            </DialogDynamicButtonActionProvider>
-          </Animated.View>
-        </FullWindowOverlay>
+                  <DialogDynamicButtonAction
+                    fallbackCaller={handleConfirm}
+                    text={override?.confirmText ?? props.confirmText ?? t("common:words.confirm")}
+                    type="confirm"
+                    className={props.variant === "destructive" ? "bg-red" : "bg-accent"}
+                    textClassName={cn("text-white", props.variant !== "destructive" && "font-bold")}
+                  />
+                </View>
+              </DialogDynamicButtonActionProvider>
+            </Animated.View>
+          </FullWindowOverlay>
+        </NavigationInstanceContext.Provider>
       ),
     )
 

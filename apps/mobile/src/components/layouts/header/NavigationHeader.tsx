@@ -1,12 +1,20 @@
 import { cn } from "@follow/utils"
-import { HeaderTitle } from "@react-navigation/elements"
-import { router, Stack, useNavigation } from "expo-router"
 import type { FC, PropsWithChildren, ReactNode } from "react"
-import { createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
-import type { LayoutChangeEvent } from "react-native"
-import { StyleSheet, TouchableOpacity, View } from "react-native"
+import {
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
+import { Alert, StyleSheet, TouchableOpacity, View } from "react-native"
 import type { AnimatedProps } from "react-native-reanimated"
 import Animated, {
+  useAnimatedReaction,
   useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
@@ -14,26 +22,38 @@ import Animated, {
 } from "react-native-reanimated"
 import type { DefaultStyle } from "react-native-reanimated/lib/typescript/hook/commonTypes"
 import { useSafeAreaFrame, useSafeAreaInsets } from "react-native-safe-area-context"
-import type { NativeStackNavigationOptions } from "react-native-screens/lib/typescript/native-stack/types"
 import type { ViewProps } from "react-native-svg/lib/typescript/fabric/utils"
 import { useColor } from "react-native-uikit-colors"
 
+import { CloseCuteReIcon } from "@/src/icons/close_cute_re"
 import { MingcuteLeftLineIcon } from "@/src/icons/mingcute_left_line"
+import {
+  useCanBack,
+  useCanDismiss,
+  useIsTopRouteInGroup,
+  useNavigation,
+  useScreenIsInSheetModal,
+} from "@/src/lib/navigation/hooks"
+import { ScreenItemContext } from "@/src/lib/navigation/ScreenItemContext"
+import { useHorizontalScrolling } from "@/src/modules/screen/atoms"
 
 import { ThemedBlurView } from "../../common/ThemedBlurView"
+import { PlatformActivityIndicator } from "../../ui/loading/PlatformActivityIndicator"
 import { getDefaultHeaderHeight } from "../utils"
-import { NavigationContext } from "../views/NavigationContext"
 import { SetNavigationHeaderHeightContext } from "../views/NavigationHeaderContext"
+import { FakeNativeHeaderTitle } from "./FakeNativeHeaderTitle"
 
+interface NavigationHeaderButtonProps {
+  canGoBack: boolean
+  canDismiss: boolean
+  modal?: boolean
+  promptBeforeLeave?: boolean
+}
 export interface NavigationHeaderRawProps {
-  headerLeft?: FC<{
-    canGoBack: boolean
-  }>
-  headerTitle?: FC<React.ComponentProps<typeof HeaderTitle>> | ReactNode
+  headerLeft?: FC<NavigationHeaderButtonProps>
+  headerRight?: FC<NavigationHeaderButtonProps>
+  headerTitle?: FC<React.ComponentProps<typeof FakeNativeHeaderTitle>> | ReactNode
   headerTitleAbsolute?: boolean
-  headerRight?: FC<{
-    canGoBack: boolean
-  }>
 
   title?: string
 
@@ -42,6 +62,7 @@ export interface NavigationHeaderRawProps {
   hideableBottomHeight?: number
 }
 
+const HideableThreshold = 20
 const useHideableBottom = (
   enable: boolean,
   originalDefaultHeaderHeight: number,
@@ -52,7 +73,7 @@ const useHideableBottom = (
   const largeDefaultHeaderHeightRef = useRef(
     originalDefaultHeaderHeight + (hideableBottomHeight || 0),
   )
-  const largeHeaderHeight = useSharedValue(originalDefaultHeaderHeight)
+  const largeHeaderHeight = useSharedValue(largeDefaultHeaderHeightRef.current)
   const [hideableBottomRef, setHideableBottomRef] = useState<View | undefined>()
 
   useEffect(() => {
@@ -63,9 +84,10 @@ const useHideableBottom = (
     })
   }, [hideableBottomRef, largeHeaderHeight, originalDefaultHeaderHeight])
 
-  const { scrollY } = useContext(NavigationContext)!
-  useEffect(() => {
-    const id = scrollY.addListener(({ value }) => {
+  const { reAnimatedScrollY } = useContext(ScreenItemContext)!
+  useAnimatedReaction(
+    () => reAnimatedScrollY.value,
+    (value) => {
       if (!enable) {
         return
       }
@@ -74,18 +96,21 @@ const useHideableBottom = (
 
       if (value <= 100) {
         largeHeaderHeight.value = withTiming(largeDefaultHeaderHeight)
-      } else if (value > lastScrollY.current) {
+      } else if (value > lastScrollY.current + HideableThreshold) {
         largeHeaderHeight.value = withTiming(originalDefaultHeaderHeight)
-      } else {
+      } else if (value < lastScrollY.current - HideableThreshold) {
         largeHeaderHeight.value = withTiming(largeDefaultHeaderHeight)
       }
       lastScrollY.current = value
-    })
+    },
+  )
 
-    return () => {
-      scrollY.removeListener(id)
+  const horizontalScrolling = useHorizontalScrolling()
+  useEffect(() => {
+    if (horizontalScrolling) {
+      largeHeaderHeight.value = withTiming(largeDefaultHeaderHeightRef.current)
     }
-  }, [enable, largeHeaderHeight, originalDefaultHeaderHeight, scrollY])
+  }, [horizontalScrolling, largeHeaderHeight])
 
   const layoutHeightOnceRef = useRef(false)
   const onLayout = useCallback(
@@ -115,10 +140,28 @@ const useHideableBottom = (
     onLayout,
   }
 }
-interface NavigationHeaderProps
+export interface InternalNavigationHeaderProps
   extends Omit<AnimatedProps<ViewProps>, "children">,
-    NavigationHeaderRawProps,
-    PropsWithChildren {}
+    PropsWithChildren {
+  headerLeft?:
+    | FC<{
+        canGoBack: boolean
+      }>
+    | ReactNode
+  promptBeforeLeave?: boolean
+  headerRight?:
+    | FC<{
+        canGoBack: boolean
+      }>
+    | ReactNode
+  title?: string
+
+  hideableBottom?: ReactNode
+  hideableBottomHeight?: number
+  headerTitleAbsolute?: boolean
+  headerTitle?: FC<React.ComponentProps<typeof FakeNativeHeaderTitle>> | ReactNode
+  isLoading?: boolean
+}
 
 const blurThreshold = 0
 const titlebarPaddingHorizontal = 8
@@ -130,36 +173,44 @@ export const InternalNavigationHeader = ({
   headerRight,
   title,
   headerTitle: customHeaderTitle,
-  modal = false,
+
   hideableBottom,
   hideableBottomHeight,
   headerTitleAbsolute,
+
+  promptBeforeLeave,
+  isLoading,
   ...rest
-}: NavigationHeaderProps) => {
+}: InternalNavigationHeaderProps) => {
   const insets = useSafeAreaInsets()
   const frame = useSafeAreaFrame()
+
+  const sheetModal = useScreenIsInSheetModal()
   const defaultHeight = useMemo(
-    () => getDefaultHeaderHeight(frame, modal, modal ? 0 : insets.top),
-    [frame, insets.top, modal],
+    () => getDefaultHeaderHeight(frame, sheetModal, sheetModal ? 0 : insets.top),
+    [frame, insets.top, sheetModal],
   )
 
   const border = useColor("opaqueSeparator")
   const opacityAnimated = useSharedValue(0)
-  const { scrollY } = useContext(NavigationContext)!
+  const { reAnimatedScrollY } = useContext(ScreenItemContext)!
 
   const setHeaderHeight = useContext(SetNavigationHeaderHeightContext)
 
-  useEffect(() => {
-    const handler = ({ value }: { value: number }) => {
+  useAnimatedReaction(
+    () => reAnimatedScrollY.value,
+    (value) => {
       opacityAnimated.value = Math.max(0, Math.min(1, (value + blurThreshold) / 10))
-    }
-    const id = scrollY.addListener(handler)
+    },
+  )
 
-    handler({ value: (scrollY as any)._value })
-    return () => {
-      scrollY.removeListener(id)
-    }
-  }, [opacityAnimated, scrollY])
+  const canBack = useCanBack()
+  const canDismiss = useCanDismiss()
+
+  useEffect(() => {
+    const { value } = reAnimatedScrollY
+    opacityAnimated.value = Math.max(0, Math.min(1, (value + blurThreshold) / 10))
+  }, [opacityAnimated, reAnimatedScrollY])
 
   const blurStyle = useAnimatedStyle(() => ({
     opacity: opacityAnimated.value,
@@ -175,7 +226,7 @@ export const InternalNavigationHeader = ({
   )
   const rootTitleBarStyle = useAnimatedStyle(() => {
     const styles = {
-      paddingTop: modal ? 0 : insets.top,
+      paddingTop: sheetModal ? 0 : insets.top,
       position: "relative",
       overflow: "hidden",
     } satisfies DefaultStyle
@@ -185,31 +236,39 @@ export const InternalNavigationHeader = ({
     return styles
   })
 
-  const navigation = useNavigation()
-  const canBack = navigation.canGoBack()
-  useEffect(() => {
-    if (title) {
-      navigation.setOptions({ title })
-    }
-  }, [navigation, title])
-
   const HeaderLeft = headerLeft ?? DefaultHeaderBackButton
 
-  const renderTitle = customHeaderTitle ?? HeaderTitle
+  const renderTitle = customHeaderTitle ?? FakeNativeHeaderTitle
   const headerTitle =
     typeof renderTitle !== "function"
       ? renderTitle
       : createElement(renderTitle, {
           children: title,
         })
-  const RightButton = headerRight ?? Noop
+  const RightButton = headerRight ?? (Noop as FC<NavigationHeaderButtonProps>)
 
   const animatedRef = useAnimatedRef<Animated.View>()
-  useEffect(() => {
+  useLayoutEffect(() => {
     animatedRef.current?.measure((x, y, width, height) => {
       setHeaderHeight?.(height)
     })
   }, [animatedRef, setHeaderHeight])
+
+  const leftRef = useRef<View>(null)
+  const [leftWidth, setLeftWidth] = useState(0)
+  useLayoutEffect(() => {
+    leftRef.current?.measure((x, y, width) => {
+      setLeftWidth(width)
+    })
+  }, [leftRef])
+
+  const rightRef = useRef<View>(null)
+  const [rightWidth, setRightWidth] = useState(0)
+  useLayoutEffect(() => {
+    rightRef.current?.measure((x, y, width) => {
+      setRightWidth(width)
+    })
+  }, [rightRef])
 
   return (
     <Animated.View
@@ -235,36 +294,69 @@ export const InternalNavigationHeader = ({
         style={{
           marginLeft: insets.left,
           marginRight: insets.right,
-          height: !modal ? defaultHeight - insets.top : defaultHeight,
+          height: !sheetModal ? defaultHeight - insets.top : defaultHeight,
           paddingHorizontal: titlebarPaddingHorizontal,
         }}
         pointerEvents={"box-none"}
       >
         {/* Left */}
         <View
-          className="min-w-6 flex-1 flex-row items-center justify-start"
+          ref={leftRef}
+          className="flex min-w-6 shrink-0 flex-row items-center justify-start"
           pointerEvents={"box-none"}
         >
-          <HeaderLeft canGoBack={canBack} />
+          {typeof HeaderLeft === "function" ? (
+            <HeaderLeft
+              canGoBack={canBack}
+              canDismiss={canDismiss}
+              modal={sheetModal}
+              promptBeforeLeave={promptBeforeLeave}
+            />
+          ) : (
+            HeaderLeft
+          )}
         </View>
         {/* Center */}
-
         <Animated.View
-          className="items-center justify-center"
+          className="flex min-w-0 flex-1 shrink flex-row items-center justify-center truncate"
           pointerEvents={"box-none"}
           style={{
             marginHorizontal: titleMarginHorizontal,
           }}
         >
-          {headerTitleAbsolute ? <View /> : headerTitle}
+          <View className="shrink" style={{ flexBasis: rightWidth }} />
+
+          {headerTitleAbsolute ? (
+            <View />
+          ) : (
+            <View>
+              {headerTitle}
+
+              {/* Only show loading indicator when headerTitle is not absolute */}
+              {!headerTitleAbsolute && isLoading && (
+                <View
+                  className="absolute right-0"
+                  style={{ transform: [{ translateX: "100%" }, { scale: 0.74 }] }}
+                >
+                  <PlatformActivityIndicator size="small" />
+                </View>
+              )}
+            </View>
+          )}
+          <View className="shrink" style={{ flexBasis: leftWidth }} />
         </Animated.View>
 
         {/* Right */}
         <View
-          className="min-w-6 flex-1 flex-row items-center justify-end"
+          ref={rightRef}
+          className="flex min-w-6 shrink-0 flex-row items-center justify-end"
           pointerEvents={"box-none"}
         >
-          <RightButton canGoBack={canBack} />
+          {typeof RightButton === "function" ? (
+            <RightButton canGoBack={canBack} canDismiss={canDismiss} modal={sheetModal} />
+          ) : (
+            RightButton
+          )}
         </View>
         <View
           className="absolute inset-0 flex-row items-center justify-center"
@@ -283,12 +375,53 @@ export const InternalNavigationHeader = ({
   )
 }
 
-export const DefaultHeaderBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
+export const DefaultHeaderBackButton = ({
+  canGoBack,
+  canDismiss,
+  promptBeforeLeave,
+}: NavigationHeaderButtonProps) => {
   const label = useColor("label")
-  if (!canGoBack) return null
+  const navigation = useNavigation()
+
+  const isTopRouteInGroup = useIsTopRouteInGroup()
+
+  const showCloseIcon = canDismiss && isTopRouteInGroup
+
+  if (!canGoBack && !canDismiss) return null
   return (
-    <UINavigationHeaderActionButton onPress={() => router.back()}>
-      <MingcuteLeftLineIcon height={20} width={20} color={label} />
+    <UINavigationHeaderActionButton
+      onPress={() => {
+        const leave = () => {
+          if (canGoBack) {
+            navigation.back()
+          } else if (canDismiss) {
+            navigation.dismiss()
+          }
+        }
+
+        if (promptBeforeLeave) {
+          Alert.alert("Are you sure you want to exit?", "You have unsaved changes.", [
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+            {
+              text: "Exit",
+              onPress: () => {
+                leave()
+              },
+            },
+          ])
+        } else {
+          leave()
+        }
+      }}
+    >
+      {!showCloseIcon ? (
+        <MingcuteLeftLineIcon height={20} width={20} color={label} />
+      ) : (
+        <CloseCuteReIcon height={20} width={20} color={label} />
+      )}
     </UINavigationHeaderActionButton>
   )
 }
@@ -298,11 +431,13 @@ export const UINavigationHeaderActionButton = ({
   onPress,
   disabled,
   className,
+  style,
 }: {
   children: ReactNode
   onPress?: () => void
   disabled?: boolean
   className?: string
+  style?: StyleProp<ViewStyle>
 }) => {
   return (
     <TouchableOpacity
@@ -310,30 +445,10 @@ export const UINavigationHeaderActionButton = ({
       className={cn("p-2", className)}
       onPress={onPress}
       disabled={disabled}
+      style={style}
     >
       {children}
     </TouchableOpacity>
   )
 }
 const Noop = () => null
-
-/**
- * NativeNavigationHeader wrapped react navigation native-stack is universal in modal and stack, but there are significant limitations in UI customization.
- */
-export interface NativeNavigationHeaderProps
-  extends Pick<NativeStackNavigationOptions, "headerLeft" | "headerRight" | "headerTitle"> {}
-export const NativeNavigationHeader: FC<NativeNavigationHeaderProps> = (props) => {
-  const navigation = useNavigation()
-  return (
-    <Stack.Screen
-      options={{
-        headerShown: true,
-
-        headerLeft: () => <DefaultHeaderBackButton canGoBack={navigation.canGoBack()} />,
-        headerTransparent: true,
-        headerBlurEffect: "systemChromeMaterial",
-        ...props,
-      }}
-    />
-  )
-}

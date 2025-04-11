@@ -1,7 +1,7 @@
 import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.js"
 import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
 import { useTitle } from "@follow/hooks"
-import type { FeedModel, InboxModel, SupportedLanguages } from "@follow/models/types"
+import type { FeedModel, InboxModel } from "@follow/models/types"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { stopPropagation } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
@@ -9,23 +9,21 @@ import { ErrorBoundary } from "@sentry/react"
 import * as React from "react"
 import { useEffect, useMemo, useRef } from "react"
 
-import { useShowAITranslation } from "~/atoms/ai-translation"
 import { useEntryIsInReadability } from "~/atoms/readability"
-import { useGeneralSettingSelector } from "~/atoms/settings/general"
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { ShadowDOM } from "~/components/common/ShadowDOM"
 import { useInPeekModal } from "~/components/ui/modal/inspire/PeekModal"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { useAuthQuery } from "~/hooks/common"
-import { checkLanguage } from "~/lib/translate"
 import { WrappedElementProvider } from "~/providers/wrapped-element-provider"
 import { Queries } from "~/queries"
+import { useEntryTranslation } from "~/store/ai/hook"
 import { useEntry } from "~/store/entry"
 import { useFeedById } from "~/store/feed"
 import { useInboxById } from "~/store/inbox"
 
 import { EntryContentHTMLRenderer } from "../renderer/html"
-import { getTranslationCache, setTranslationCache } from "./atoms"
+import { AISummary } from "./AISummary"
 import { EntryTimelineSidebar } from "./components/EntryTimelineSidebar"
 import { EntryTitle } from "./components/EntryTitle"
 import { SourceContentPanel } from "./components/SourceContentView"
@@ -34,7 +32,6 @@ import { EntryHeader } from "./header"
 import { useFocusEntryContainerSubscriptions } from "./hooks"
 import type { EntryContentProps } from "./index.shared"
 import {
-  AISummary,
   ContainerToc,
   NoContent,
   ReadabilityAutoToggleEffect,
@@ -116,57 +113,29 @@ export const EntryContent: Component<EntryContentProps> = ({
     [entry?.entries.media, data?.entries.media],
   )
   const customCSS = useUISettingKey("customCSS")
-  const showAITranslation = useShowAITranslation()
-  const translationLanguage = useGeneralSettingSelector(
-    (s) => s.translationLanguage,
-  ) as SupportedLanguages
+
+  const contentTranslated = useEntryTranslation({ entry, extraFields: ["content"] })
+
+  const isInPeekModal = useInPeekModal()
 
   if (!entry) return null
 
-  const content = entry?.entries.content ?? data?.entries.content
-
-  const translate = async (html: HTMLElement | null) => {
-    if (!html || !entry) return
-
-    const fullText = html.textContent ?? ""
-    if (!fullText) return
-
-    const translation =
-      entry.settings?.translation ?? (showAITranslation ? translationLanguage : undefined)
-
-    if (translation) {
-      const isLanguageMatch = checkLanguage({
-        content: fullText,
-        language: translation,
-      })
-      if (isLanguageMatch) {
-        return
-      }
-    }
-
-    const { immersiveTranslate } = await import("~/lib/immersive-translate")
-    immersiveTranslate({
-      html,
-      entry,
-      targetLanguage: translation as SupportedLanguages,
-      cache: {
-        get: (key: string) => getTranslationCache()[key],
-        set: (key: string, value: string) =>
-          setTranslationCache({ ...getTranslationCache(), [key]: value }),
-      },
-    })
-  }
+  const entryContent = entry?.entries.content ?? data?.entries.content
+  const translatedContent = contentTranslated.data?.content
+  const content = translatedContent || entryContent
 
   const isInbox = !!inbox
 
   return (
     <>
-      <EntryHeader
-        entryId={entry.entries.id}
-        view={view}
-        className={cn("@container h-[55px] shrink-0 px-3", classNames?.header)}
-        compact={compact}
-      />
+      {!isInPeekModal && (
+        <EntryHeader
+          entryId={entry.entries.id}
+          view={view}
+          className={cn("@container h-[55px] shrink-0 px-3", classNames?.header)}
+          compact={compact}
+        />
+      )}
 
       <div className="@container relative flex size-full flex-col overflow-hidden print:size-auto print:overflow-visible">
         <EntryTimelineSidebar entryId={entry.entries.id} />
@@ -206,7 +175,6 @@ export const EntryContent: Component<EntryContentProps> = ({
                           view={view}
                           feedId={feed?.id}
                           entryId={entryId}
-                          handleTranslate={translate}
                           mediaInfo={mediaInfo}
                           noMedia={noMedia}
                           accessory={contentAccessories}
@@ -234,7 +202,7 @@ export const EntryContent: Component<EntryContentProps> = ({
                 <div className="center mt-16 min-w-0">
                   {isPending ? (
                     <EntryContentLoading
-                      icon={!isInbox ? (feed as FeedModel)?.siteUrl! : undefined}
+                      icon={!isInbox ? (feed as FeedModel)?.siteUrl : undefined}
                     />
                   ) : error ? (
                     <div className="center flex min-w-0 flex-col gap-2">

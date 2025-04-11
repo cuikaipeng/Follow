@@ -1,5 +1,7 @@
+import { getGeneralSettings } from "@/src/atoms/settings/general"
 import type { SummarySchema } from "@/src/database/schemas/types"
 import { apiClient } from "@/src/lib/api-fetch"
+import type { SupportedLanguages } from "@/src/lib/language"
 import { summaryService } from "@/src/services/summary"
 
 import { getEntry } from "../entry/getter"
@@ -92,57 +94,67 @@ class SummaryActions {
 export const summaryActions = new SummaryActions()
 
 class SummarySyncService {
+  private pendingPromises: Record<string, Promise<string>> = {}
+
   async generateSummary(entryId: string) {
     const entry = getEntry(entryId)
     if (!entry) return
 
     const state = get()
-    if (state.generatingStatus[entryId] === SummaryGeneratingStatus.Pending) return
+    if (state.generatingStatus[entryId] === SummaryGeneratingStatus.Pending)
+      return this.pendingPromises[entryId]
 
     immerSet((state) => {
       state.generatingStatus[entryId] = SummaryGeneratingStatus.Pending
     })
 
-    const language = entry.settings?.translation
+    const { actionLanguage } = getGeneralSettings()
+
     // Use Our AI to generate summary
-    const summary = await apiClient.ai.summary
+    const pendingPromise = apiClient.ai.summary
       .$get({
         query: {
           id: entryId,
-
-          language,
+          language: actionLanguage as SupportedLanguages,
         },
       })
       .then((summary) => {
         immerSet((state) => {
           if (!summary.data) {
             state.generatingStatus[entryId] = SummaryGeneratingStatus.Error
-            return
+            return ""
           }
 
           state.data[entryId] = {
-            lang: language,
+            lang: actionLanguage,
             summary: summary.data,
             lastAccessed: Date.now(),
           }
           state.generatingStatus[entryId] = SummaryGeneratingStatus.Success
         })
 
-        return summary.data
+        return summary.data || ""
       })
       .catch((error) => {
         immerSet((state) => {
           state.generatingStatus[entryId] = SummaryGeneratingStatus.Error
         })
+
         throw error
       })
+      .finally(() => {
+        delete this.pendingPromises[entryId]
+      })
+
+    this.pendingPromises[entryId] = pendingPromise
+    const summary = await pendingPromise
 
     if (summary) {
       summaryActions.upsertMany([
         {
           entryId,
           summary,
-          language: language ?? null,
+          language: actionLanguage ?? null,
         },
       ])
     }

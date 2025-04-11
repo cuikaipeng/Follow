@@ -1,22 +1,28 @@
 import { cn } from "@follow/utils"
 import type { PropsWithChildren } from "react"
+import { useTranslation } from "react-i18next"
 import { Pressable, Text, View } from "react-native"
 
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { GroupedInsetListNavigationLinkIcon } from "@/src/components/ui/grouped/GroupedList"
 import { Eye2CuteReIcon } from "@/src/icons/eye_2_cute_re"
 import { Grid2CuteReIcon } from "@/src/icons/grid_2_cute_re"
 import { PowerIcon } from "@/src/icons/power"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { useReadingBehavior } from "@/src/modules/onboarding/hooks/use-reading-behavior"
 
-const SelectReadingModeScreen = () => {
+export const SelectReadingModeScreen: NavigationControllerView = () => {
+  const { t } = useTranslation()
   const { behavior, updateSettings } = useReadingBehavior()
 
   return (
-    <SafeModalScrollView className="bg-system-grouped-background">
-      <ModalHeader headerTitle="Select Reading Mode" />
-
+    <SafeNavigationScrollView
+      className="bg-system-grouped-background"
+      Header={<NavigationBlurEffectHeaderView title={t("onboarding.reading_preferences")} />}
+    >
       <View className="mt-8 flex w-full gap-4">
         <Card
           icon={
@@ -29,9 +35,7 @@ const SelectReadingModeScreen = () => {
             updateSettings("radical")
           }}
         >
-          <Text className="text-label">
-            Radical: Automatically mark entries as read when displayed
-          </Text>
+          <Text className="text-label">{t("onboarding.reading_radical")}</Text>
         </Card>
 
         <Card
@@ -45,9 +49,7 @@ const SelectReadingModeScreen = () => {
             updateSettings("balanced")
           }}
         >
-          <Text className="text-label">
-            Balanced: Automatically mark entries as read when scrolled out of view
-          </Text>
+          <Text className="text-label">{t("onboarding.reading_balanced")}</Text>
         </Card>
 
         <Card
@@ -61,10 +63,10 @@ const SelectReadingModeScreen = () => {
             updateSettings("conservative")
           }}
         >
-          <Text className="text-label">Conservative: Mark entries as read only when clicked</Text>
+          <Text className="text-label">{t("onboarding.reading_conservative")}</Text>
         </Card>
       </View>
-    </SafeModalScrollView>
+    </SafeNavigationScrollView>
   )
 }
 
@@ -92,5 +94,3 @@ const Card = ({
     </Pressable>
   )
 }
-
-export default SelectReadingModeScreen

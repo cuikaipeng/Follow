@@ -5,8 +5,8 @@ import { useMutation } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { toggleShowAISummary } from "~/atoms/ai-summary"
-import { toggleShowAITranslation } from "~/atoms/ai-translation"
+import { toggleShowAISummaryOnce } from "~/atoms/ai-summary"
+import { toggleShowAITranslationOnce } from "~/atoms/ai-translation"
 import {
   getShowSourceContent,
   toggleShowSourceContent,
@@ -176,6 +176,21 @@ export const useRegisterEntryCommands = () => {
       },
     },
     {
+      id: COMMAND_ID.entry.exportAsPDF,
+      label: t("entry_actions.export_as_pdf"),
+      icon: <i className="i-mgc-pdf-cute-re" />,
+      run: ({ entryId }) => {
+        const entry = useEntryStore.getState().flatMapEntries[entryId]
+
+        if (!entry) {
+          toast.error("Failed to export as pdf: entry is not available", { duration: 3000 })
+          return
+        }
+
+        window.print()
+      },
+    },
+    {
       id: COMMAND_ID.entry.copyTitle,
       label: t("entry_actions.copy_title"),
       icon: <i className="i-mgc-copy-cute-re" />,
@@ -210,7 +225,7 @@ export const useRegisterEntryCommands = () => {
     {
       id: COMMAND_ID.entry.viewSourceContent,
       label: t("entry_actions.view_source_content"),
-      icon: <i className="i-mgc-world-2-cute-re" />,
+      icon: <i className="i-mgc-web-cute-re" />,
       run: ({ entryId }) => {
         if (!getShowSourceContent()) {
           const entry = useEntryStore.getState().flatMapEntries[entryId]
@@ -298,7 +313,7 @@ export const useRegisterEntryCommands = () => {
             presentActivationModal()
             return
           }
-          toggleShowAISummary()
+          toggleShowAISummaryOnce()
         },
       },
       {
@@ -310,7 +325,7 @@ export const useRegisterEntryCommands = () => {
             presentActivationModal()
             return
           }
-          toggleShowAITranslation()
+          toggleShowAITranslationOnce()
         },
       },
     ],

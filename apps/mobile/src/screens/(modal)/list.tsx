@@ -1,15 +1,17 @@
 import { useActionSheet } from "@expo/react-native-action-sheet"
 import { FeedViewType } from "@follow/constants"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { router, useLocalSearchParams, useNavigation } from "expo-router"
 import { memo, useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
 import { View } from "react-native"
 import { z } from "zod"
 
-import { ModalHeaderSubmitButton } from "@/src/components/common/ModalSharedComponents"
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import { HeaderSubmitButton } from "@/src/components/layouts/header/HeaderElements"
+import {
+  NavigationBlurEffectHeader,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { FormProvider, useFormContext } from "@/src/components/ui/form/FormProvider"
 import { FormLabel } from "@/src/components/ui/form/Label"
 import { NumberField, TextField } from "@/src/components/ui/form/TextField"
@@ -19,6 +21,9 @@ import {
 } from "@/src/components/ui/grouped/GroupedList"
 import { PowerIcon } from "@/src/icons/power"
 import { getBizFetchErrorMessage } from "@/src/lib/api-fetch"
+import { useNavigation } from "@/src/lib/navigation/hooks"
+import { useSetModalScreenOptions } from "@/src/lib/navigation/ScreenOptionsContext"
+import type { NavigationControllerView } from "@/src/lib/navigation/types"
 import { toast } from "@/src/lib/toast"
 import { FeedViewSelector } from "@/src/modules/feed/view-selector"
 import { getList } from "@/src/store/list/getters"
@@ -38,7 +43,7 @@ const listSchema = z.object({
     .optional()
     .transform((val) => (val === "" ? null : val)),
 
-  fee: z.number().min(0),
+  fee: z.number().min(0).nullable(),
   view: z.number().int(),
 })
 
@@ -49,22 +54,22 @@ const defaultValues = {
   fee: 0,
   view: FeedViewType.Articles,
 } as ListModel
-export default function ListScreen() {
-  const listId = useLocalSearchParams<{ id?: string }>().id
-
+export const ListScreen: NavigationControllerView<{
+  listId?: string
+}> = ({ listId }) => {
+  const { t } = useTranslation("settings")
   const list = useList(listId || "")
   const form = useForm({
     defaultValues: list || defaultValues,
-    // @ts-ignore
     resolver: zodResolver(listSchema),
     mode: "all",
   })
   const isEditing = !!listId
   const { showActionSheetWithOptions } = useActionSheet()
-
+  const navigation = useNavigation()
   return (
     <FormProvider form={form}>
-      <SafeModalScrollView className="bg-system-grouped-background pb-safe flex-1">
+      <SafeNavigationScrollView className="bg-system-grouped-background pb-safe flex-1">
         <ScreenOptions title={list?.title} listId={listId} />
 
         <GroupedInsetListCard showSeparator={false} className="mt-2 px-3 py-6">
@@ -76,7 +81,7 @@ export default function ListScreen() {
             }}
             render={({ field: { onChange, onBlur, ref, value } }) => (
               <TextField
-                label="Title"
+                label={t("lists.title")}
                 required={true}
                 wrapperClassName="mt-2"
                 placeholder=""
@@ -95,7 +100,7 @@ export default function ListScreen() {
               control={form.control}
               render={({ field: { onChange, onBlur, ref, value } }) => (
                 <TextField
-                  label="Description"
+                  label={t("lists.description")}
                   wrapperClassName="mt-2"
                   placeholder=""
                   onBlur={onBlur}
@@ -115,7 +120,7 @@ export default function ListScreen() {
               render={({ field: { onChange, onBlur, ref, value } }) => (
                 <TextField
                   autoCapitalize="none"
-                  label="Image"
+                  label={t("lists.image")}
                   wrapperClassName="mt-2"
                   placeholder="https://"
                   onBlur={onBlur}
@@ -131,7 +136,7 @@ export default function ListScreen() {
           </View>
 
           <View className="mt-4">
-            <FormLabel label="View" className="mb-4 pl-2.5" optional />
+            <FormLabel label={t("lists.view")} className="mb-4 pl-2.5" optional />
             <Controller
               name="view"
               control={form.control}
@@ -147,7 +152,7 @@ export default function ListScreen() {
               control={form.control}
               render={({ field: { onChange, onBlur, ref, value } }) => (
                 <NumberField
-                  label="Fee"
+                  label={t("lists.fee.label")}
                   wrapperClassName="mt-2"
                   placeholder="0"
                   onBlur={onBlur}
@@ -165,19 +170,22 @@ export default function ListScreen() {
         {isEditing && (
           <GroupedInsetListCard className="mt-6">
             <GroupedInsetButtonCell
-              label="Delete"
+              label={t("words.delete", { ns: "common" })}
               style="destructive"
               onPress={() => {
                 showActionSheetWithOptions(
                   {
-                    options: ["Delete", "Cancel"],
+                    options: [
+                      t("words.delete", { ns: "common" }),
+                      t("words.cancel", { ns: "common" }),
+                    ],
                     cancelButtonIndex: 1,
                     destructiveButtonIndex: 0,
                   },
                   async (index) => {
                     if (index === 0) {
                       await listSyncServices.deleteList({ listId: listId! })
-                      router.dismiss()
+                      navigation.dismiss()
                     }
                   },
                 )
@@ -185,7 +193,7 @@ export default function ListScreen() {
             />
           </GroupedInsetListCard>
         )}
-      </SafeModalScrollView>
+      </SafeNavigationScrollView>
     </FormProvider>
   )
 }
@@ -195,25 +203,28 @@ interface ScreenOptionsProps {
   listId?: string
 }
 const ScreenOptions = memo(({ title, listId }: ScreenOptionsProps) => {
+  const { t } = useTranslation("settings")
   const form = useFormContext()
 
   const { isValid, isDirty } = form.formState
 
   const isEditing = !!listId
   const [isLoading, setIsLoading] = useState(false)
-  const navigation = useNavigation()
+
+  const setModalOptions = useSetModalScreenOptions()
   useEffect(() => {
-    navigation.setOptions({
+    setModalOptions({
       gestureEnabled: !isDirty,
     })
-  }, [isDirty, navigation])
+  }, [isDirty, setModalOptions])
+  const navigation = useNavigation()
 
   return (
-    <ModalHeader
-      headerTitle={title ? `Edit List - ${title}` : "Create List"}
+    <NavigationBlurEffectHeader
+      title={title ? `${t("lists.edit.label")} - ${title}` : t("lists.create")}
       headerRight={
         <FormProvider form={form}>
-          <ModalHeaderSubmitButton
+          <HeaderSubmitButton
             isValid={isValid}
             isLoading={isLoading}
             onPress={form.handleSubmit((values) => {
@@ -229,7 +240,7 @@ const ScreenOptions = memo(({ title, listId }: ScreenOptionsProps) => {
                   })
                   .finally(() => {
                     setIsLoading(false)
-                    router.dismiss()
+                    navigation.dismiss()
                   })
                 return
               }
@@ -250,7 +261,7 @@ const ScreenOptions = memo(({ title, listId }: ScreenOptionsProps) => {
                 })
                 .finally(() => {
                   setIsLoading(false)
-                  router.dismiss()
+                  navigation.dismiss()
                 })
             })}
           />

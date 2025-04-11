@@ -6,15 +6,14 @@ import { HTML } from "~/components/ui/markdown/HTML"
 export const EntryTranslation: Component<{
   source?: string | null
   target?: string
-  showTranslation?: boolean
   isHTML?: boolean
-}> = ({ source, target, showTranslation = true, className, isHTML }) => {
+}> = ({ source, target, className, isHTML }) => {
   const nextTarget = useMemo(() => {
-    if (!target || !showTranslation || source === target) {
+    if (!target || source === target) {
       return ""
     }
     return target
-  }, [source, target, showTranslation])
+  }, [source, target])
 
   if (!source) {
     return null
@@ -41,17 +40,15 @@ export const EntryTranslation: Component<{
           </HTML>
         </>
       ) : (
-        <>
-          <div className={cn("inline align-middle", className)}>
-            {nextTarget && (
-              <>
-                <span className="align-middle">{nextTarget}</span>
-                <i className="i-mgc-translate-2-cute-re mr-2 align-middle" />
-              </>
-            )}
-            <span className="align-middle">{source}</span>
-          </div>
-        </>
+        <div className={cn("inline align-middle", className)}>
+          {nextTarget && (
+            <>
+              <span className="align-middle">{nextTarget}</span>
+              <i className="i-mgc-translate-2-cute-re mr-2 align-middle" />
+            </>
+          )}
+          <span className="align-middle">{source}</span>
+        </div>
       )}
     </div>
   )

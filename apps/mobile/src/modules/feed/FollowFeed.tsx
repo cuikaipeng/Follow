@@ -1,23 +1,25 @@
 import { FeedViewType } from "@follow/constants"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { StackActions } from "@react-navigation/native"
-import { router, useNavigation } from "expo-router"
 import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
-import { ActivityIndicator, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { z } from "zod"
 
-import { ModalHeaderSubmitButton } from "@/src/components/common/ModalSharedComponents"
-import { ModalHeader } from "@/src/components/layouts/header/ModalHeader"
-import { SafeModalScrollView } from "@/src/components/layouts/views/SafeModalScrollView"
+import { HeaderSubmitTextButton } from "@/src/components/layouts/header/HeaderElements"
+import {
+  NavigationBlurEffectHeaderView,
+  SafeNavigationScrollView,
+} from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { FormProvider } from "@/src/components/ui/form/FormProvider"
 import { FormLabel } from "@/src/components/ui/form/Label"
 import { FormSwitch } from "@/src/components/ui/form/Switch"
 import { TextField } from "@/src/components/ui/form/TextField"
 import { GroupedInsetListCard } from "@/src/components/ui/grouped/GroupedList"
 import { FeedIcon } from "@/src/components/ui/icon/feed-icon"
-import { useIsRouteOnlyOne } from "@/src/hooks/useIsRouteOnlyOne"
+import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
+import { useCanDismiss, useNavigation } from "@/src/lib/navigation/hooks"
+import { useSetModalScreenOptions } from "@/src/lib/navigation/ScreenOptionsContext"
 import { FeedViewSelector } from "@/src/modules/feed/view-selector"
 import { useFeed, usePrefetchFeed, usePrefetchFeedByUrl } from "@/src/store/feed/hooks"
 import { useSubscriptionByFeedId } from "@/src/store/subscription/hooks"
@@ -39,7 +41,7 @@ export function FollowFeed(props: { id: string }) {
   if (isLoading) {
     return (
       <View className="mt-24 flex-1 flex-row items-start justify-center">
-        <ActivityIndicator />
+        <PlatformActivityIndicator />
       </View>
     )
   }
@@ -55,7 +57,7 @@ export function FollowUrl(props: { url: string }) {
   if (isLoading) {
     return (
       <View className="mt-24 flex-1 flex-row items-start justify-center">
-        <ActivityIndicator />
+        <PlatformActivityIndicator />
       </View>
     )
   }
@@ -79,9 +81,10 @@ function FollowImpl(props: { feedId: string }) {
   })
 
   const [isLoading, setIsLoading] = useState(false)
-  const routeOnlyOne = useIsRouteOnlyOne()
+
   const navigate = useNavigation()
-  const parentRoute = navigate.getParent()
+
+  const canDismiss = useCanDismiss()
   const submit = async () => {
     setIsLoading(true)
     const values = form.getValues()
@@ -98,49 +101,47 @@ function FollowImpl(props: { feedId: string }) {
       setIsLoading(false)
     })
 
-    if (router.canDismiss()) {
-      router.dismissAll()
-
-      if (!routeOnlyOne) {
-        parentRoute?.dispatch(StackActions.popToTop())
-      }
+    if (canDismiss) {
+      navigate.dismiss()
     } else {
-      // If we can't dismiss, redirect to the root route
-      router.replace("/")
+      navigate.back()
     }
   }
 
   const insets = useSafeAreaInsets()
 
   const { isValid, isDirty } = form.formState
-  const navigation = useNavigation()
+
+  const setScreenOptions = useSetModalScreenOptions()
   useEffect(() => {
-    navigation.setOptions({
-      gestureEnabled: !isDirty,
+    setScreenOptions({
+      preventNativeDismiss: isDirty,
     })
-  }, [isDirty, navigation])
+  }, [isDirty, setScreenOptions])
 
   if (!feed?.id) {
     return <Text className="text-label">Feed ({id}) not found</Text>
   }
 
   return (
-    <SafeModalScrollView
+    <SafeNavigationScrollView
       className="bg-system-grouped-background"
-      contentContainerClassName="gap-y-4 mt-2"
+      contentViewClassName="gap-y-4 mt-2"
       contentContainerStyle={{ paddingBottom: insets.bottom }}
+      Header={
+        <NavigationBlurEffectHeaderView
+          title={`${isSubscribed ? "Edit" : "Follow"} - ${feed?.title}`}
+          headerRight={
+            <HeaderSubmitTextButton
+              isValid={isValid}
+              onPress={form.handleSubmit(submit)}
+              isLoading={isLoading}
+              label={isSubscribed ? "Save" : "Follow"}
+            />
+          }
+        />
+      }
     >
-      <ModalHeader
-        headerTitle={`${isSubscribed ? "Edit" : "Follow"} - ${feed?.title}`}
-        headerRight={
-          <ModalHeaderSubmitButton
-            isValid={isValid}
-            onPress={form.handleSubmit(submit)}
-            isLoading={isLoading}
-          />
-        }
-      />
-
       {/* Group 1 */}
       <GroupedInsetListCard className="px-5 py-4">
         <View className="flex flex-row gap-4">
@@ -217,6 +218,6 @@ function FollowImpl(props: { feedId: string }) {
           </View>
         </FormProvider>
       </GroupedInsetListCard>
-    </SafeModalScrollView>
+    </SafeNavigationScrollView>
   )
 }

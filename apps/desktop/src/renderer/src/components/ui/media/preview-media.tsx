@@ -36,7 +36,7 @@ const Wrapper: Component<{
 
   const [showActionOverlay, setShowActionOverlay] = useState(false)
   useEffect(() => {
-    if (!containerRef.current) {
+    if (!containerRef.current || !showActions) {
       return
     }
     const $container = containerRef.current
@@ -57,7 +57,7 @@ const Wrapper: Component<{
       $container.removeEventListener("mousemove", handleMouseMove)
       $container.removeEventListener("mouseleave", outOfContainer)
     }
-  }, [sideContent])
+  }, [sideContent, showActions])
 
   return (
     <div
@@ -445,7 +445,9 @@ const FallbackableImage: FC<
               width={props.width}
               {...props}
               className={cn(
-                "mx-auto transition-opacity duration-700",
+                // See https://github.com/BetterTyped/react-zoom-pan-pinch/issues/135#issuecomment-683463453
+                // See also https://github.com/RSSNext/Folo/issues/3183
+                "!pointer-events-auto mx-auto transition-opacity duration-700",
                 isLoading ? "opacity-0" : "opacity-100",
                 props.className,
               )}
@@ -456,7 +458,7 @@ const FallbackableImage: FC<
             />
             <div
               className={cn(
-                "center absolute inset-0 size-full transition-opacity duration-700",
+                "center pointer-events-none absolute inset-0 size-full transition-opacity duration-700",
                 isLoading ? "opacity-100" : "opacity-0",
               )}
             >

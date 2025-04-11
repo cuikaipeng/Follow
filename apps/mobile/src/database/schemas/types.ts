@@ -9,6 +9,7 @@ import type {
   listsTable,
   subscriptionsTable,
   summariesTable,
+  translationsTable,
   unreadTable,
   usersTable,
 } from "."
@@ -31,6 +32,8 @@ export type CollectionSchema = typeof collectionsTable.$inferSelect
 
 export type SummarySchema = typeof summariesTable.$inferSelect
 
+export type TranslationSchema = typeof translationsTable.$inferSelect
+
 export type ImageSchema = typeof imagesTable.$inferInsert
 
 export type ActionSettings = HonoApiClient.ActionSettings
@@ -46,7 +49,7 @@ export type MediaModel = {
 
 export type AttachmentsModel = {
   url: string
-  duration_in_seconds?: number
+  duration_in_seconds?: number | string
   mime_type?: string
   size_in_bytes?: number
   title?: string

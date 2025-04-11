@@ -4,11 +4,18 @@ import type { ConfigContext, ExpoConfig } from "expo/config"
 
 import PKG from "./package.json"
 
-// const isDev = process.env.NODE_ENV === "development"
 const isCI = process.env.CI === "true"
 // const roundedIconPath = resolve(__dirname, "../../resources/icon.png")
-const iconPath = resolve(__dirname, "./assets/icon.png")
+const iconPathMap = {
+  production: resolve(__dirname, "./assets/icon.png"),
+  development: resolve(__dirname, "./assets/icon-dev.png"),
+  "ios-simulator": resolve(__dirname, "./assets/icon-dev.png"),
+  preview: resolve(__dirname, "./assets/icon-staging.png"),
+} as Record<string, string>
+const iconPath = iconPathMap[process.env.PROFILE || "production"] || iconPathMap.production
+
 const adaptiveIconPath = resolve(__dirname, "./assets/adaptive-icon.png")
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
 
@@ -25,7 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     policy: "appVersion",
   },
 
-  name: "Follow",
+  name: "Folo",
   slug: "follow",
   version: PKG.version,
   orientation: "portrait",
@@ -42,6 +49,31 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ITSAppUsesNonExemptEncryption: false,
       UIBackgroundModes: ["audio"],
       LSApplicationQueriesSchemes: ["bilibili", "youtube"],
+      CFBundleAllowMixedLocalizations: true,
+      // apps/mobile/src/@types/constants.ts currentSupportedLanguages
+      CFBundleLocalizations: [
+        "en",
+        "de",
+        "ja",
+        "zh-CN",
+        "zh-TW",
+        "zh-HK",
+        "pt",
+        "fr",
+        "ar-DZ",
+        "ar-SA",
+        "ar-MA",
+        "ar-IQ",
+        "ar-KW",
+        "ar-TN",
+        "fi",
+        "it",
+        "ru",
+        "es",
+        "ko",
+        "tr",
+      ],
+      CFBundleDevelopmentRegion: "en",
     },
     googleServicesFile: "./build/GoogleService-Info.plist",
   },
@@ -53,11 +85,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     googleServicesFile: "./build/google-services.json",
   },
-  web: {
-    bundler: "metro",
-    output: "static",
-    favicon: iconPath,
+  androidStatusBar: {
+    translucent: true,
   },
+  // web: {
+  //   bundler: "metro",
+  //   output: "static",
+  //   favicon: iconPath,
+  // },
   plugins: [
     [
       "expo-document-picker",
@@ -66,18 +101,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     "expo-localization",
-    [
-      "expo-router",
-      {
-        root: "./src/screens",
-      },
-    ],
+
     [
       "expo-splash-screen",
       {
         backgroundColor: "#ffffff",
         dark: {
           backgroundColor: "#000000",
+        },
+        android: {
+          image: iconPath,
+          imageWidth: 200,
         },
       },
     ],
@@ -108,6 +142,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [require("./scripts/with-follow-app-delegate.js")],
+    [require("./scripts/with-gradle-jvm-heap-size-increase.js")],
     "expo-secure-store",
     "@react-native-firebase/app",
     "@react-native-firebase/crashlytics",
@@ -119,6 +154,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     "react-native-video",
+    [
+      "expo-notifications",
+      {
+        enableBackgroundRemoteNotifications: true,
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

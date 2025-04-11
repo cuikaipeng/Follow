@@ -1,22 +1,27 @@
 import { FeedViewType } from "@follow/constants"
 import type { FlashList } from "@shopify/flash-list"
+import { useEffect } from "react"
 
+import { useGeneralSettingKey } from "@/src/atoms/settings/general"
+import { withErrorBoundary } from "@/src/components/common/ErrorBoundary"
 import { NoLoginInfo } from "@/src/components/common/NoLoginInfo"
+import { ListErrorView } from "@/src/components/errors/ListErrorView"
 import { useRegisterNavigationScrollView } from "@/src/components/layouts/tabbar/hooks"
 import { EntryListContentPicture } from "@/src/modules/entry-list/EntryListContentPicture"
 import { useWhoami } from "@/src/store/user/hooks"
 
+import { useFetchEntriesControls } from "../feed-drawer/atoms"
 import { EntryListContentArticle } from "./EntryListContentArticle"
 import { EntryListContentSocial } from "./EntryListContentSocial"
 import { EntryListContentVideo } from "./EntryListContentVideo"
 import { EntryListContextViewContext } from "./EntryListContext"
 
-export function EntryListSelector({
+function EntryListSelectorImpl({
   entryIds,
   viewId,
   active = true,
 }: {
-  entryIds: string[]
+  entryIds: string[] | null
   viewId: FeedViewType
   active?: boolean
 }) {
@@ -47,6 +52,22 @@ export function EntryListSelector({
     }
   }
 
+  const unreadOnly = useGeneralSettingKey("unreadOnly")
+  useEffect(() => {
+    ref?.current?.scrollToOffset({
+      offset: 0,
+    })
+  }, [unreadOnly, ref])
+
+  const { isRefetching } = useFetchEntriesControls()
+  useEffect(() => {
+    if (isRefetching) {
+      ref?.current?.scrollToOffset({
+        offset: 0,
+      })
+    }
+  }, [isRefetching, ref])
+
   return (
     <EntryListContextViewContext.Provider value={viewId}>
       {whoami ? (
@@ -57,3 +78,5 @@ export function EntryListSelector({
     </EntryListContextViewContext.Provider>
   )
 }
+
+export const EntryListSelector = withErrorBoundary(EntryListSelectorImpl, ListErrorView)
