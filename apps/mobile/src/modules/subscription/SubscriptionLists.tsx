@@ -1,7 +1,7 @@
 import type { FeedViewType } from "@follow/constants"
 import type { FlashList } from "@shopify/flash-list"
 import type { ParseKeys } from "i18next"
-import { useMemo, useState } from "react"
+import { memo, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Text, View } from "react-native"
 import { useEventCallback } from "usehooks-ts"
@@ -19,9 +19,9 @@ import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { StarCuteFiIcon } from "@/src/icons/star_cute_fi"
 import { useNavigation } from "@/src/lib/navigation/hooks"
-import { closeDrawer, getHorizontalScrolling, selectFeed } from "@/src/modules/screen/atoms"
+import { closeDrawer, selectFeed } from "@/src/modules/screen/atoms"
 import { TimelineSelectorList } from "@/src/modules/screen/TimelineSelectorList"
-import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]"
+import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]/FeedScreen"
 import { FEED_COLLECTION_LIST } from "@/src/store/entry/utils"
 import {
   useGroupedSubscription,
@@ -33,6 +33,7 @@ import {
 } from "@/src/store/subscription/hooks"
 import { subscriptionSyncService } from "@/src/store/subscription/store"
 
+import { usePagerListPerformanceHack } from "../entry-list/hooks"
 import { useFeedListSortMethod, useFeedListSortOrder } from "./atoms"
 import { CategoryGrouped } from "./CategoryGrouped"
 import { InboxItem } from "./items/InboxItem"
@@ -46,7 +47,7 @@ const keyExtractor = (item: string | { category: string; subscriptionIds: string
   return item.category
 }
 
-export const SubscriptionList = ({
+const SubscriptionListImpl = ({
   view,
   active = true,
 }: {
@@ -103,6 +104,8 @@ export const SubscriptionList = ({
 
   const scrollViewRef = useRegisterNavigationScrollView<FlashList<any>>(active)
 
+  const { onScroll, style } = usePagerListPerformanceHack(scrollViewRef)
+
   return (
     <TimelineSelectorList
       contentContainerClassName="pb-6"
@@ -118,8 +121,9 @@ export const SubscriptionList = ({
       estimatedItemSize={50}
       renderItem={ItemRender}
       keyExtractor={keyExtractor}
-      // itemLayoutAnimation={LinearTransition}
       extraData={extraData}
+      onScroll={onScroll}
+      style={style}
     />
   )
 }
@@ -232,10 +236,6 @@ const StarItem = () => {
       <ItemPressable
         itemStyle={ItemPressableStyle.Grouped}
         onPress={() => {
-          const isHorizontalScrolling = getHorizontalScrolling()
-          if (isHorizontalScrolling) {
-            return
-          }
           selectFeed({ type: "feed", feedId: FEED_COLLECTION_LIST })
           closeDrawer()
           navigation.pushControllerView(FeedScreen, {
@@ -252,3 +252,5 @@ const StarItem = () => {
     </GroupedInsetListCard>
   )
 }
+
+export const SubscriptionList = memo(SubscriptionListImpl)

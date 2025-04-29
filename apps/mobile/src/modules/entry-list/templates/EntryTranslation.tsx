@@ -1,4 +1,3 @@
-import { cn } from "@follow/utils"
 import { useMemo } from "react"
 import type { TextProps } from "react-native"
 import { Text, View } from "react-native"
@@ -11,21 +10,25 @@ export const EntryTranslation = ({
   className,
   inline,
   showTranslation,
+  bilingual,
   ...props
 }: {
   source?: string | null
-  target?: string
+  target?: string | null
   className?: string
   inline?: boolean
   showTranslation?: boolean
+  bilingual?: boolean
 } & TextProps) => {
+  const showTranslationFinal = useGeneralSettingKey("translation") || showTranslation
+  const bilingualFinal = useGeneralSettingKey("translationMode") === "bilingual" || bilingual
+
   const nextSource = useMemo(() => {
     if (!source) {
       return ""
     }
     return source.trim()
   }, [source])
-  const showTranslationFinal = useGeneralSettingKey("translation") || showTranslation
   const nextTarget = useMemo(() => {
     if (
       !target ||
@@ -37,6 +40,14 @@ export const EntryTranslation = ({
     return target.trim()
   }, [nextSource, target, showTranslationFinal])
 
+  if (!bilingualFinal) {
+    return (
+      <Text {...props} className={className}>
+        {nextTarget || nextSource}
+      </Text>
+    )
+  }
+
   if (inline) {
     return (
       <Text {...props} className={className}>
@@ -47,19 +58,14 @@ export const EntryTranslation = ({
 
   return (
     <View>
-      {nextTarget && (
-        <>
-          <Text {...props} className={className}>
-            {nextTarget}
-          </Text>
-          <Text {...props} className={cn("my-2", className)}>
-            ⇋
-          </Text>
-        </>
-      )}
       <Text {...props} className={className}>
         {nextSource}
       </Text>
+      {nextTarget && (
+        <Text {...props} className={className}>
+          {nextTarget}
+        </Text>
+      )}
     </View>
   )
 }

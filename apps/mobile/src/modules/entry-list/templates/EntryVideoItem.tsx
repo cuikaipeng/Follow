@@ -1,5 +1,7 @@
+import { FeedViewType } from "@follow/constants"
 import { tracker } from "@follow/tracker"
 import { transformVideoUrl } from "@follow/utils"
+import { memo } from "react"
 import { Linking } from "react-native"
 
 import { getGeneralSettings } from "@/src/atoms/settings/general"
@@ -13,7 +15,7 @@ import { unreadSyncService } from "@/src/store/unread/store"
 import { VideoContextMenu } from "../../context-menu/video"
 import { EntryGridFooter } from "../../entry-content/EntryGridFooter"
 
-export function EntryVideoItem({ id }: { id: string }) {
+export const EntryVideoItem = memo(({ id }: { id: string }) => {
   const item = useEntry(id)
 
   if (!item || !item.media) {
@@ -46,11 +48,13 @@ export function EntryVideoItem({ id }: { id: string }) {
             width: 200,
           }}
         />
-        <EntryGridFooter entryId={id} />
+        <EntryGridFooter entryId={id} view={FeedViewType.Videos} />
       </ItemPressable>
     </VideoContextMenu>
   )
-}
+})
+
+EntryVideoItem.displayName = "EntryVideoItem"
 
 const parseSchemeLink = (url: string) => {
   let urlObject: URL
@@ -66,6 +70,10 @@ const parseSchemeLink = (url: string) => {
       const bvid = urlObject.pathname.match(/video\/(BV\w+)/)?.[1]
       return bvid ? `bilibili://video/${bvid}` : null
     }
+    case "t.bilibili.com": {
+      const id = urlObject.pathname.match(/\d+/)?.[0]
+      return id ? `bilibili://following/detail/${id}` : null
+    }
     case "www.youtube.com": {
       // youtube://watch?v=xxx
       const videoId = urlObject.searchParams.get("v")
@@ -78,8 +86,8 @@ const parseSchemeLink = (url: string) => {
 }
 
 const openVideo = async (url: string) => {
-  const { openLinksInApp } = getGeneralSettings()
-  if (!openLinksInApp) {
+  const { openLinksInExternalApp } = getGeneralSettings()
+  if (openLinksInExternalApp) {
     const schemeLink = parseSchemeLink(url)
     try {
       const isInstalled = !!schemeLink && (await Linking.canOpenURL(schemeLink))

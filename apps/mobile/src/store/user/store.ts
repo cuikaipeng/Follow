@@ -98,9 +98,9 @@ class UserSyncService {
 
     if (!me) throw new Error("user not login")
 
-    const method = enabled ? twoFactor.enable : twoFactor.disable
-
-    const res = await method({ password })
+    const res = enabled
+      ? await twoFactor.enable({ password })
+      : await twoFactor.disable({ password })
 
     if (!res.error) {
       immerSet((state) => {
@@ -153,6 +153,22 @@ class UserSyncService {
 
     return res
   }
+
+  async fetchUser(userId: string) {
+    const res = await apiClient.profiles.$get({ query: { id: userId } })
+    if (res.code === 0) {
+      const { whoami } = get()
+      immerSet((state) => {
+        state.users[userId] = {
+          email: null,
+          isMe: whoami?.id === userId,
+          ...res.data,
+        }
+      })
+    }
+
+    return res.data
+  }
 }
 
 class UserActions {
@@ -172,9 +188,7 @@ class UserActions {
     tx.store(() => this.upsertManyInSession(users))
     const { whoami } = useUserStore.getState()
     tx.persist(() =>
-      UserService.upsertMany(
-        users.map((user) => ({ ...user, isMe: whoami?.id === user.id ? 1 : 0 })),
-      ),
+      UserService.upsertMany(users.map((user) => ({ ...user, isMe: whoami?.id === user.id }))),
     )
     await tx.run()
   }

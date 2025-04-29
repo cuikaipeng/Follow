@@ -18,7 +18,7 @@ import { useColor } from "@/src/theme/colors"
 import { ReAnimatedPressable } from "../../common/AnimatedComponents"
 import { ItemPressableStyle } from "./enum"
 
-interface ItemPressableProps extends PressableProps {
+export interface ItemPressableProps extends PressableProps {
   itemStyle?: ItemPressableStyle
   touchHighlight?: boolean
 }
@@ -51,6 +51,9 @@ export const ItemPressable: FC<ItemPressableProps> = memo(
         backgroundColor: interpolateColor(pressed.value, [0, 1], [itemNormalColor, systemFill]),
       }
     })
+
+    const isUnStyled = itemStyle === ItemPressableStyle.UnStyled
+
     return (
       <ReAnimatedPressable
         {...props}
@@ -63,7 +66,10 @@ export const ItemPressable: FC<ItemPressableProps> = memo(
         onLongPress={composeEventHandlers(props.onLongPress, () => {})}
         delayLongPress={props.delayLongPress ?? 100}
         className={cn("relative overflow-hidden", props.className)}
-        style={StyleSheet.flatten([props.style, { backgroundColor: itemNormalColor }])}
+        style={StyleSheet.flatten([
+          props.style,
+          !isUnStyled && { backgroundColor: itemNormalColor },
+        ])}
       >
         {useTypeScriptHappyCallback(
           (props) => {

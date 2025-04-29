@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import type { env as EnvType } from "@follow/shared/env.desktop"
 import legacy from "@vitejs/plugin-legacy"
 import { minify as htmlMinify } from "html-minifier-terser"
 import { cyan, dim, green } from "kolorist"
@@ -12,7 +13,6 @@ import { analyzer } from "vite-bundle-analyzer"
 import mkcert from "vite-plugin-mkcert"
 import { VitePWA } from "vite-plugin-pwa"
 
-import type { env as EnvType } from "../../packages/shared/src/env"
 import { viteRenderBaseConfig } from "./configs/vite.render.config"
 import { createDependencyChunksPlugin } from "./plugins/vite/deps"
 import { htmlInjectPlugin } from "./plugins/vite/html-inject"
@@ -21,7 +21,7 @@ import { createPlatformSpecificImportPlugin } from "./plugins/vite/specific-impo
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 const isCI = process.env.CI === "true" || process.env.CI === "1"
-const ROOT = "./src/renderer"
+const ROOT = "./layer/renderer"
 
 const devPrint = (): PluginOption => ({
   name: "dev-print",
@@ -47,6 +47,43 @@ const isWebBuild = process.env.WEB_BUILD === "1"
 // eslint-disable-next-line no-console
 console.log(green("Build type:"), isWebBuild ? "Web" : "Unknown")
 
+const proxyConfig = {
+  target: "http://localhost:2234",
+  changeOrigin: true,
+  selfHandleResponse: true,
+  configure: (proxy, _options) => {
+    proxy.on("proxyRes", (proxyRes, req, res) => {
+      const body = [] as any[]
+      proxyRes.on("data", (chunk: any) => body.push(chunk))
+      proxyRes.on("end", () => {
+        const html = parseHTML(Buffer.concat(body).toString())
+        const doc = html.document
+
+        const $scripts = doc.querySelectorAll("script")
+        $scripts.forEach((script) => {
+          const src = script.getAttribute("src")
+          if (src) {
+            script.setAttribute("src", `http://localhost:2234${src}`)
+          }
+        })
+
+        const $links = doc.querySelectorAll("link")
+        $links.forEach((link) => {
+          const href = link.getAttribute("href")
+          if (href) {
+            link.setAttribute("href", `http://localhost:2234${href}`)
+          }
+        })
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8")
+
+        const modifiedHtml = doc.toString()
+        res.end(modifiedHtml)
+      })
+    })
+  },
+}
+
 export default ({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const typedEnv = env as typeof EnvType
@@ -67,48 +104,17 @@ export default ({ mode }) => {
       },
     },
     server: {
+      host: true,
       port: 2233,
       watch: {
         ignored: ["**/dist/**", "**/out/**", "**/public/**", ".git/**"],
       },
       cors: true,
       proxy: {
-        "/login": {
-          target: "http://localhost:2234",
-          changeOrigin: true,
-          selfHandleResponse: true,
-          configure: (proxy, _options) => {
-            proxy.on("proxyRes", (proxyRes, req, res) => {
-              const body = [] as any[]
-              proxyRes.on("data", (chunk: any) => body.push(chunk))
-              proxyRes.on("end", () => {
-                const html = parseHTML(Buffer.concat(body).toString())
-                const doc = html.document
-
-                const $scripts = doc.querySelectorAll("script")
-                $scripts.forEach((script) => {
-                  const src = script.getAttribute("src")
-                  if (src) {
-                    script.setAttribute("src", `http://localhost:2234${src}`)
-                  }
-                })
-
-                const $links = doc.querySelectorAll("link")
-                $links.forEach((link) => {
-                  const href = link.getAttribute("href")
-                  if (href) {
-                    link.setAttribute("href", `http://localhost:2234${href}`)
-                  }
-                })
-
-                res.setHeader("Content-Type", "text/html; charset=utf-8")
-
-                const modifiedHtml = doc.toString()
-                res.end(modifiedHtml)
-              })
-            })
-          },
-        },
+        "/login": proxyConfig,
+        "/forget-password": proxyConfig,
+        "/reset-password": proxyConfig,
+        "/register": proxyConfig,
 
         ...(env.VITE_DEV_PROXY
           ? {
@@ -124,7 +130,7 @@ export default ({ mode }) => {
     resolve: {
       alias: {
         ...viteRenderBaseConfig.resolve?.alias,
-        "@follow/logger": resolve(__dirname, "../../packages/logger/web.ts"),
+        "@follow/logger": resolve(__dirname, "../../packages/internal/logger/web.ts"),
       },
     },
     plugins: [
@@ -236,7 +242,7 @@ export default ({ mode }) => {
         ],
         ["vfile", "unified"],
         ["es-toolkit/compat"],
-        ["framer-motion"],
+        ["motion/react"],
         ["clsx", "tailwind-merge", "class-variance-authority"],
 
         [

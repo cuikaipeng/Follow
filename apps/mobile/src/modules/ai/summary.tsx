@@ -1,4 +1,6 @@
 import { cn } from "@follow/utils"
+import MaskedView from "@react-native-masked-view/masked-view"
+import { LinearGradient } from "expo-linear-gradient"
 import type { FC } from "react"
 import * as React from "react"
 import type { LayoutChangeEvent } from "react-native"
@@ -13,7 +15,8 @@ import Animated, {
 } from "react-native-reanimated"
 import { useColor } from "react-native-uikit-colors"
 
-import { Magic2CuteReIcon } from "@/src/icons/magic_2_cute_re"
+import { AiCuteReIcon } from "@/src/icons/ai_cute_re"
+import { isAndroid } from "@/src/lib/platform"
 
 export const AISummary: FC<{
   className?: string
@@ -22,8 +25,6 @@ export const AISummary: FC<{
   error?: string
   onRetry?: () => void
 }> = ({ className, summary, pending = false, error, onRetry }) => {
-  const labelColor = useColor("label")
-
   const opacity = useSharedValue(0.3)
   const height = useSharedValue(0)
 
@@ -56,18 +57,32 @@ export const AISummary: FC<{
     })
   }
 
+  const purpleColor = useColor("purple")
+
   if (pending) return null
   return (
     <Animated.View
       className={cn(
-        "bg-tertiary-system-background border-non-opaque-separator mx-4 my-2 rounded-xl p-4",
+        "border-opaque-separator/50 mx-4 my-2 rounded-xl p-4",
+        // Opacity modifier style incorrectly applied in Android
+        isAndroid ? "bg-secondary-system-background" : "bg-secondary-system-background/30",
         className,
       )}
       style={styles.card}
     >
       <View className="mb-2 flex-row items-center gap-2">
-        <Magic2CuteReIcon height={18} width={18} color={labelColor} />
-        <Text className="text-label text-[16px] font-semibold">AI Summary</Text>
+        <AiCuteReIcon height={16} width={16} color={purpleColor} />
+        <MaskedView
+          maskElement={
+            <View className="bg-transparent">
+              <Text className="text-[15px] font-semibold">AI Summary</Text>
+            </View>
+          }
+        >
+          <LinearGradient colors={["#9333ea", "#2563eb"]} start={[0, 0]} end={[1, 0]}>
+            <Text className="text-[15px] font-semibold text-transparent">AI Summary</Text>
+          </LinearGradient>
+        </MaskedView>
       </View>
       <Animated.View style={animatedContentStyle}>
         <View style={{ height: contentHeight }}>
@@ -110,7 +125,9 @@ export const AISummary: FC<{
               )}
             </View>
           ) : (
-            <Text className="text-label mt-2 text-[15px] leading-[22px]">{summary.trim()}</Text>
+            <Text className="text-label mt-2 text-[14px] leading-[22px]" selectable>
+              {summary.trim()}
+            </Text>
           )}
         </View>
       </View>
@@ -121,10 +138,6 @@ export const AISummary: FC<{
 const styles = StyleSheet.create({
   card: {
     borderWidth: 0.5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
     elevation: 2,
   },
 })

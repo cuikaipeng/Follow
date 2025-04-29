@@ -23,7 +23,7 @@ import { CheckCircleCuteReIcon } from "@/src/icons/check_circle_cute_re"
 import { CloseCircleFillIcon } from "@/src/icons/close_circle_fill"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { toast } from "@/src/lib/toast"
-import { EditEmailScreen } from "@/src/screens/(modal)/edit-email"
+import { EditEmailScreen } from "@/src/screens/(modal)/EditEmailScreen"
 import { useWhoami } from "@/src/store/user/hooks"
 import type { MeModel } from "@/src/store/user/store"
 import { userSyncService } from "@/src/store/user/store"
@@ -43,6 +43,7 @@ export const EditProfileScreen = () => {
     },
     onSuccess: () => {
       toast.success("Profile updated")
+      setDirtyFields({})
     },
     onError: (error) => {
       toast.error(error.message)
@@ -64,7 +65,8 @@ export const EditProfileScreen = () => {
           headerRight={
             <HeaderSubmitTextButton
               label={t("words.save", { ns: "common" })}
-              isValid={isPending || Object.keys(dirtyFields).length === 0}
+              isValid={Object.keys(dirtyFields).length > 0}
+              isLoading={isPending}
               onPress={() => {
                 updateProfile()
               }}

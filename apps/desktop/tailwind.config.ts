@@ -1,17 +1,13 @@
+import { extendConfig } from "@follow/configs/tailwindcss/web"
 import plugin from "tailwindcss/plugin"
-import resolveConfig from "tailwindcss/resolveConfig"
-
-import { baseTwConfig } from "../../configs/tailwind.base.config"
 
 const isWebBuild = !!process.env.WEB_BUILD || !!process.env.RN_BUILD || !!process.env.VERCEL
-
-export default resolveConfig({
-  ...baseTwConfig,
+export default extendConfig({
   content: [
-    "./src/renderer/src/**/*.{ts,tsx}",
+    "./layer/renderer/src/**/*.{ts,tsx}",
     "./apps/web/src/**/*.{ts,tsx}",
 
-    "./src/renderer/index.html",
+    "./layer/renderer/index.html",
     "./apps/web/index.html",
     "../../packages/**/*.{ts,tsx}",
     "!../../packages/**/node_modules",
@@ -20,9 +16,21 @@ export default resolveConfig({
     hoverOnlyWhenSupported: isWebBuild,
   },
   theme: {
-    ...baseTwConfig.theme,
     extend: {
-      ...baseTwConfig.theme?.extend,
+      cursor: {
+        button: "var(--cursor-button)",
+        select: "var(--cursor-select)",
+        checkbox: "var(--cursor-checkbox)",
+        link: "var(--cursor-link)",
+        menu: "var(--cursor-menu)",
+        radio: "var(--cursor-radio)",
+        switch: "var(--cursor-switch)",
+        card: "var(--cursor-card)",
+      },
+
+      width: {
+        "feed-col": "var(--fo-feed-col-w)",
+      },
       spacing: {
         "safe-inset-top": "var(--fo-window-padding-top, 0)",
         "margin-macos-traffic-light-x": "var(--fo-macos-traffic-light-width, 0)",
@@ -32,16 +40,26 @@ export default resolveConfig({
       height: {
         screen: "100svh",
       },
+      colors: {
+        sidebar: "hsl(var(--fo-sidebar) / <alpha-value>)",
+      },
+
       keyframes: {
+        "caret-blink": {
+          "0%,70%,100%": { opacity: "1" },
+          "20%,50%": { opacity: "0" },
+        },
         glow: {
           "0%, 100%": { opacity: "0.5" },
           "50%": { opacity: "0.7" },
         },
       },
+      animation: {
+        "caret-blink": "caret-blink 1.25s ease-out infinite",
+      },
     },
   },
   plugins: [
-    ...baseTwConfig.plugins,
     plugin(({ addVariant }) => {
       addVariant("f-motion-reduce", '[data-motion-reduce="true"] &')
       addVariant("group-motion-reduce", ':merge(.group)[data-motion-reduce="true"] &')
@@ -54,7 +72,7 @@ export default resolveConfig({
       addVariant("macos", ":where(html[data-os='macOS']) &")
       addVariant("windows", ":where(html[data-os='Windows']) &")
     }),
-
+    require("tailwindcss-multi"),
     plugin(({ addUtilities, matchUtilities, theme }) => {
       addUtilities({
         ".safe-inset-top": {

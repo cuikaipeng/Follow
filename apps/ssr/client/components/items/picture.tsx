@@ -4,7 +4,6 @@ import { getPreferredTitle } from "@client/lib/helper"
 import type { EntriesPreview } from "@client/query/entries"
 import type { Feed } from "@client/query/feed"
 import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.jsx"
-import { FeedIcon } from "@follow/components/ui/feed-icon/index.jsx"
 import { TitleMarquee } from "@follow/components/ui/marquee/index.jsx"
 import {
   MasonryItemsAspectRatioContext,
@@ -19,12 +18,14 @@ import { nextFrame } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
 import dayjs from "dayjs"
 import { throttle } from "es-toolkit/compat"
-import { AnimatePresence, m } from "framer-motion"
 import type { RenderComponentProps } from "masonic"
+import { AnimatePresence, m } from "motion/react"
 import type { FC, PropsWithChildren } from "react"
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { PhotoProvider, PhotoView } from "react-photo-view"
 import inlineStyle from "react-photo-view/dist/react-photo-view.css?raw"
+
+import { FeedIcon } from "../ui/feed-icon"
 
 const MasonryItemFixedDimensionWrapper = (
   props: PropsWithChildren<{

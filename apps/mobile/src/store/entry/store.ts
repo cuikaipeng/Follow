@@ -1,5 +1,4 @@
 import { FeedViewType } from "@follow/constants"
-import { readability } from "@follow/utils"
 import { debounce } from "es-toolkit/compat"
 import { fetch as expoFetch } from "expo/fetch"
 
@@ -13,6 +12,8 @@ import { collectionActions } from "../collection/store"
 import { feedActions } from "../feed/store"
 import { createImmerSetter, createTransaction, createZustandStore } from "../internal/helper"
 import { getSubscription } from "../subscription/getter"
+import { getDefaultCategory } from "../subscription/utils"
+import type { PublishAtTimeRangeFilter } from "../unread/types"
 import { getEntry } from "./getter"
 import type { EntryModel, FetchEntriesProps } from "./types"
 import { getEntriesParams } from "./utils"
@@ -93,13 +94,13 @@ class EntryActions {
   }) {
     if (!feedId) return
     const subscription = getSubscription(feedId)
-    if (subscription?.category) {
-      const entryIdSetByCategory = draft.entryIdByCategory[subscription.category]
-      if (!entryIdSetByCategory) {
-        draft.entryIdByCategory[subscription.category] = new Set([entryId])
-      } else {
-        entryIdSetByCategory.add(entryId)
-      }
+    const category = subscription?.category || getDefaultCategory(subscription)
+    if (!category) return
+    const entryIdSetByCategory = draft.entryIdByCategory[category]
+    if (!entryIdSetByCategory) {
+      draft.entryIdByCategory[category] = new Set([entryId])
+    } else {
+      entryIdSetByCategory.add(entryId)
     }
   }
 
@@ -274,18 +275,30 @@ class EntryActions {
     entryIds,
     feedIds,
     read,
+    time,
   }: {
     entryIds?: EntryId[]
     feedIds?: FeedId[]
     read: boolean
+    time?: PublishAtTimeRangeFilter
   }) {
     immerSet((draft) => {
       if (entryIds) {
         for (const entryId of entryIds) {
           const entry = draft.data[entryId]
-          if (entry) {
-            entry.read = read
+          if (!entry) {
+            continue
           }
+
+          if (
+            time &&
+            (+new Date(entry.publishedAt) < time.startTime ||
+              +new Date(entry.publishedAt) > time.endTime)
+          ) {
+            continue
+          }
+
+          entry.read = read
         }
       }
 
@@ -298,6 +311,14 @@ class EntryActions {
           )
 
         for (const entry of entries) {
+          if (
+            time &&
+            (+new Date(entry.publishedAt) < time.startTime ||
+              +new Date(entry.publishedAt) > time.endTime)
+          ) {
+            continue
+          }
+
           entry.read = read
         }
       }
@@ -436,8 +457,19 @@ class EntrySyncServices {
     const entry = honoMorph.toEntry(res.data)
     if (!currentEntry && entry) {
       await entryActions.upsertMany([entry])
-    } else if (entry?.content && currentEntry?.content !== entry.content) {
-      await entryActions.updateEntryContent({ entryId, content: entry.content })
+    } else {
+      if (entry?.content && currentEntry?.content !== entry.content) {
+        await entryActions.updateEntryContent({ entryId, content: entry.content })
+      }
+      if (
+        entry?.readabilityContent &&
+        currentEntry?.readabilityContent !== entry.readabilityContent
+      ) {
+        await entryActions.updateEntryContent({
+          entryId,
+          readabilityContent: entry.readabilityContent,
+        })
+      }
     }
     return entry
   }
@@ -445,8 +477,12 @@ class EntrySyncServices {
   async fetchEntryReadabilityContent(entryId: EntryId) {
     const entry = getEntry(entryId)
 
-    if (entry?.url && !entry?.readabilityContent) {
-      const contentByFetch = await readability(entry.url)
+    if (entry?.url && entry?.readabilityContent === null) {
+      const { data: contentByFetch } = await apiClient.entries.readability.$get({
+        query: {
+          id: entryId,
+        },
+      })
       if (contentByFetch?.content && entry?.readabilityContent !== contentByFetch.content) {
         await entryActions.updateEntryContent({
           entryId,
@@ -480,7 +516,7 @@ class EntrySyncServices {
       // https://github.com/facebook/react-native/issues/37505
       // TODO: And it seems we can not just use fetch from expo for ofetch, need further investigation
       const response = await expoFetch(apiClient.entries.stream.$url().toString(), {
-        method: "post",
+        method: "POST",
         headers: {
           cookie: getCookie(),
         },

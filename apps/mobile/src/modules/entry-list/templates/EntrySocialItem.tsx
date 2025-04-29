@@ -1,8 +1,7 @@
 import { FeedViewType } from "@follow/constants"
 import { tracker } from "@follow/tracker"
-import { useCallback, useEffect, useMemo } from "react"
+import { memo, useCallback, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
-import ReAnimated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 import { useGeneralSettingKey } from "@/src/atoms/settings/general"
 import { UserAvatar } from "@/src/components/ui/avatar/UserAvatar"
@@ -12,11 +11,10 @@ import { Galeria } from "@/src/components/ui/image/galeria"
 import { Image } from "@/src/components/ui/image/Image"
 import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
-import { gentleSpringPreset } from "@/src/constants/spring"
+import { VideoPlayer } from "@/src/components/ui/video/VideoPlayer"
 import { useNavigation } from "@/src/lib/navigation/hooks"
-import { getHorizontalScrolling } from "@/src/modules/screen/atoms"
-import { EntryDetailScreen } from "@/src/screens/(stack)/entries/[entryId]"
-import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]"
+import { EntryDetailScreen } from "@/src/screens/(stack)/entries/[entryId]/EntryDetailScreen"
+import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]/FeedScreen"
 import { useEntry } from "@/src/store/entry/hooks"
 import { useFeed } from "@/src/store/feed/hooks"
 import { useEntryTranslation } from "@/src/store/translation/hooks"
@@ -26,7 +24,7 @@ import { EntryItemContextMenu } from "../../context-menu/entry"
 import { EntryItemSkeleton } from "../EntryListContentSocial"
 import { EntryTranslation } from "./EntryTranslation"
 
-export function EntrySocialItem({ entryId }: { entryId: string }) {
+export const EntrySocialItem = memo(({ entryId }: { entryId: string }) => {
   const entry = useEntry(entryId)
   const translation = useEntryTranslation(entryId)
 
@@ -34,46 +32,25 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
 
   const navigation = useNavigation()
   const handlePress = useCallback(() => {
-    const isHorizontalScrolling = getHorizontalScrolling()
-    if (!isHorizontalScrolling) {
-      unreadSyncService.markEntryAsRead(entryId)
-      tracker.navigateEntry({
-        feedId: entry?.feedId!,
-        entryId,
-      })
-      navigation.pushControllerView(EntryDetailScreen, {
-        entryId,
-        view: FeedViewType.SocialMedia,
-      })
-    }
+    unreadSyncService.markEntryAsRead(entryId)
+    tracker.navigateEntry({
+      feedId: entry?.feedId!,
+      entryId,
+    })
+    navigation.pushControllerView(EntryDetailScreen, {
+      entryId,
+      view: FeedViewType.SocialMedia,
+    })
   }, [entry?.feedId, entryId, navigation])
-
-  const unreadZoomSharedValue = useSharedValue(entry?.read ? 0 : 1)
-
-  const unreadIndicatorStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        {
-          scale: unreadZoomSharedValue.value,
-        },
-      ],
-    }
-  })
-
-  useEffect(() => {
-    if (!entry) return
-
-    if (entry.read) {
-      unreadZoomSharedValue.value = withSpring(0, gentleSpringPreset)
-    } else {
-      unreadZoomSharedValue.value = withSpring(1, gentleSpringPreset)
-    }
-  }, [entry, entry?.read, unreadZoomSharedValue])
 
   const autoExpandLongSocialMedia = useGeneralSettingKey("autoExpandLongSocialMedia")
 
   const memoedMediaUrlList = useMemo(() => {
-    return entry?.media?.map((i) => i.url) ?? []
+    return (entry?.media
+      ?.map((i) =>
+        i.type === "video" ? i.preview_image_url : i.type === "photo" ? i.url : undefined,
+      )
+      .filter(Boolean) || []) as string[]
   }, [entry])
 
   if (!entry) return <EntryItemSkeleton />
@@ -81,17 +58,13 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
   const { description, publishedAt, media } = entry
 
   return (
-    <EntryItemContextMenu id={entryId}>
+    <EntryItemContextMenu id={entryId} view={FeedViewType.SocialMedia}>
       <ItemPressable
-        touchHighlight={false}
         itemStyle={ItemPressableStyle.Plain}
         className="flex flex-col gap-2 p-4 pl-6"
         onPress={handlePress}
       >
-        <ReAnimated.View
-          className="bg-red absolute left-1.5 top-[25] size-2 rounded-full"
-          style={unreadIndicatorStyle}
-        />
+        {!entry.read && <View className="bg-red absolute left-1.5 top-[25] size-2 rounded-full" />}
 
         <View className="flex flex-1 flex-row items-start gap-4">
           <Pressable
@@ -132,26 +105,55 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
         {media && media.length > 0 && (
           <View className="ml-10 flex flex-row flex-wrap justify-between">
             <Galeria urls={memoedMediaUrlList}>
-              {media.map((image, index) => {
+              {media.map((mediaItem, index) => {
+                // TODO: support video
+                const imageUrl =
+                  mediaItem.type === "video"
+                    ? mediaItem.preview_image_url
+                    : mediaItem.type === "photo"
+                      ? mediaItem.url
+                      : undefined
                 const fullWidth = index === media.length - 1 && media.length % 2 === 1
+                if (!imageUrl) return null
+
+                const ImageItem = (
+                  <Galeria.Image index={index}>
+                    <Image
+                      proxy={{
+                        width: fullWidth ? 400 : 200,
+                      }}
+                      source={{ uri: imageUrl }}
+                      blurhash={mediaItem.blurhash}
+                      className="border-secondary-system-background w-full rounded-lg border"
+                      aspectRatio={
+                        fullWidth && mediaItem.width && mediaItem.height
+                          ? mediaItem.width / mediaItem.height
+                          : 1
+                      }
+                    />
+                  </Galeria.Image>
+                )
+
+                if (mediaItem.type === "video") {
+                  return (
+                    <View key={`${entryId}-${mediaItem.url}`} className="w-full">
+                      <VideoPlayer
+                        source={{
+                          uri: mediaItem.url,
+                        }}
+                        height={mediaItem.height}
+                        width={mediaItem.width}
+                        placeholder={ImageItem}
+                      />
+                    </View>
+                  )
+                }
                 return (
                   <Pressable
-                    key={`${entryId}-${image.url}`}
+                    key={`${entryId}-${imageUrl}`}
                     className={fullWidth ? "w-full" : "w-1/2 p-0.5"}
                   >
-                    <Galeria.Image index={index}>
-                      <Image
-                        proxy={{
-                          width: fullWidth ? 400 : 200,
-                        }}
-                        source={{ uri: image.url }}
-                        blurhash={image.blurhash}
-                        className="border-secondary-system-background w-full rounded-lg border"
-                        aspectRatio={
-                          fullWidth && image.width && image.height ? image.width / image.height : 1
-                        }
-                      />
-                    </Galeria.Image>
+                    {ImageItem}
                   </Pressable>
                 )
               })}
@@ -161,4 +163,6 @@ export function EntrySocialItem({ entryId }: { entryId: string }) {
       </ItemPressable>
     </EntryItemContextMenu>
   )
-}
+})
+
+EntrySocialItem.displayName = "EntrySocialItem"

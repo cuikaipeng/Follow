@@ -1,3 +1,4 @@
+import type { FeedViewType } from "@follow/constants"
 import { PortalProvider } from "@gorhom/portal"
 import type { PropsWithChildren } from "react"
 import { useCallback } from "react"
@@ -11,24 +12,30 @@ import {
 import { ContextMenu } from "@/src/components/ui/context-menu"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { toast } from "@/src/lib/toast"
-import { getHorizontalScrolling, useSelectedView } from "@/src/modules/screen/atoms"
-import { EntryDetailScreen } from "@/src/screens/(stack)/entries/[entryId]"
+import { EntryDetailScreen } from "@/src/screens/(stack)/entries/[entryId]/EntryDetailScreen"
 import { useIsEntryStarred } from "@/src/store/collection/hooks"
 import { collectionSyncService } from "@/src/store/collection/store"
+import { getFetchEntryPayload } from "@/src/store/entry/getter"
 import { useEntry } from "@/src/store/entry/hooks"
 import { unreadSyncService } from "@/src/store/unread/store"
 
-export const EntryItemContextMenu = ({ id, children }: PropsWithChildren<{ id: string }>) => {
+import { useSelectedFeed, useSelectedView } from "../screen/atoms"
+
+export const EntryItemContextMenu = ({
+  id,
+  children,
+  view,
+}: PropsWithChildren<{ id: string; view: FeedViewType }>) => {
   const { t } = useTranslation()
+  const selectedView = useSelectedView()
+  const selectedFeed = useSelectedFeed()
   const entry = useEntry(id)
   const feedId = entry?.feedId
-  const view = useSelectedView()
   const isEntryStarred = useIsEntryStarred(id)
 
   const navigation = useNavigation()
   const handlePressPreview = useCallback(() => {
-    const isHorizontalScrolling = getHorizontalScrolling()
-    if (entry && !isHorizontalScrolling) {
+    if (entry) {
       preloadWebViewEntry(entry)
       navigation.pushControllerView(EntryDetailScreen, {
         entryId: id,
@@ -58,6 +65,33 @@ export const EntryItemContextMenu = ({ id, children }: PropsWithChildren<{ id: s
         </ContextMenu.Preview>
 
         <ContextMenu.Item
+          key="MarkAsReadAbove"
+          onSelect={() => {
+            const payload = getFetchEntryPayload(selectedFeed, selectedView)
+            const { publishedAt } = entry
+            unreadSyncService.markViewAsRead({
+              view: selectedView,
+              filter: payload,
+              time: {
+                startTime: new Date(publishedAt).getTime(),
+                endTime: Date.now(),
+              },
+            })
+          }}
+        >
+          <ContextMenu.ItemIcon
+            ios={{
+              name: "arrow.up",
+            }}
+          />
+          <ContextMenu.ItemTitle>
+            {t("operation.mark_all_as_read_which", {
+              which: t("operation.mark_all_as_read_which_above"),
+            })}
+          </ContextMenu.ItemTitle>
+        </ContextMenu.Item>
+
+        <ContextMenu.Item
           key="MarkAsRead"
           onSelect={() => {
             entry.read
@@ -73,6 +107,33 @@ export const EntryItemContextMenu = ({ id, children }: PropsWithChildren<{ id: s
               name: entry.read ? "circle.fill" : "checkmark.circle",
             }}
           />
+        </ContextMenu.Item>
+
+        <ContextMenu.Item
+          key="MarkAsReadBelow"
+          onSelect={() => {
+            const payload = getFetchEntryPayload(selectedFeed, selectedView)
+            const { publishedAt } = entry
+            unreadSyncService.markViewAsRead({
+              view: selectedView,
+              filter: payload,
+              time: {
+                startTime: 1,
+                endTime: new Date(publishedAt).getTime() - 1,
+              },
+            })
+          }}
+        >
+          <ContextMenu.ItemIcon
+            ios={{
+              name: "arrow.down",
+            }}
+          />
+          <ContextMenu.ItemTitle>
+            {t("operation.mark_all_as_read_which", {
+              which: t("operation.mark_all_as_read_which_below"),
+            })}
+          </ContextMenu.ItemTitle>
         </ContextMenu.Item>
 
         {feedId && view !== undefined && (

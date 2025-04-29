@@ -1,35 +1,31 @@
-import { atom } from "jotai"
-import { useMemo, useState } from "react"
-import { useAnimatedValue } from "react-native"
-import { useSharedValue } from "react-native-reanimated"
+import { View } from "react-native"
 
+import { SafeNavigationScrollView } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { Search3CuteFiIcon } from "@/src/icons/search_3_cute_fi"
 import { Search3CuteReIcon } from "@/src/icons/search_3_cute_re"
 import type { TabScreenComponent } from "@/src/lib/navigation/bottom-tab/types"
-import { StackScreenHeaderPortal } from "@/src/lib/navigation/StackScreenHeaderPortal"
-import { DiscoverContext } from "@/src/modules/discover/DiscoverContext"
-import { Recommendations } from "@/src/modules/discover/Recommendations"
+import Content from "@/src/modules/discover/Content"
+import {
+  SearchPageProvider,
+  SearchPageScrollContainerAnimatedXProvider,
+} from "@/src/modules/discover/ctx"
 import { DiscoverHeader } from "@/src/modules/discover/search"
 
 export default function Discover() {
-  const animatedX = useAnimatedValue(0)
-  const currentTabAtom = useState(() => atom(0))[0]
-  const headerHeightAtom = useState(() => atom(0))[0]
-  const animatedY = useSharedValue(0)
-  const ctxValue = useMemo(
-    () => ({ animatedX, currentTabAtom, headerHeightAtom, animatedY }),
-    [animatedX, currentTabAtom, headerHeightAtom, animatedY],
-  )
   return (
-    <DiscoverContext.Provider value={ctxValue}>
-      <StackScreenHeaderPortal>
-        <DiscoverContext.Provider value={ctxValue}>
-          <DiscoverHeader />
-        </DiscoverContext.Provider>
-      </StackScreenHeaderPortal>
-
-      <Recommendations />
-    </DiscoverContext.Provider>
+    <SearchPageScrollContainerAnimatedXProvider>
+      <SearchPageProvider>
+        <SafeNavigationScrollView
+          Header={
+            <View className="absolute top-0 z-10 w-full">
+              <DiscoverHeader />
+            </View>
+          }
+        >
+          <Content />
+        </SafeNavigationScrollView>
+      </SearchPageProvider>
+    </SearchPageScrollContainerAnimatedXProvider>
   )
 }
 

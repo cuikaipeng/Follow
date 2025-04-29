@@ -3,7 +3,7 @@ import type { PrimitiveAtom } from "jotai"
 import { atom, useAtomValue, useSetAtom } from "jotai"
 import type { FC, ReactNode } from "react"
 import { memo, useCallback, useContext, useMemo, useRef } from "react"
-import type { NativeSyntheticEvent } from "react-native"
+import type { NativeSyntheticEvent, StyleProp, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import { useSharedValue } from "react-native-reanimated"
 import type { ScreenStackHeaderConfigProps, StackPresentationTypes } from "react-native-screens"
@@ -14,6 +14,8 @@ import {
   ScreenStackItem,
 } from "react-native-screens"
 
+import { ErrorBoundary } from "@/src/components/common/ErrorBoundary"
+import { ScreenErrorScreen } from "@/src/components/errors/ScreenErrorScreen"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { useColor } from "@/src/theme/colors"
 
@@ -33,6 +35,7 @@ export const WrappedScreenItem: FC<
 
     headerConfig?: ScreenStackHeaderConfigProps
     screenOptions?: NavigationControllerViewExtraProps
+    style?: StyleProp<ViewStyle>
   } & ScreenOptionsContextType
 > = memo(
   ({
@@ -41,6 +44,7 @@ export const WrappedScreenItem: FC<
     stackPresentation,
     headerConfig,
     screenOptions: screenOptionsProp,
+    style,
     ...rest
   }) => {
     const navigation = useNavigation()
@@ -143,6 +147,7 @@ export const WrappedScreenItem: FC<
             style={[
               StyleSheet.absoluteFill,
               { backgroundColor: screenOptionsProp?.transparent ? undefined : backgroundColor },
+              style,
             ]}
             {...rest}
             {...mergedScreenOptions}
@@ -150,7 +155,7 @@ export const WrappedScreenItem: FC<
             onNativeDismissCancelled={handleDismiss}
           >
             <Header />
-            {children}
+            <ErrorBoundary fallbackRender={ScreenErrorScreen}>{children}</ErrorBoundary>
           </ScreenStackItem>
         </ScreenOptionsContext.Provider>
       </ScreenItemContext.Provider>

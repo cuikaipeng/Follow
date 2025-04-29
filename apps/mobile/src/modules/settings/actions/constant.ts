@@ -1,9 +1,10 @@
 import type { ParseKeys } from "i18next"
+import type { SFSymbol } from "sf-symbols-typescript"
 
 import type { SupportedLanguages } from "@/src/lib/language"
 import type { Navigation } from "@/src/lib/navigation/Navigation"
 import { actionActions } from "@/src/store/action/store"
-import type { ActionId, ActionRule } from "@/src/store/action/types"
+import type { ActionId } from "@/src/store/action/types"
 
 import { EditRewriteRulesScreen } from "../routes/EditRewriteRules"
 import { EditWebhooksScreen } from "../routes/EditWebhooks"
@@ -11,8 +12,13 @@ import { EditWebhooksScreen } from "../routes/EditWebhooks"
 export const filterFieldOptions: Array<{
   label: Extract<ParseKeys<"settings">, `actions.action_card.feed_options.${string}`>
   value: string
-  type?: "text" | "number" | "view"
+  type?: "text" | "number" | "view" | "status"
 }> = [
+  {
+    label: "actions.action_card.feed_options.status",
+    value: "status",
+    type: "status",
+  },
   {
     label: "actions.action_card.feed_options.subscription_view",
     value: "view",
@@ -60,7 +66,7 @@ export const filterFieldOptions: Array<{
 export const filterOperatorOptions: Array<{
   label: Extract<ParseKeys<"settings">, `actions.action_card.operation_options.${string}`>
   value: string
-  types: Array<"text" | "number" | "view">
+  types: Array<"text" | "number" | "view" | "status">
 }> = [
   {
     label: "actions.action_card.operation_options.contains",
@@ -75,7 +81,7 @@ export const filterOperatorOptions: Array<{
   {
     label: "actions.action_card.operation_options.is_equal_to",
     value: "eq",
-    types: ["number", "text", "view"],
+    types: ["number", "text", "view", "status"],
   },
   {
     label: "actions.action_card.operation_options.is_not_equal_to",
@@ -104,39 +110,47 @@ export const availableActionList: Array<{
   label: Extract<ParseKeys<"settings">, `actions.action_card.${string}`>
   onEnable?: (index: number) => void
   onNavigate?: (router: Navigation, index: number) => void
-  component?: React.FC<{ rule: ActionRule }>
+  icon: SFSymbol
 }> = [
   {
     value: "summary",
     label: "actions.action_card.generate_summary",
+    icon: "sparkles",
   },
   {
     value: "translation",
     label: "actions.action_card.translate_into",
+    icon: "translate",
   },
   {
     value: "readability",
     label: "actions.action_card.enable_readability",
+    icon: "text.document",
   },
   {
     value: "sourceContent",
     label: "actions.action_card.source_content",
+    icon: "macwindow",
   },
   {
     value: "newEntryNotification",
     label: "actions.action_card.new_entry_notification",
+    icon: "bell.and.waves.left.and.right",
   },
   {
     value: "silence",
     label: "actions.action_card.silence",
+    icon: "speaker.slash",
   },
   {
     value: "block",
     label: "actions.action_card.block",
+    icon: "xmark.circle",
   },
   {
     value: "rewriteRules",
     label: "actions.action_card.rewrite_rules",
+    icon: "pencil.and.outline",
     onEnable: (index: number) => {
       actionActions.patchRule(index, {
         result: {
@@ -156,6 +170,7 @@ export const availableActionList: Array<{
   {
     value: "webhooks",
     label: "actions.action_card.webhooks",
+    icon: "arrow.up.right.square",
     onEnable: (index) => {
       actionActions.patchRule(index, { result: { webhooks: [""] } })
     },

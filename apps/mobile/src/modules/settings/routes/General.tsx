@@ -2,7 +2,7 @@ import { ACTION_LANGUAGE_KEYS } from "@follow/shared"
 import i18next from "i18next"
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { Text, View } from "react-native"
+import { View } from "react-native"
 
 import type { MobileSupportedLanguages } from "@/src/@types/constants"
 import { currentSupportedLanguages } from "@/src/@types/constants"
@@ -13,7 +13,6 @@ import {
 } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { Select } from "@/src/components/ui/form/Select"
 import {
-  GroupedInsetListBaseCell,
   GroupedInsetListCard,
   GroupedInsetListCell,
   GroupedInsetListSectionHeader,
@@ -60,15 +59,38 @@ function LanguageSetting({ settingKey }: { settingKey: "language" | "actionLangu
   const { t } = useTranslation("settings")
 
   return (
-    <GroupedInsetListBaseCell>
-      <Text className="text-label">
-        {settingKey === "language" ? t("general.language") : t("general.action_language.label")}
-      </Text>
-
+    <GroupedInsetListCell
+      label={settingKey === "language" ? t("general.language") : t("general.action_language.label")}
+    >
       <View className="w-[150px]">
         <LanguageSelect settingKey={settingKey} />
       </View>
-    </GroupedInsetListBaseCell>
+    </GroupedInsetListCell>
+  )
+}
+
+function TranslationModeSetting() {
+  const { t } = useTranslation("settings")
+  const translationMode = useGeneralSettingKey("translationMode")
+
+  return (
+    <GroupedInsetListCell
+      label={t("general.translation_mode.label")}
+      description={t("general.translation_mode.description")}
+    >
+      <View className="w-[130px]">
+        <Select
+          value={translationMode}
+          onValueChange={(value) => {
+            setGeneralSetting("translationMode", value as "bilingual" | "translation-only")
+          }}
+          options={[
+            { label: t("general.translation_mode.bilingual"), value: "bilingual" },
+            { label: t("general.translation_mode.translation-only"), value: "translation-only" },
+          ]}
+        />
+      </View>
+    </GroupedInsetListCell>
   )
 }
 
@@ -77,14 +99,13 @@ export const GeneralScreen: NavigationControllerView = () => {
 
   const translation = useGeneralSettingKey("translation")
   const summary = useGeneralSettingKey("summary")
-  // TODO: support autoGroup
-  // const autoGroup = useGeneralSettingKey("autoGroup")
+  const autoGroup = useGeneralSettingKey("autoGroup")
   const showUnreadOnLaunch = useGeneralSettingKey("unreadOnly")
   // const groupByDate = useGeneralSettingKey("groupByDate")
   const expandLongSocialMedia = useGeneralSettingKey("autoExpandLongSocialMedia")
   const markAsReadWhenScrolling = useGeneralSettingKey("scrollMarkUnread")
   const markAsReadWhenInView = useGeneralSettingKey("renderMarkUnread")
-  const openLinksInApp = useGeneralSettingKey("openLinksInApp")
+  const openLinksInExternalApp = useGeneralSettingKey("openLinksInExternalApp")
 
   return (
     <SafeNavigationScrollView
@@ -119,12 +140,13 @@ export const GeneralScreen: NavigationControllerView = () => {
             }}
           />
         </GroupedInsetListCell>
+        <TranslationModeSetting />
         <LanguageSetting settingKey="actionLanguage" />
       </GroupedInsetListCard>
 
       {/* Subscriptions */}
 
-      {/* <GroupedInsetListSectionHeader label={t("general.subscriptions")} />
+      <GroupedInsetListSectionHeader label={t("general.subscriptions")} />
       <GroupedInsetListCard>
         <GroupedInsetListCell
           label={t("general.auto_group.label")}
@@ -138,7 +160,7 @@ export const GeneralScreen: NavigationControllerView = () => {
             }}
           />
         </GroupedInsetListCell>
-      </GroupedInsetListCard> */}
+      </GroupedInsetListCard>
 
       {/* Timeline */}
 
@@ -213,12 +235,12 @@ export const GeneralScreen: NavigationControllerView = () => {
 
       <GroupedInsetListSectionHeader label={t("general.content")} />
       <GroupedInsetListCard>
-        <GroupedInsetListCell label={t("general.open_links_in_app.label")}>
+        <GroupedInsetListCell label={t("general.open_links_in_external_app.label")}>
           <Switch
             size="sm"
-            value={openLinksInApp}
+            value={openLinksInExternalApp}
             onValueChange={(value) => {
-              setGeneralSetting("openLinksInApp", value)
+              setGeneralSetting("openLinksInExternalApp", value)
             }}
           />
         </GroupedInsetListCell>

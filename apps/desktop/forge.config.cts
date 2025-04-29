@@ -96,6 +96,7 @@ const ignorePattern = new RegExp(`^/node_modules/(?!${[...keepModules].join("|")
 
 const config: ForgeConfig = {
   packagerConfig: {
+    name: isStaging ? "Folo Staging" : "Folo",
     appCategoryType: "public.app-category.news",
     buildVersion: process.env.BUILD_VERSION || undefined,
     appBundleId: "is.follow",
@@ -116,6 +117,9 @@ const config: ForgeConfig = {
     ignore: [ignorePattern],
 
     prune: true,
+    extendInfo: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
     osxSign: {
       optionsForFile:
         platform === "mas"
