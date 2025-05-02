@@ -229,6 +229,7 @@ const FeedListImpl = forwardRef<HTMLDivElement, { className?: string; view: numb
               <SortByAlphabeticalInbox view={view} data={inboxesData} />
             </>
           )}
+
           {(hasListData || hasInboxData) && (
             <div
               className={cn(

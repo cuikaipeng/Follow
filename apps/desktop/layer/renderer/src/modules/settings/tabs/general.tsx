@@ -1,6 +1,5 @@
 import { useMobile } from "@follow/components/hooks/useMobile.js"
 import { ResponsiveSelect } from "@follow/components/ui/select/responsive.js"
-import { UserRole } from "@follow/constants"
 import { useTypeScriptHappyCallback } from "@follow/hooks"
 import { ACTION_LANGUAGE_MAP } from "@follow/shared"
 import { IN_ELECTRON } from "@follow/shared/constants"
@@ -21,7 +20,6 @@ import {
   useGeneralSettingSelector,
   useGeneralSettingValue,
 } from "~/atoms/settings/general"
-import { useUserRole } from "~/atoms/user"
 import { useProxyValue, useSetProxy } from "~/hooks/biz/useProxySetting"
 import { useMinimizeToTrayValue, useSetMinimizeToTray } from "~/hooks/biz/useTraySetting"
 import { fallbackLanguage } from "~/i18n"
@@ -60,8 +58,6 @@ export const SettingGeneral = () => {
   )
 
   const isMobile = useMobile()
-  const role = useUserRole()
-  const isTrialUser = role === UserRole.Trial
 
   const reRenderKey = useGeneralSettingKey("enhancedSettings")
 
@@ -89,15 +85,12 @@ export const SettingGeneral = () => {
           {
             type: "title",
             value: t("general.action.title"),
-            disabled: isTrialUser,
           },
           defineSettingItem("summary", {
             label: t("general.action.summary"),
-            disabled: isTrialUser,
           }),
           defineSettingItem("translation", {
             label: t("general.action.translation"),
-            disabled: isTrialUser,
           }),
           TranslationModeSelector,
           ActionLanguageSelector,
@@ -211,7 +204,6 @@ export const LanguageSelector = ({
   contentClassName?: string
 }) => {
   const { t } = useTranslation("settings")
-  const { t: langT } = useTranslation("lang")
   const language = useGeneralSettingSelector((state) => state.language)
 
   const finalRenderLanguage = currentSupportedLanguages.includes(language)
@@ -236,44 +228,26 @@ export const LanguageSelector = ({
         onValueChange={(value) => {
           setGeneralSetting("language", value as string)
         }}
-        renderItem={useTypeScriptHappyCallback(
-          (item) => {
-            const lang = item.value
-            const percent = I18N_COMPLETENESS_MAP[lang]
+        renderItem={useTypeScriptHappyCallback((item) => {
+          const lang = item.value
+          const percent = I18N_COMPLETENESS_MAP[lang]
 
-            const languageName =
-              langT(`langs.${lang}` as any) === `langs.${lang}`
-                ? defaultResources[lang].lang.name
-                : langT(`langs.${lang}` as any)
+          const originalLanguageName = defaultResources[lang].lang.name
 
-            const originalLanguageName = defaultResources[lang].lang.name
-
-            if (isMobile) {
-              return `${languageName} - ${originalLanguageName} (${percent}%)`
-            }
-            return (
-              <span className="group" key={lang}>
-                <span
-                  className={cn(originalLanguageName !== languageName && "group-hover:invisible")}
-                >
-                  {languageName}
-                  {typeof percent === "number" ? (percent >= 100 ? null : ` (${percent}%)`) : null}
-                </span>
-                {originalLanguageName !== languageName && (
-                  <span
-                    className="absolute inset-0 hidden items-center pl-2 group-hover:flex"
-                    key={"org"}
-                  >
-                    {originalLanguageName}
-                  </span>
-                )}
+          if (isMobile) {
+            return `${originalLanguageName} (${percent}%)`
+          }
+          return (
+            <span className="group" key={lang}>
+              <span>
+                {originalLanguageName}
+                {typeof percent === "number" ? (percent >= 100 ? null : ` (${percent}%)`) : null}
               </span>
-            )
-          },
-          [langT],
-        )}
+            </span>
+          )
+        }, [])}
         items={currentSupportedLanguages.map((lang) => ({
-          label: langT(`langs.${lang}` as any),
+          label: `langs.${lang}`,
           value: lang,
         }))}
       />
@@ -284,10 +258,6 @@ export const LanguageSelector = ({
 const TranslationModeSelector = () => {
   const { t } = useTranslation("settings")
   const translationMode = useGeneralSettingKey("translationMode")
-  const role = useUserRole()
-  if (role === UserRole.Trial) {
-    return null
-  }
 
   return (
     <SettingItemGroup>
@@ -315,10 +285,6 @@ const TranslationModeSelector = () => {
 const ActionLanguageSelector = () => {
   const { t } = useTranslation("settings")
   const actionLanguage = useGeneralSettingKey("actionLanguage")
-  const role = useUserRole()
-  if (role === UserRole.Trial) {
-    return null
-  }
 
   return (
     <div className="mb-3 mt-4 flex items-center justify-between">
@@ -334,7 +300,10 @@ const ActionLanguageSelector = () => {
         }}
         items={[
           { label: t("general.action_language.default"), value: DEFAULT_ACTION_LANGUAGE },
-          ...Object.values(ACTION_LANGUAGE_MAP),
+          ...Object.values(ACTION_LANGUAGE_MAP).map((item) => ({
+            label: defaultResources[item.value].lang.name,
+            value: item.value,
+          })),
         ]}
       />
     </div>

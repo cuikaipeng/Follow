@@ -504,7 +504,7 @@ declare const achievementsOpenAPISchema: zod.ZodObject<{
     tx: string | null;
 }>;
 
-declare const languageSchema: z.ZodEnum<["ar-DZ", "ar-IQ", "ar-KW", "ar-MA", "ar-SA", "ar-TN", "de", "en", "es", "fi", "fr", "it", "ja", "ko", "pt", "ru", "tr", "zh-CN", "zh-HK", "zh-TW"]>;
+declare const languageSchema: z.ZodEnum<["en", "ja", "zh-CN", "zh-TW"]>;
 declare const conditionItemSchema: z.ZodObject<{
     field: z.ZodEnum<["view", "title", "site_url", "feed_url", "category", "entry_title", "entry_content", "entry_url", "entry_author", "entry_media_length", "status"]>;
     operator: z.ZodEnum<["contains", "not_contains", "eq", "not_eq", "gt", "lt", "regex"]>;
@@ -592,7 +592,7 @@ declare const actions: drizzle_orm_pg_core.PgTableWithColumns<{
                 }[][];
                 result: {
                     disabled?: boolean | undefined;
-                    translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                    translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                     summary?: boolean | undefined;
                     readability?: boolean | undefined;
                     sourceContent?: boolean | undefined;
@@ -636,7 +636,7 @@ declare const actions: drizzle_orm_pg_core.PgTableWithColumns<{
                 }[][];
                 result: {
                     disabled?: boolean | undefined;
-                    translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                    translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                     summary?: boolean | undefined;
                     readability?: boolean | undefined;
                     sourceContent?: boolean | undefined;
@@ -689,7 +689,7 @@ declare const actionsItemOpenAPISchema: z.ZodObject<{
     }>, "many">, "many">]>;
     result: z.ZodObject<{
         disabled: z.ZodOptional<z.ZodBoolean>;
-        translation: z.ZodOptional<z.ZodUnion<[z.ZodEnum<["ar-DZ", "ar-IQ", "ar-KW", "ar-MA", "ar-SA", "ar-TN", "de", "en", "es", "fi", "fr", "it", "ja", "ko", "pt", "ru", "tr", "zh-CN", "zh-HK", "zh-TW"]>, z.ZodBoolean]>>;
+        translation: z.ZodOptional<z.ZodUnion<[z.ZodEnum<["en", "ja", "zh-CN", "zh-TW"]>, z.ZodBoolean]>>;
         summary: z.ZodOptional<z.ZodBoolean>;
         readability: z.ZodOptional<z.ZodBoolean>;
         sourceContent: z.ZodOptional<z.ZodBoolean>;
@@ -723,7 +723,7 @@ declare const actionsItemOpenAPISchema: z.ZodObject<{
         webhooks: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     }, "strip", z.ZodTypeAny, {
         disabled?: boolean | undefined;
-        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
         summary?: boolean | undefined;
         readability?: boolean | undefined;
         sourceContent?: boolean | undefined;
@@ -743,7 +743,7 @@ declare const actionsItemOpenAPISchema: z.ZodObject<{
         webhooks?: string[] | undefined;
     }, {
         disabled?: boolean | undefined;
-        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
         summary?: boolean | undefined;
         readability?: boolean | undefined;
         sourceContent?: boolean | undefined;
@@ -775,7 +775,7 @@ declare const actionsItemOpenAPISchema: z.ZodObject<{
     }[][];
     result: {
         disabled?: boolean | undefined;
-        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
         summary?: boolean | undefined;
         readability?: boolean | undefined;
         sourceContent?: boolean | undefined;
@@ -807,7 +807,7 @@ declare const actionsItemOpenAPISchema: z.ZodObject<{
     }[][];
     result: {
         disabled?: boolean | undefined;
-        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
         summary?: boolean | undefined;
         readability?: boolean | undefined;
         sourceContent?: boolean | undefined;
@@ -911,7 +911,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
         }>, "many">, "many">]>;
         result: z.ZodObject<{
             disabled: z.ZodOptional<z.ZodBoolean>;
-            translation: z.ZodOptional<z.ZodUnion<[z.ZodEnum<["ar-DZ", "ar-IQ", "ar-KW", "ar-MA", "ar-SA", "ar-TN", "de", "en", "es", "fi", "fr", "it", "ja", "ko", "pt", "ru", "tr", "zh-CN", "zh-HK", "zh-TW"]>, z.ZodBoolean]>>;
+            translation: z.ZodOptional<z.ZodUnion<[z.ZodEnum<["en", "ja", "zh-CN", "zh-TW"]>, z.ZodBoolean]>>;
             summary: z.ZodOptional<z.ZodBoolean>;
             readability: z.ZodOptional<z.ZodBoolean>;
             sourceContent: z.ZodOptional<z.ZodBoolean>;
@@ -945,7 +945,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
             webhooks: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         }, "strip", z.ZodTypeAny, {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -965,7 +965,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
             webhooks?: string[] | undefined;
         }, {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -997,7 +997,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
         }[][];
         result: {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -1029,7 +1029,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
         }[][];
         result: {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -1066,7 +1066,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
         }[][];
         result: {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -1103,7 +1103,7 @@ declare const actionsOpenAPISchema: z.ZodObject<z.objectUtil.extendShape<Omit<{
         }[][];
         result: {
             disabled?: boolean | undefined;
-            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
             summary?: boolean | undefined;
             readability?: boolean | undefined;
             sourceContent?: boolean | undefined;
@@ -13260,7 +13260,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
                         }[][];
                         result: {
                             disabled?: boolean | undefined;
-                            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                             summary?: boolean | undefined;
                             readability?: boolean | undefined;
                             sourceContent?: boolean | undefined;
@@ -13304,7 +13304,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
                         }[][];
                         result: {
                             disabled?: boolean | undefined;
-                            translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                            translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                             summary?: boolean | undefined;
                             readability?: boolean | undefined;
                             sourceContent?: boolean | undefined;
@@ -13339,7 +13339,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
             input: {
                 query: {
                     id: string;
-                    language: "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW";
+                    language: "en" | "ja" | "zh-CN" | "zh-TW";
                     fields: string;
                     part?: string | undefined;
                 };
@@ -13363,7 +13363,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
             input: {
                 query: {
                     id: string;
-                    language?: "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                    language?: "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                     target?: "content" | "readabilityContent" | undefined;
                 };
             };
@@ -13771,7 +13771,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
                     } | undefined;
                     settings?: {
                         disabled?: boolean | undefined;
-                        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                         summary?: boolean | undefined;
                         readability?: boolean | undefined;
                         sourceContent?: boolean | undefined;
@@ -14039,7 +14039,7 @@ declare const _routes: hono_hono_base.HonoBase<Env, ({
                     } | undefined;
                     settings?: {
                         disabled?: boolean | undefined;
-                        translation?: boolean | "ar-DZ" | "ar-IQ" | "ar-KW" | "ar-MA" | "ar-SA" | "ar-TN" | "de" | "en" | "es" | "fi" | "fr" | "it" | "ja" | "ko" | "pt" | "ru" | "tr" | "zh-CN" | "zh-HK" | "zh-TW" | undefined;
+                        translation?: boolean | "en" | "ja" | "zh-CN" | "zh-TW" | undefined;
                         summary?: boolean | undefined;
                         readability?: boolean | undefined;
                         sourceContent?: boolean | undefined;

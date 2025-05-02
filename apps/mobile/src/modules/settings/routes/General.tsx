@@ -6,6 +6,7 @@ import { View } from "react-native"
 
 import type { MobileSupportedLanguages } from "@/src/@types/constants"
 import { currentSupportedLanguages } from "@/src/@types/constants"
+import { defaultResources } from "@/src/@types/default-resource"
 import { setGeneralSetting, useGeneralSettingKey } from "@/src/atoms/settings/general"
 import {
   NavigationBlurEffectHeaderView,
@@ -22,7 +23,7 @@ import { updateDayjsLocale } from "@/src/lib/i18n"
 import type { NavigationControllerView } from "@/src/lib/navigation/types"
 
 export function LanguageSelect({ settingKey }: { settingKey: "language" | "actionLanguage" }) {
-  const { t: tLang } = useTranslation("lang")
+  const { t } = useTranslation("settings")
   const languageMapWithTranslation = useMemo(() => {
     const languageKeys =
       settingKey === "language"
@@ -31,13 +32,18 @@ export function LanguageSelect({ settingKey }: { settingKey: "language" | "actio
             (a, b) => currentSupportedLanguages.indexOf(a) - currentSupportedLanguages.indexOf(b),
           )
 
-    return languageKeys.map((key) => ({
-      subLabel: settingKey === "language" ? tLang(`langs.${key}`, { lng: key }) : undefined,
-      label: tLang(`langs.${key}`),
-      value: key,
-    }))
-  }, [settingKey, tLang])
-  const language = useGeneralSettingKey(settingKey)
+    return [
+      settingKey === "actionLanguage" && {
+        label: t("general.action_language.default"),
+        value: "default",
+      },
+      ...languageKeys.map((key) => ({
+        label: defaultResources[key].lang.name,
+        value: key,
+      })),
+    ].filter((i) => typeof i !== "boolean")
+  }, [settingKey, t])
+  const language = useGeneralSettingKey(settingKey) as MobileSupportedLanguages | "default"
 
   return (
     <Select
@@ -49,7 +55,11 @@ export function LanguageSelect({ settingKey }: { settingKey: "language" | "actio
           updateDayjsLocale(value)
         }
       }}
-      displayValue={tLang(`langs.${language}` as any)}
+      displayValue={
+        language === "default"
+          ? t(`general.action_language.default`)
+          : defaultResources[language]?.lang.name
+      }
       options={languageMapWithTranslation}
     />
   )
