@@ -1,23 +1,28 @@
 import { Card, CardContent, CardHeader } from "@follow/components/ui/card/index.jsx"
-import { ScrollArea } from "@follow/components/ui/scroll-area/ScrollArea.js"
 import { FeedViewType, views } from "@follow/constants"
 import type { EntryModelSimple, FeedModel } from "@follow/models"
 import { cn } from "@follow/utils/utils"
-import { cloneElement, forwardRef } from "react"
+import { cloneElement } from "react"
 
 import { useI18n } from "~/hooks/common"
 
 import { EntryItemSkeleton } from "../entry-column/EntryItemSkeleton"
 import { EntryItemStateless } from "../entry-column/item-stateless"
 
-export const ViewSelectorRadioGroup = forwardRef<
-  HTMLInputElement,
-  {
-    entries?: EntryModelSimple[]
-    feed?: FeedModel
-    view?: number
-  } & React.InputHTMLAttributes<HTMLInputElement>
->(({ entries, feed, view, className, ...rest }, ref) => {
+export const ViewSelectorRadioGroup = ({
+  ref,
+  entries,
+  feed,
+  view,
+  className,
+  ...rest
+}: {
+  entries?: EntryModelSimple[]
+  feed?: FeedModel
+  view?: number
+} & React.InputHTMLAttributes<HTMLInputElement> & {
+    ref?: React.Ref<HTMLInputElement | null>
+  }) => {
   const t = useI18n()
 
   const showPreview = feed && entries && entries.length > 0
@@ -58,17 +63,13 @@ export const ViewSelectorRadioGroup = forwardRef<
         ))}
       </CardHeader>
       {showPreview && (
-        <CardContent className="relative h-64 w-full">
-          <div className="absolute inset-0">
-            <ScrollArea flex rootClassName="h-full" viewportClassName="flex flex-col gap-2">
-              {entries.slice(0, 2).map((entry) => (
-                <EntryItemStateless entry={entry} feed={feed} view={view} key={entry.guid} />
-              ))}
-            </ScrollArea>
-          </div>
+        <CardContent className="relative flex w-full flex-col gap-2">
+          {entries.slice(0, 2).map((entry) => (
+            <EntryItemStateless entry={entry} feed={feed} view={view} key={entry.guid} />
+          ))}
         </CardContent>
       )}
       {showLoading && <EntryItemSkeleton view={view ?? FeedViewType.Articles} count={2} />}
     </Card>
   )
-})
+}

@@ -1,6 +1,10 @@
-import { getReadonlyRoute, useReadonlyRouteSelector } from "@follow/components/atoms/route.js"
+import {
+  getReadonlyRoute,
+  useReadonlyRoute,
+  useReadonlyRouteSelector,
+} from "@follow/components/atoms/route.js"
 import { FeedViewType } from "@follow/constants"
-import { isBizId } from "@follow/utils/utils"
+import { useMemo } from "react"
 import type { Params } from "react-router"
 import { useParams } from "react-router"
 
@@ -14,7 +18,6 @@ import {
   ROUTE_TIMELINE_OF_VIEW,
 } from "~/constants"
 import { getListById } from "~/store/list"
-import { getSubscriptionByFeedId } from "~/store/subscription"
 
 export const useRouteEntryId = () => {
   const { entryId } = useParams()
@@ -37,21 +40,13 @@ export interface BizRouteParams {
   inboxId?: string
   listId?: string
   timelineId?: string
-  isPreview?: boolean
 }
 
-const parseRouteParams = (params: Params<any>): BizRouteParams => {
+const parseRouteParams = (params: Params<any>, _searchParams: URLSearchParams): BizRouteParams => {
   const listId = params.feedId?.startsWith(ROUTE_FEED_IN_LIST)
     ? params.feedId.slice(ROUTE_FEED_IN_LIST.length)
     : undefined
   const list = listId ? getListById(listId) : undefined
-
-  let isPreview = false
-  if (listId) {
-    isPreview = !getSubscriptionByFeedId(listId)
-  } else if (params.feedId) {
-    isPreview = isBizId(params.feedId) && !getSubscriptionByFeedId(params.feedId)
-  }
 
   return {
     view: params.timelineId?.startsWith(ROUTE_TIMELINE_OF_VIEW)
@@ -74,12 +69,15 @@ const parseRouteParams = (params: Params<any>): BizRouteParams => {
       : undefined,
     listId,
     timelineId: params.timelineId,
-    isPreview,
   }
 }
 
 export const useRouteParams = () => {
-  return useRouteParamsSelector((s) => s)
+  const route = useReadonlyRoute()
+  return useMemo(
+    () => parseRouteParams(route.params, route.searchParams),
+    [route.params, route.searchParams],
+  )
 }
 
 const noop = [] as any[]
@@ -89,13 +87,13 @@ export const useRouteParamsSelector = <T>(
   deps = noop,
 ): T =>
   useReadonlyRouteSelector((route) => {
-    const { params } = route
+    const { params, searchParams } = route
 
-    return selector(parseRouteParams(params))
+    return selector(parseRouteParams(params, searchParams))
   }, deps)
 
 export const getRouteParams = () => {
   const route = getReadonlyRoute()
-  const { params } = route
-  return parseRouteParams(params)
+  const { params, searchParams } = route
+  return parseRouteParams(params, searchParams)
 }
