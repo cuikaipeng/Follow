@@ -1,4 +1,5 @@
 import { UserRole } from "@follow/constants"
+import type { ServerConfigs } from "@follow/models/src/types"
 import * as FileSystem from "expo-file-system"
 import type { ParseKeys } from "i18next"
 import type { FC } from "react"
@@ -6,18 +7,19 @@ import { Fragment, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Alert, PixelRatio, View } from "react-native"
 
+import { useServerConfigs } from "@/src/atoms/server-configs"
 import {
   GroupedInsetListCard,
   GroupedInsetListNavigationLink,
   GroupedInsetListNavigationLinkIcon,
 } from "@/src/components/ui/grouped/GroupedList"
 import { getDbPath } from "@/src/database"
-import { BellRingingCuteFiIcon } from "@/src/icons/bell_ringing_cute_fi"
 import { CertificateCuteFiIcon } from "@/src/icons/certificate_cute_fi"
 import { DatabaseIcon } from "@/src/icons/database"
 import { ExitCuteFiIcon } from "@/src/icons/exit_cute_fi"
 import { LoveCuteFiIcon } from "@/src/icons/love_cute_fi"
 import { Magic2CuteFiIcon } from "@/src/icons/magic_2_cute_fi"
+import { NotificationCuteReIcon } from "@/src/icons/notification_cute_re"
 import { PaletteCuteFiIcon } from "@/src/icons/palette_cute_fi"
 import { RadaCuteFiIcon } from "@/src/icons/rada_cute_fi"
 import { SafeLockFilledIcon } from "@/src/icons/safe_lock_filled"
@@ -51,6 +53,7 @@ interface GroupNavigationLink {
 
   anonymous?: boolean
   todo?: boolean
+  hideIf?: (serverConfigs?: ServerConfigs | null) => boolean
 }
 const SettingGroupNavigationLinks: GroupNavigationLink[] = [
   {
@@ -63,7 +66,7 @@ const SettingGroupNavigationLinks: GroupNavigationLink[] = [
   },
   {
     label: "titles.notifications",
-    icon: BellRingingCuteFiIcon,
+    icon: NotificationCuteReIcon,
     onPress: ({ navigation }) => {
       navigation.pushControllerView(NotificationsScreen)
     },
@@ -108,6 +111,7 @@ const BetaGroupNavigationLinks: GroupNavigationLink[] = [
     },
     iconBackgroundColor: "#EC4899",
     anonymous: false,
+    hideIf: (serverConfigs) => !serverConfigs?.INVITATION_ENABLED,
   },
 ]
 
@@ -235,18 +239,19 @@ const navigationGroups = [
 
 export const SettingsList: FC = () => {
   const whoami = useWhoami()
+  const serverConfigs = useServerConfigs()
 
   const filteredNavigationGroups = useMemo(() => {
-    if (whoami) return navigationGroups
-
     return navigationGroups
       .map((group) => {
-        const filteredGroup = group.filter((link) => link.anonymous !== false)
+        const filteredGroup = group
+          .filter((link) => link.anonymous !== !!whoami)
+          .filter((link) => !link.hideIf?.(serverConfigs))
         if (filteredGroup.length === 0) return false
         return filteredGroup
       })
       .filter((group) => group !== false)
-  }, [whoami])
+  }, [whoami, serverConfigs])
 
   const pixelRatio = PixelRatio.get()
   const groupGap = 100 / pixelRatio

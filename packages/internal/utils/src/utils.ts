@@ -345,10 +345,10 @@ export const toScientificNotation = (
 }
 
 export function transformShortcut(shortcut: string, platform: OS = getOS()): string {
-  if (platform === "Windows") {
-    return shortcut.replace("Meta", "Ctrl").replace("meta", "ctrl")
+  if (platform === "macOS") {
+    return shortcut.replace("$mod", "Meta")
   }
-  return shortcut
+  return shortcut.replace("$mod", "Ctrl")
 }
 
 // time like 1:30:00
@@ -406,4 +406,19 @@ export function duplicateIfLengthLessThan(text: string, length: number) {
   return text.length > 0 && text.length < length
     ? text.repeat(Math.ceil(length / text.length))
     : text
+}
+
+export function combineCleanupFunctions(...fns: Array<Nullable<(() => void) | void>>) {
+  return () => {
+    fns.forEach((fn) => {
+      if (typeof fn === "function") {
+        fn()
+      }
+    })
+  }
+}
+
+export function doesTextContainHTML(text?: string | null): boolean {
+  if (!text) return false
+  return /<([a-z][a-z0-9]*)\b[^>]*>\s*[^<>\s].*<\/\1>/i.test(text)
 }

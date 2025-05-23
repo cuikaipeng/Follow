@@ -10,6 +10,7 @@ import {
   feedSubscriptionCountSelector,
   folderFeedsByFeedIdSelector,
   inboxSubscriptionCountSelector,
+  isSubscribedSelector,
   listSubscriptionCountSelector,
   subscriptionByFeedIdSelector,
   subscriptionByViewSelector,
@@ -206,4 +207,13 @@ export const useInboxesGroupedData = (view: FeedViewType) => {
 
     return groupFolder
   }, [data])
+}
+
+export const useIsSubscribed = (feedId: string) =>
+  useSubscriptionStore(useCallback((state) => isSubscribedSelector(feedId)(state), [feedId]))
+
+export const useNonPrivateSubscriptionIds = (ids: string[]) => {
+  const subscriptions = useSubscriptionsByFeedIds(ids)
+  const nonPrivateSubscriptions = subscriptions.filter((s) => !!s).filter((s) => !s?.isPrivate)
+  return nonPrivateSubscriptions.map((s) => s.listId || s.feedId)
 }

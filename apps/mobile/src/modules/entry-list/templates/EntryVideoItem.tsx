@@ -1,11 +1,12 @@
 import { FeedViewType } from "@follow/constants"
 import { tracker } from "@follow/tracker"
-import { transformVideoUrl } from "@follow/utils"
-import { memo } from "react"
-import { Linking, View } from "react-native"
+import { formatDuration, transformVideoUrl } from "@follow/utils"
+import { memo, useMemo } from "react"
+import { Linking, Text, View } from "react-native"
 
 import { getGeneralSettings } from "@/src/atoms/settings/general"
 import { Image } from "@/src/components/ui/image/Image"
+import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { openLink } from "@/src/lib/native"
 import { toast } from "@/src/lib/toast"
@@ -18,15 +19,27 @@ import { EntryGridFooter } from "../../entry-content/EntryGridFooter"
 export const EntryVideoItem = memo(({ id }: { id: string }) => {
   const item = useEntry(id)
 
-  if (!item || !item.media) {
+  const duration = useMemo(() => {
+    const seconds = item?.attachments?.find(
+      (attachment) => attachment.duration_in_seconds,
+    )?.duration_in_seconds
+    if (seconds) {
+      return formatDuration(Number.parseInt(seconds.toString()))
+    }
+    return 0
+  }, [item?.attachments])
+
+  if (!item) {
     return null
   }
+
+  const imageUrl = item.media?.at(0)?.url
 
   return (
     <View className="m-1">
       <VideoContextMenu entryId={id}>
         <ItemPressable
-          className="overflow-hidden rounded-md"
+          itemStyle={ItemPressableStyle.Plain}
           onPress={() => {
             unreadSyncService.markEntryAsRead(id)
             tracker.navigateEntry({
@@ -41,14 +54,25 @@ export const EntryVideoItem = memo(({ id }: { id: string }) => {
             openVideo(item.url)
           }}
         >
-          <Image
-            source={{ uri: item.media[0]?.url || "" }}
-            aspectRatio={16 / 9}
-            className="w-full rounded-lg"
-            proxy={{
-              width: 200,
-            }}
-          />
+          <View className="relative">
+            {imageUrl ? (
+              <Image
+                source={{ uri: imageUrl }}
+                aspectRatio={16 / 9}
+                className="w-full rounded-lg"
+                proxy={{
+                  width: 200,
+                }}
+              />
+            ) : (
+              <FallbackMedia />
+            )}
+            {!!duration && (
+              <Text className="absolute bottom-2 right-2 rounded-md bg-black/50 px-1 py-0.5 text-xs font-medium text-white">
+                {duration}
+              </Text>
+            )}
+          </View>
           <EntryGridFooter entryId={id} view={FeedViewType.Videos} />
         </ItemPressable>
       </VideoContextMenu>
@@ -57,6 +81,15 @@ export const EntryVideoItem = memo(({ id }: { id: string }) => {
 })
 
 EntryVideoItem.displayName = "EntryVideoItem"
+
+const FallbackMedia = () => (
+  <View
+    className="bg-tertiary-system-fill w-full items-center justify-center rounded-lg"
+    style={{ aspectRatio: 16 / 9 }}
+  >
+    <Text className="text-label text-center">No media available</Text>
+  </View>
+)
 
 const parseSchemeLink = (url: string) => {
   let urlObject: URL

@@ -1,4 +1,4 @@
-import { useFocusable } from "@follow/components/common/Focusable.jsx"
+import { useFocusable } from "@follow/components/common/Focusable/index.js"
 import { stopPropagation } from "@follow/utils/dom"
 import { cn, getOS } from "@follow/utils/utils"
 import * as React from "react"
@@ -73,6 +73,10 @@ export const ActionButton = ({
   React.useImperativeHandle(ref, () => buttonRef.current!)
 
   const [shouldHighlightMotion, setShouldHighlightMotion] = useState(highlightMotion)
+  React.useEffect(() => {
+    setShouldHighlightMotion(highlightMotion)
+  }, [highlightMotion])
+
   const [loading, setLoading] = useState(false)
 
   const Trigger = (
@@ -116,6 +120,7 @@ export const ActionButton = ({
             }
           : void 0
       }
+      id={id}
       {...rest}
     >
       {loading ? (
@@ -190,7 +195,7 @@ const HotKeyTrigger = ({
   const isFocusWithIn = useFocusable()
   const enabledInOptions = options?.enabled || true
 
-  useHotkeys(shortcut, fn, {
+  useHotkeys(replaceShortcut(shortcut), fn, {
     preventDefault: true,
     enabled: shortcutOnlyFocusWithIn
       ? isFocusWithIn
@@ -200,4 +205,10 @@ const HotKeyTrigger = ({
     ...options,
   })
   return null
+}
+
+const os = getOS()
+
+const replaceShortcut = (shortcut: string) => {
+  return shortcut.replace("$mod", os === "macOS" ? "Meta" : "Ctrl")
 }

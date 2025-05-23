@@ -110,6 +110,10 @@ export const GeneralScreen: NavigationControllerView = () => {
   const translation = useGeneralSettingKey("translation")
   const summary = useGeneralSettingKey("summary")
   const autoGroup = useGeneralSettingKey("autoGroup")
+  const hideAllReadSubscriptions = useGeneralSettingKey("hideAllReadSubscriptions")
+  const hidePrivateSubscriptionsInTimeline = useGeneralSettingKey(
+    "hidePrivateSubscriptionsInTimeline",
+  )
   const showUnreadOnLaunch = useGeneralSettingKey("unreadOnly")
   // const groupByDate = useGeneralSettingKey("groupByDate")
   const expandLongSocialMedia = useGeneralSettingKey("autoExpandLongSocialMedia")
@@ -167,6 +171,32 @@ export const GeneralScreen: NavigationControllerView = () => {
             value={autoGroup}
             onValueChange={(value) => {
               setGeneralSetting("autoGroup", value)
+            }}
+          />
+        </GroupedInsetListCell>
+
+        <GroupedInsetListCell
+          label={t("general.hide_all_read_subscriptions.label")}
+          description={t("general.hide_all_read_subscriptions.description")}
+        >
+          <Switch
+            size="sm"
+            value={hideAllReadSubscriptions}
+            onValueChange={(value) => {
+              setGeneralSetting("hideAllReadSubscriptions", value)
+            }}
+          />
+        </GroupedInsetListCell>
+
+        <GroupedInsetListCell
+          label={t("general.hide_private_subscriptions_in_timeline.label")}
+          description={t("general.hide_private_subscriptions_in_timeline.description")}
+        >
+          <Switch
+            size="sm"
+            value={hidePrivateSubscriptionsInTimeline}
+            onValueChange={(value) => {
+              setGeneralSetting("hidePrivateSubscriptionsInTimeline", value)
             }}
           />
         </GroupedInsetListCell>

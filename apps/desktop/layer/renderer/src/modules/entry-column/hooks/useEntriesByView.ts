@@ -3,7 +3,6 @@ import { isBizId } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { debounce } from "es-toolkit/compat"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { useRouteParams } from "~/hooks/biz/useRouteParams"
@@ -52,6 +51,9 @@ const useRemoteEntries = (): UseEntriesReturn => {
   const isPreview = useIsPreviewFeed()
 
   const unreadOnly = useGeneralSettingKey("unreadOnly")
+  const hidePrivateSubscriptionsInTimeline = useGeneralSettingKey(
+    "hidePrivateSubscriptionsInTimeline",
+  )
 
   const folderIds = useFolderFeedsByFeedId({
     feedId,
@@ -65,6 +67,7 @@ const useRemoteEntries = (): UseEntriesReturn => {
       listId,
       view,
       ...(unreadOnly === true && !isPreview && { read: false }),
+      ...(hidePrivateSubscriptionsInTimeline === true && { excludePrivate: true }),
     }
 
     if (feedId && listId && isBizId(feedId)) {
@@ -72,7 +75,16 @@ const useRemoteEntries = (): UseEntriesReturn => {
     }
 
     return params
-  }, [feedId, folderIds, inboxId, listId, unreadOnly, view, isPreview])
+  }, [
+    feedId,
+    folderIds,
+    inboxId,
+    listId,
+    unreadOnly,
+    isPreview,
+    view,
+    hidePrivateSubscriptionsInTimeline,
+  ])
   const query = useEntries(entriesOptions)
 
   const [fetchedTime, setFetchedTime] = useState<number>()
@@ -102,12 +114,6 @@ const useRemoteEntries = (): UseEntriesReturn => {
   useEffect(() => {
     setPauseQuery(hasUpdate)
   }, [hasUpdate])
-
-  useEffect(() => {
-    if (query.isError) {
-      toast.error(query.error.message)
-    }
-  }, [query.isError])
 
   const refetch = useCallback(async () => void query.refetch(), [query])
   const fetchNextPage = useCallback(async () => void query.fetchNextPage(), [query])
@@ -141,6 +147,9 @@ const useLocalEntries = (): UseEntriesReturn => {
   const { feedId, view, inboxId, listId, isAllFeeds } = useRouteParams()
 
   const unreadOnly = useGeneralSettingKey("unreadOnly")
+  const hidePrivateSubscriptionsInTimeline = useGeneralSettingKey(
+    "hidePrivateSubscriptionsInTimeline",
+  )
 
   const folderIds = useFolderFeedsByFeedId({
     feedId,
@@ -152,6 +161,7 @@ const useLocalEntries = (): UseEntriesReturn => {
     {
       unread: unreadOnly,
       view,
+      excludePrivate: hidePrivateSubscriptionsInTimeline,
     },
   )
 

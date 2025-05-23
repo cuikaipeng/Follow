@@ -38,7 +38,7 @@ import {
   useModalStack,
 } from "~/components/ui/modal/stacked/hooks"
 
-import { FeedForm } from "./feed-form"
+import { FeedForm } from "./FeedForm"
 import type { RSSHubRoute } from "./types"
 import { normalizeRSSHubParameters } from "./utils"
 
@@ -88,14 +88,16 @@ export const DiscoverFeedForm = ({
   route,
   routePrefix,
   noDescription,
-
   routeParams,
+  viewportClassName,
+  rootClassName,
 }: {
   route: RSSHubRoute
   routePrefix: string
   noDescription?: boolean
-
   routeParams?: RouteParams
+  viewportClassName?: string
+  rootClassName?: string
 }) => {
   const { t } = useTranslation()
   const keys = useMemo(
@@ -226,9 +228,8 @@ export const DiscoverFeedForm = ({
     <div className={cn("flex h-full flex-col", "mx-auto")} ref={rootContainerRef}>
       <Form {...form}>
         <ScrollArea.ScrollArea
-          flex
-          rootClassName={cn(isInModal && "-mx-4 px-4 -mt-4", "max-h-[calc(100vh-200px)] grow")}
-          viewportClassName="pt-4"
+          rootClassName={cn(isInModal && "-mx-4 -mt-4", rootClassName)}
+          viewportClassName={cn("pt-4 px-4 max-h-[calc(100vh-200px)]", viewportClassName)}
         >
           <div className="flex">
             <div className="w-0 grow truncate">
@@ -323,7 +324,7 @@ export const DiscoverFeedForm = ({
                           className="grow-0"
                         />
                         {!!value.description && (
-                          <Markdown className="text-text-secondary text-footnote w-full max-w-full pl-3">
+                          <Markdown className="text-text-secondary text-footnote w-full max-w-full text-wrap pl-3">
                             {value.description}
                           </Markdown>
                         )}
@@ -350,7 +351,7 @@ export const DiscoverFeedForm = ({
         </ScrollArea.ScrollArea>
       </Form>
 
-      <ReadmeAside description={route.description} />
+      {!noDescription && <ReadmeAside description={route.description} />}
     </div>
   )
 }

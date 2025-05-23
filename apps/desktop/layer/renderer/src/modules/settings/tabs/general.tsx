@@ -97,11 +97,19 @@ export const SettingGeneral = () => {
 
           {
             type: "title",
-            value: t("general.sidebar"),
+            value: t("general.subscription"),
           },
           defineSettingItem("autoGroup", {
             label: t("general.auto_group.label"),
             description: t("general.auto_group.description"),
+          }),
+          defineSettingItem("hideAllReadSubscriptions", {
+            label: t("general.hide_all_read_subscriptions.label"),
+            description: t("general.hide_all_read_subscriptions.description"),
+          }),
+          defineSettingItem("hidePrivateSubscriptionsInTimeline", {
+            label: t("general.hide_private_subscriptions_in_timeline.label"),
+            description: t("general.hide_private_subscriptions_in_timeline.description"),
           }),
 
           {
