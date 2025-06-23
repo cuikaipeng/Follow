@@ -1,19 +1,20 @@
 import {
-  Focusable,
-  useFocusable,
   useFocusActions,
+  useGlobalFocusableScopeSelector,
 } from "@follow/components/common/Focusable/index.js"
 import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.js"
 import { Spring } from "@follow/components/constants/spring.js"
 import { MotionButtonBase } from "@follow/components/ui/button/index.js"
 import { RootPortal } from "@follow/components/ui/portal/index.js"
 import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
-import type { FeedViewType } from "@follow/constants"
-import { useTitle } from "@follow/hooks"
-import type { FeedModel, InboxModel } from "@follow/models/types"
+import { FeedViewType } from "@follow/constants"
+import { useSmoothScroll, useTitle } from "@follow/hooks"
+import type { FeedModel } from "@follow/models/types"
+import { useEntry } from "@follow/store/entry/hooks"
+import { useFeedById } from "@follow/store/feed/hooks"
+import { useIsInbox } from "@follow/store/inbox/hooks"
 import { nextFrame, stopPropagation } from "@follow/utils/dom"
 import { EventBus } from "@follow/utils/event-bus"
-import { springScrollTo } from "@follow/utils/scroller"
 import { cn, combineCleanupFunctions } from "@follow/utils/utils"
 import { ErrorBoundary } from "@sentry/react"
 import type { JSAnimation, Variants } from "motion/react"
@@ -23,25 +24,22 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { useEntryIsInReadability } from "~/atoms/readability"
 import { useIsZenMode, useUISettingKey } from "~/atoms/settings/ui"
+import { Focusable, FocusablePresets } from "~/components/common/Focusable"
 import { ShadowDOM } from "~/components/common/ShadowDOM"
 import type { TocRef } from "~/components/ui/markdown/components/Toc"
 import { useInPeekModal } from "~/components/ui/modal/inspire/InPeekModal"
 import { HotkeyScope } from "~/constants"
 import { useRenderStyle } from "~/hooks/biz/useRenderStyle"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useConditionalHotkeyScope } from "~/hooks/common"
 import { useFeedSafeUrl } from "~/hooks/common/useFeedSafeUrl"
-import { useHotkeyScope } from "~/providers/hotkey-provider"
 import { WrappedElementProvider } from "~/providers/wrapped-element-provider"
-import { useEntry } from "~/store/entry"
-import { useFeedById } from "~/store/feed"
-import { useInboxById } from "~/store/inbox"
 
 import { COMMAND_ID } from "../command/commands/id"
 import { useCommandBinding } from "../command/hooks/use-command-binding"
 import { useCommandHotkey } from "../command/hooks/use-register-hotkey"
 import { EntryContentHTMLRenderer } from "../renderer/html"
 import { AISummary } from "./AISummary"
+import { ApplyEntryActions } from "./ApplyEntryActions"
 import { EntryTimelineSidebar } from "./components/EntryTimelineSidebar"
 import { EntryTitle } from "./components/EntryTitle"
 import { SourceContentPanel } from "./components/SourceContentView"
@@ -52,18 +50,16 @@ import type { EntryContentProps } from "./index.shared"
 import {
   ContainerToc,
   NoContent,
-  ReadabilityAutoToggleEffect,
   ReadabilityNotice,
   RenderError,
   TitleMetaHandler,
-  ViewSourceContentAutoToggleEffect,
 } from "./index.shared"
 import { EntryContentLoading } from "./loading"
 
 const pageMotionVariants = {
-  initial: { opacity: 0, y: 50 },
+  initial: { opacity: 0, y: 25 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: 50, transition: { duration: 0 } },
+  exit: { opacity: 0, y: 25, transition: { duration: 0 } },
 } satisfies Variants
 
 export const EntryContent: Component<EntryContentProps> = ({
@@ -73,13 +69,17 @@ export const EntryContent: Component<EntryContentProps> = ({
   compact,
   classNames,
 }) => {
-  const entry = useEntry(entryId)
-  useTitle(entry?.entries.title)
+  const entry = useEntry(entryId, (state) => {
+    const { feedId, inboxHandle } = state
+    const { title, url } = state
 
-  const feed = useFeedById(entry?.feedId) as FeedModel | InboxModel
+    return { feedId, inboxId: inboxHandle, title, url }
+  })
+  useTitle(entry?.title)
 
-  const inbox = useInboxById(entry?.inboxId, (inbox) => inbox !== null)
-  const isInbox = !!inbox
+  const feed = useFeedById(entry?.feedId)
+
+  const isInbox = useIsInbox(entry?.inboxId)
   const isInReadabilityMode = useEntryIsInReadability(entryId)
 
   const { error, content, isPending } = useEntryContent(entryId)
@@ -94,7 +94,6 @@ export const EntryContent: Component<EntryContentProps> = ({
 
   const isInPeekModal = useInPeekModal()
 
-  const [isUserInteraction, setIsUserInteraction] = useState(false)
   const isZenMode = useIsZenMode()
 
   const [panelPortalElement, setPanelPortalElement] = useState<HTMLDivElement | null>(null)
@@ -115,13 +114,18 @@ export const EntryContent: Component<EntryContentProps> = ({
     }
   }, [animationController, entryId])
 
+  const isInHasTimelineView = ![
+    FeedViewType.Pictures,
+    FeedViewType.SocialMedia,
+    FeedViewType.Videos,
+  ].includes(view)
   if (!entry) return null
 
   return (
     <>
       {!isInPeekModal && (
         <EntryHeader
-          entryId={entry.entries.id}
+          entryId={entryId}
           view={view}
           className={cn("@container h-[55px] shrink-0 px-3", classNames?.header)}
           compact={compact}
@@ -130,27 +134,22 @@ export const EntryContent: Component<EntryContentProps> = ({
       <div className="w-full" ref={setPanelPortalElement} />
 
       <Focusable
+        scope={HotkeyScope.EntryRender}
         className="@container relative flex size-full flex-col overflow-hidden print:size-auto print:overflow-visible"
-        onFocus={() => setIsUserInteraction(true)}
       >
         <RootPortal to={panelPortalElement}>
-          <RegisterCommands
-            scrollAnimationRef={scrollAnimationRef}
-            scrollerRef={scrollerRef}
-            isUserInteraction={isUserInteraction}
-            setIsUserInteraction={setIsUserInteraction}
-          />
+          <RegisterCommands scrollAnimationRef={scrollAnimationRef} scrollerRef={scrollerRef} />
         </RootPortal>
-        <EntryTimelineSidebar entryId={entry.entries.id} />
+        <EntryTimelineSidebar entryId={entryId} />
         <EntryScrollArea className={className} scrollerRef={scrollerRef}>
           {/* Indicator for the entry */}
           <m.div
             initial={pageMotionVariants.initial}
             animate={animationController}
-            transition={Spring.presets.smooth}
+            transition={Spring.presets.bouncy}
             className="select-text"
           >
-            {!isZenMode && (
+            {!isZenMode && isInHasTimelineView && (
               <>
                 <div className="absolute inset-y-0 left-0 flex w-12 items-center justify-center opacity-0 duration-200 hover:opacity-100">
                   <MotionButtonBase
@@ -178,8 +177,6 @@ export const EntryContent: Component<EntryContentProps> = ({
             )}
 
             <article
-              tabIndex={-1}
-              onFocus={() => setIsUserInteraction(true)}
               data-testid="entry-render"
               onContextMenu={stopPropagation}
               className="@[950px]:max-w-[70ch] @7xl:max-w-[80ch] relative m-auto min-w-0 max-w-[550px]"
@@ -188,8 +185,8 @@ export const EntryContent: Component<EntryContentProps> = ({
 
               <WrappedElementProvider boundingDetection>
                 <div className="mx-auto mb-32 mt-8 max-w-full cursor-auto text-[0.94rem]">
-                  <TitleMetaHandler entryId={entry.entries.id} />
-                  <AISummary entryId={entry.entries.id} />
+                  <TitleMetaHandler entryId={entryId} />
+                  <AISummary entryId={entryId} />
                   <ErrorBoundary fallback={RenderError}>
                     <ReadabilityNotice entryId={entryId} />
                     <ShadowDOM injectHostStyles={!isInbox}>
@@ -200,7 +197,7 @@ export const EntryContent: Component<EntryContentProps> = ({
                       <Renderer
                         entryId={entryId}
                         view={view}
-                        feedId={feed?.id}
+                        feedId={feed?.id || ""}
                         noMedia={noMedia}
                         content={content}
                       />
@@ -209,10 +206,7 @@ export const EntryContent: Component<EntryContentProps> = ({
                 </div>
               </WrappedElementProvider>
 
-              {entry.settings?.readability && (
-                <ReadabilityAutoToggleEffect id={entry.entries.id} url={entry.entries.url ?? ""} />
-              )}
-              {entry.settings?.sourceContent && <ViewSourceContentAutoToggleEffect />}
+              <ApplyEntryActions entryId={entryId} key={entryId} />
 
               {!content && !isInReadabilityMode && (
                 <div className="center mt-16 min-w-0">
@@ -229,11 +223,7 @@ export const EntryContent: Component<EntryContentProps> = ({
                       </pre>
                     </div>
                   ) : (
-                    <NoContent
-                      id={entry.entries.id}
-                      url={entry.entries.url ?? ""}
-                      sourceContent={entry.settings?.sourceContent}
-                    />
+                    <NoContent id={entryId} url={entry.url ?? ""} />
                   )}
                 </div>
               )}
@@ -258,7 +248,7 @@ const EntryScrollArea: Component<{
   }
   return (
     <ScrollArea.ScrollArea
-      focusable={false}
+      focusable
       mask={false}
       rootClassName={cn(
         "h-0 min-w-0 grow overflow-y-auto print:h-auto print:overflow-visible",
@@ -318,23 +308,16 @@ const Renderer: React.FC<{
 
 const RegisterCommands = ({
   scrollerRef,
-  isUserInteraction,
-  setIsUserInteraction,
   scrollAnimationRef,
 }: {
   scrollerRef: React.RefObject<HTMLDivElement | null>
-  isUserInteraction: boolean
-  setIsUserInteraction: (isUserInteraction: boolean) => void
+
   scrollAnimationRef: React.RefObject<JSAnimation<any> | null>
 }) => {
   const isAlreadyScrolledBottomRef = useRef(false)
   const [showKeepScrollingPanel, setShowKeepScrollingPanel] = useState(false)
 
-  const containerFocused = useFocusable()
-  useConditionalHotkeyScope(HotkeyScope.EntryRender, isUserInteraction && containerFocused, true)
-
-  const activeScope = useHotkeyScope()
-  const when = activeScope.includes(HotkeyScope.EntryRender)
+  const when = useGlobalFocusableScopeSelector(FocusablePresets.isEntryRender)
 
   useCommandBinding({
     commandId: COMMAND_ID.entryRender.scrollUp,
@@ -363,7 +346,7 @@ const RegisterCommands = ({
   })
 
   const { highlightBoundary } = useFocusActions()
-
+  const smoothScrollTo = useSmoothScroll()
   useEffect(() => {
     const checkScrollBottom = ($scroller: HTMLDivElement) => {
       const currentScroll = $scroller.scrollTop
@@ -373,7 +356,7 @@ const RegisterCommands = ({
         EventBus.dispatch(COMMAND_ID.timeline.switchToNext)
         setShowKeepScrollingPanel(false)
         isAlreadyScrolledBottomRef.current = false
-        springScrollTo(0, $scroller)
+        smoothScrollTo(0, $scroller)
         return
       }
 
@@ -400,29 +383,37 @@ const RegisterCommands = ({
       },
       cleanupScrollAnimation,
       EventBus.subscribe(COMMAND_ID.entryRender.scrollUp, () => {
-        const currentScroll = scrollerRef.current?.scrollTop
-        const delta = window.innerHeight
+        const $scroller = scrollerRef.current
+        if (!$scroller) return
 
-        if (typeof currentScroll === "number" && delta) {
-          cleanupScrollAnimation()
-          scrollAnimationRef.current = springScrollTo(currentScroll - delta, scrollerRef.current!)
-        }
-        checkScrollBottom(scrollerRef.current!)
+        const currentScroll = $scroller.scrollTop
+        // Smart scroll distance: larger viewports get larger scroll distances
+        // But cap it at a reasonable maximum for very large screens
+        const viewportHeight = $scroller.clientHeight
+        const delta = Math.min(Math.max(120, viewportHeight * 0.25), 250)
+
+        cleanupScrollAnimation()
+        const targetScroll = Math.max(0, currentScroll - delta)
+        smoothScrollTo(targetScroll, $scroller)
+        checkScrollBottom($scroller)
       }),
 
       EventBus.subscribe(COMMAND_ID.entryRender.scrollDown, () => {
         const $scroller = scrollerRef.current
-        if (!$scroller) {
-          return
-        }
+        if (!$scroller) return
 
         const currentScroll = $scroller.scrollTop
-        const delta = window.innerHeight
+        // Smart scroll distance: larger viewports get larger scroll distances
+        // But cap it at a reasonable maximum for very large screens
+        const viewportHeight = $scroller.clientHeight
+        const delta = Math.min(Math.max(120, viewportHeight * 0.25), 250)
 
-        if (typeof currentScroll === "number" && delta) {
-          cleanupScrollAnimation()
-          scrollAnimationRef.current = springScrollTo(currentScroll + delta, $scroller)
-        }
+        cleanupScrollAnimation()
+        const targetScroll = Math.min(
+          $scroller.scrollHeight - $scroller.clientHeight,
+          currentScroll + delta,
+        )
+        smoothScrollTo(targetScroll, $scroller)
         checkScrollBottom($scroller)
       }),
       EventBus.subscribe(
@@ -437,11 +428,10 @@ const RegisterCommands = ({
           if (highlight) {
             nextFrame(highlightBoundary)
           }
-          setIsUserInteraction(true)
         },
       ),
     )
-  }, [highlightBoundary, scrollAnimationRef, scrollerRef, setIsUserInteraction])
+  }, [highlightBoundary, scrollAnimationRef, scrollerRef, smoothScrollTo])
 
   return (
     <AnimatePresence>

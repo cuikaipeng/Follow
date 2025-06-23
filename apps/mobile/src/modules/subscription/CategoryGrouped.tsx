@@ -1,3 +1,4 @@
+import { useUnreadByIds } from "@follow/store/unread/hooks"
 import { cn } from "@follow/utils"
 import { memo, useState } from "react"
 import { Text, View } from "react-native"
@@ -11,7 +12,6 @@ import { RightCuteFiIcon } from "@/src/icons/right_cute_fi"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { selectFeed } from "@/src/modules/screen/atoms"
 import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]/FeedScreen"
-import { useUnreadCounts } from "@/src/store/unread/hooks"
 import { useColor } from "@/src/theme/colors"
 
 import { SubscriptionFeedCategoryContextMenu } from "../context-menu/feeds"
@@ -32,7 +32,7 @@ export const CategoryGrouped = memo(
     isFirst: boolean
     isLast: boolean
   }) => {
-    const unreadCounts = useUnreadCounts(subscriptionIds)
+    const unreadCounts = useUnreadByIds(subscriptionIds)
     const [expanded, setExpanded] = useState(false)
     const rotateSharedValue = useSharedValue(0)
     const rotateStyle = useAnimatedStyle(() => {
@@ -47,7 +47,11 @@ export const CategoryGrouped = memo(
     return (
       <>
         <View style={{ marginHorizontal: GROUPED_LIST_MARGIN }}>
-          <SubscriptionFeedCategoryContextMenu feedIds={subscriptionIds} asChild>
+          <SubscriptionFeedCategoryContextMenu
+            feedIds={subscriptionIds}
+            category={category}
+            asChild
+          >
             <ItemPressable
               itemStyle={ItemPressableStyle.Grouped}
               onPress={() => {

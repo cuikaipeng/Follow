@@ -1,3 +1,4 @@
+import { useSetGlobalFocusableScope } from "@follow/components/common/Focusable/hooks.js"
 import { Divider } from "@follow/components/ui/divider/Divider.js"
 import { Kbd } from "@follow/components/ui/kbd/Kbd.js"
 import { RootPortal } from "@follow/components/ui/portal/index.js"
@@ -7,18 +8,20 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import * as React from "react"
 
 import { HotkeyScope } from "~/constants"
-import { useConditionalHotkeyScope } from "~/hooks/common"
 
 const DropdownMenu: typeof DropdownMenuPrimitive.Root = (props) => {
-  const [open, setOpen] = React.useState(!!props.open)
-  useConditionalHotkeyScope(HotkeyScope.DropdownMenu, open)
-
+  const setGlobalFocusableScope = useSetGlobalFocusableScope()
   return (
     <DropdownMenuPrimitive.Root
       {...props}
       onOpenChange={useTypeScriptHappyCallback(
         (open) => {
-          setOpen(open)
+          if (open) {
+            setGlobalFocusableScope(HotkeyScope.DropdownMenu, "append")
+          } else {
+            setGlobalFocusableScope(HotkeyScope.DropdownMenu, "remove")
+          }
+
           props.onOpenChange?.(open)
         },
         [props.onOpenChange],
