@@ -1,5 +1,6 @@
-import { Pressable, Text } from "react-native"
+import { Pressable } from "react-native"
 
+import { Text } from "@/src/components/ui/typography/Text"
 import { destination } from "@/src/lib/navigation/biz/Destination"
 import { accentColor } from "@/src/theme/colors"
 
@@ -12,7 +13,7 @@ export function NoLoginInfo({ target }: { target: "timeline" | "subscriptions" }
       onPress={() => destination.Login()}
     >
       <Logo width={40} height={40} color={accentColor} />
-      <Text className="text-secondary-label text-xl">{`Sign in to see your ${target}`}</Text>
+      <Text className="text-xl text-secondary-label">{`Sign in to see your ${target}`}</Text>
     </Pressable>
   )
 }

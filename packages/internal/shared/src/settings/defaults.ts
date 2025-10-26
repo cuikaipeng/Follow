@@ -1,4 +1,6 @@
-import type { GeneralSettings, IntegrationSettings, UISettings } from "./interface"
+import type { AISettings, GeneralSettings, IntegrationSettings, UISettings } from "./interface"
+
+export const DEFAULT_SUMMARIZE_TIMELINE_SHORTCUT_ID = "default-summarize-timeline"
 
 export const defaultGeneralSettings: GeneralSettings = {
   // App
@@ -9,10 +11,6 @@ export const defaultGeneralSettings: GeneralSettings = {
   summary: true,
   actionLanguage: "default",
 
-  // mobile app
-  startupScreen: "timeline",
-  // Data control
-  dataPersist: true,
   sendAnonymousData: true,
   showQuickTimeline: true,
 
@@ -22,14 +20,15 @@ export const defaultGeneralSettings: GeneralSettings = {
   hidePrivateSubscriptionsInTimeline: false,
 
   // view
-  unreadOnly: true,
+  unreadOnly: false,
   // mark unread
   scrollMarkUnread: true,
   hoverMarkUnread: true,
   renderMarkUnread: false,
-  // UX
+  // timeline
   groupByDate: true,
   autoExpandLongSocialMedia: false,
+  dimRead: false,
 
   // Secure
   jumpOutLinkWarn: true,
@@ -44,8 +43,11 @@ export const defaultGeneralSettings: GeneralSettings = {
 }
 
 export const defaultUISettings: UISettings = {
+  accentColor: "orange",
+
   // Sidebar
   entryColWidth: 356,
+  aiColWidth: 384,
   feedColWidth: 256,
   hideExtraBadge: false,
 
@@ -65,7 +67,7 @@ export const defaultUISettings: UISettings = {
   usePointerCursor: false,
 
   // Font
-  uiFontFamily: "SN Pro",
+  uiFontFamily: "system-ui",
   readerFontFamily: "inherit",
   contentFontSize: 16,
   dateFormat: "default",
@@ -80,6 +82,7 @@ export const defaultUISettings: UISettings = {
 
   // View
   pictureViewMasonry: true,
+  pictureViewImageOnly: false,
   wideMode: false,
 
   // Action Order
@@ -93,6 +96,12 @@ export const defaultUISettings: UISettings = {
 
   // Discover
   discoverLanguage: "all",
+
+  // Timeline tabs preset (excluding the first fixed tab)
+  timelineTabs: {
+    visible: [],
+    hidden: [],
+  },
 }
 
 export const defaultIntegrationSettings: IntegrationSettings = {
@@ -133,11 +142,37 @@ export const defaultIntegrationSettings: IntegrationSettings = {
   zoteroUserID: "",
   zoteroToken: "",
 
+  // qbittorrent
+  enableQBittorrent: false,
+  qbittorrentHost: "",
+  qbittorrentUsername: "",
+  qbittorrentPassword: "",
+
   saveSummaryAsDescription: false,
+
+  // custom actions
+  enableCustomIntegration: false,
+  customIntegration: [],
+
+  // fetch preferences (Electron only)
+  useBrowserFetch: true,
+}
+
+export const defaultAISettings: AISettings = {
+  personalizePrompt: "",
+  shortcuts: [],
+
+  // MCP Services
+  mcpEnabled: false,
+  mcpServices: [],
+
+  // Features
+  autoScrollWhenStreaming: true,
 }
 
 export const defaultSettings = {
   general: defaultGeneralSettings,
   ui: defaultUISettings,
   integration: defaultIntegrationSettings,
+  ai: defaultAISettings,
 }

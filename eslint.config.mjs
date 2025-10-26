@@ -1,9 +1,8 @@
 // @ts-check
-import path from "node:path"
-
 import { fixupPluginRules } from "@eslint/compat"
 import { defineConfig } from "eslint-config-hyoban"
 import reactNative from "eslint-plugin-react-native"
+import path from "pathe"
 
 import checkI18nJson from "./plugins/eslint/eslint-check-i18n-json.js"
 import noDebug from "./plugins/eslint/eslint-no-debug.js"
@@ -15,7 +14,6 @@ export default defineConfig(
     formatting: false,
     lessOpinionated: true,
     ignores: [
-      "packages/internal/shared/src/hono.ts",
       "resources/**",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
@@ -43,8 +41,7 @@ export default defineConfig(
       "@eslint-react/hooks-extra/no-direct-set-state-in-use-effect": 0,
       "@eslint-react/dom/no-flush-sync": 1,
       "@eslint-react/hooks-extra/no-unnecessary-use-callback": "warn",
-      // NOTE: Disable this temporarily
-      "react-compiler/react-compiler": 0,
+      "unicorn/no-array-callback-reference": 0,
       "no-restricted-syntax": 0,
       "no-restricted-globals": [
         "error",
@@ -55,6 +52,25 @@ export default defineConfig(
             "You can use `useLocaltion` or `getReadonlyRoute` to get the route info.",
         },
       ],
+
+      // disable react compiler rules for now
+      "react-hooks/no-unused-directives": "off",
+      "react-hooks/static-components": "off",
+      "react-hooks/use-memo": "off",
+      "react-hooks/component-hook-factories": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/globals": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/error-boundaries": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/set-state-in-render": "off",
+      "react-hooks/unsupported-syntax": "off",
+      "react-hooks/config": "off",
+      "react-hooks/gating": "off",
+
+      "unicorn/require-module-specifiers": "off",
     },
   },
   // use correct tailwind config for eslint
@@ -109,6 +125,23 @@ export default defineConfig(
       "package-json-extend/ensure-package-version": "error",
       "package-json-extend/no-duplicate-package": "error",
       "package-json/require-type": 0,
+    },
+  },
+  {
+    files: ["**/*.{js,ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "node:path",
+              message:
+                "For better cross-platform compatibility, please use 'pathe' instead of 'node:path'",
+            },
+          ],
+        },
+      ],
     },
   },
   {

@@ -1,7 +1,9 @@
 import { wrapCreateBrowserRouterV7 } from "@sentry/react"
+import * as React from "react"
 import { createBrowserRouter, createHashRouter } from "react-router"
 
 import { NotFound } from "./components/common/404"
+// @ts-ignore
 import tree from "./generated-routes"
 
 declare global {

@@ -10,6 +10,8 @@ import {
   FormMessage,
 } from "@follow/components/ui/form/index.jsx"
 import { Input, TextArea } from "@follow/components/ui/input/index.js"
+import { useWhoami } from "@follow/store/user/hooks"
+import { userActions } from "@follow/store/user/store"
 import { cn } from "@follow/utils/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
@@ -18,7 +20,6 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { setWhoami, useWhoami } from "~/atoms/user"
 import { AvatarUploadModal } from "~/components/ui/crop/AvatarUploadModal"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { updateUser } from "~/lib/auth"
@@ -70,9 +71,11 @@ type ExtendedUser = ReturnType<typeof useWhoami> & {
 export const ProfileSettingForm = ({
   className,
   buttonClassName,
+  hideAvatar,
 }: {
   className?: string
   buttonClassName?: string
+  hideAvatar?: boolean
 }) => {
   const { t } = useTranslation("settings")
   const user = useWhoami() as ExtendedUser
@@ -103,17 +106,16 @@ export const ProfileSettingForm = ({
         handle: values.handle,
         image: values.image,
         name: values.name,
-        // @ts-expect-error
         bio: values.bio,
         website: values.website,
-        socialLinks: values.socialLinks,
+        socialLinks: values.socialLinks as any,
       }),
     onError: (error) => {
       toastFetchError(error)
     },
     onSuccess: (_, variables) => {
       if (user && variables) {
-        setWhoami({ ...user, ...variables })
+        userActions.updateWhoami({ ...variables } as any)
       }
       toast(t("profile.updateSuccess"), {
         duration: 3000,
@@ -174,34 +176,36 @@ export const ProfileSettingForm = ({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className={cn("mt-4 space-y-4", className)}>
-        <FormField
-          control={form.control}
-          name="image"
-          render={({ field }) => (
-            <div className="absolute right-0 flex -translate-y-full gap-4">
-              <FormItem className="w-full">
-                <FormControl>
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={openAvatarUpload}
-                      className="group relative cursor-pointer transition-all duration-200 hover:opacity-80"
-                    >
-                      <Avatar className="size-16">
-                        <AvatarImage src={field.value} />
-                        <AvatarFallback>{user?.name?.[0] || ""}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                        <i className="i-mgc-pic-cute-fi text-xl text-white" />
-                      </div>
-                    </button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </div>
-          )}
-        />
+        {!hideAvatar && (
+          <FormField
+            control={form.control}
+            name="image"
+            render={({ field }) => (
+              <div className="absolute right-0 flex -translate-y-full gap-4">
+                <FormItem className="w-full">
+                  <FormControl>
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={openAvatarUpload}
+                        className="group relative cursor-pointer transition-all duration-200 hover:opacity-80"
+                      >
+                        <Avatar className="size-16">
+                          <AvatarImage src={field.value} />
+                          <AvatarFallback>{user?.name?.[0] || ""}</AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                          <i className="i-mgc-pic-cute-fi text-xl text-white" />
+                        </div>
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </div>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}
@@ -236,6 +240,41 @@ export const ProfileSettingForm = ({
           )}
         />
 
+        {hideAvatar && (
+          <FormField
+            control={form.control}
+            name="image"
+            render={({ field }) => (
+              <div className="flex gap-4">
+                <FormItem className="w-full">
+                  <FormLabel className={formItemLabelClassName}>
+                    {t("profile.avatar.label")}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-4">
+                      <Input {...field} />
+                      <button
+                        type="button"
+                        onClick={openAvatarUpload}
+                        className="group relative cursor-pointer transition-all duration-200 hover:opacity-80"
+                      >
+                        <Avatar className="size-8">
+                          <AvatarImage src={field.value} />
+                          <AvatarFallback>{user?.name?.[0] || ""}</AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                          <i className="i-mgc-pic-cute-fi text-xl text-white" />
+                        </div>
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </div>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="bio"
@@ -247,7 +286,7 @@ export const ProfileSettingForm = ({
                   rounded="lg"
                   {...field}
                   placeholder={t("profile.profile.bio_placeholder")}
-                  className="placeholder:text-text-tertiary min-h-[80px] resize-none p-3 text-sm"
+                  className="min-h-[80px] resize-none p-3 text-sm placeholder:text-text-tertiary"
                 />
               </FormControl>
               <FormMessage />
@@ -286,17 +325,17 @@ export const ProfileSettingForm = ({
                     <FormControl>
                       <label
                         className={cn(
-                          "ring-accent/20 focus-within:border-accent/80 h-9 duration-200 focus-within:outline-none focus-within:ring-2",
-                          "border-border bg-theme-background hover:bg-accent/5 flex cursor-text items-center gap-2 rounded-lg border px-3 py-2 transition-colors dark:bg-zinc-700/[0.15]",
+                          "h-9 ring-accent/20 duration-200 focus-within:border-accent/80 focus-within:outline-none focus-within:ring-2",
+                          "flex cursor-text items-center gap-2 rounded-lg border border-border bg-theme-background px-3 py-2 transition-colors hover:bg-accent/5 dark:bg-zinc-700/[0.15]",
                         )}
                       >
                         <i
-                          className={`${socialIconClassNames[social]} text-text-secondary shrink-0 text-base`}
+                          className={`${socialIconClassNames[social]} shrink-0 text-base text-text-secondary`}
                         />
                         <input
                           {...field}
                           placeholder={socialCopyMap[social]}
-                          className="placeholder:text-text-tertiary flex-1 border-0 !bg-transparent p-0 text-sm focus-visible:ring-0"
+                          className="flex-1 border-0 !bg-transparent p-0 text-sm placeholder:text-text-tertiary focus-visible:ring-0"
                         />
                       </label>
                     </FormControl>

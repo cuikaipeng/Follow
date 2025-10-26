@@ -1,16 +1,17 @@
 /* @moduleResolution bundler */
 import "./tw-css-plugin"
 
-import path, { resolve } from "node:path"
-
 import { getIconCollections, iconsPlugin } from "@egoist/tailwindcss-icons"
 import { cleanupSVG, importDirectorySync, isEmptyColor, parseColors, runSVGO } from "@iconify/tools"
 import { compareColors, stringToColor } from "@iconify/utils/lib/colors"
 import { merge } from "es-toolkit/compat"
+import path, { resolve } from "pathe"
 import { theme } from "tailwindcss/defaultConfig"
 import type { Config } from "tailwindcss/types/config"
 import { withUIKit } from "tailwindcss-uikit-colors/src/macos/tailwind"
 import { workspaceRootSync } from "workspace-root"
+
+import ratioMixingPlugin from "./ratio-mixing-plugin"
 
 const workspaceRoot = workspaceRootSync(__dirname)
 const twConfig = {
@@ -43,7 +44,6 @@ const twConfig = {
     extend: {
       fontFamily: {
         theme: "var(--fo-font-family)",
-        default: "SN pro, sans-serif, system-ui",
       },
 
       colors: {
@@ -51,24 +51,9 @@ const twConfig = {
         background: "hsl(var(--background) / <alpha-value>)",
 
         accent: "hsl(var(--fo-a) / <alpha-value>)",
+        folo: "#FF5C00",
 
         theme: {
-          // https://uicolors.app/create
-          accent: {
-            DEFAULT: "hsl(var(--fo-a) / <alpha-value>)",
-            "50": "#fff8ed",
-            "100": "#ffeed4",
-            "200": "#ffdaa8",
-            "300": "#ffbe70",
-            "400": "#ff9737",
-            "500": "#ff760a",
-            "600": "#f05d06",
-            "700": "#c74507",
-            "800": "#9e360e",
-            "900": "#7f2f0f",
-            "950": "#451505",
-          },
-
           boxShadow: {
             "context-menu":
               "0px 0px 1px rgba(0, 0, 0, 0.4), 0px 0px 1.5px rgba(0, 0, 0, 0.3), 0px 7px 22px rgba(0, 0, 0, 0.25)",
@@ -124,6 +109,15 @@ const twConfig = {
     require("tailwindcss-safe-area"),
 
     require(resolve(__dirname, "./tailwind-extend.css")),
+
+    ratioMixingPlugin({
+      baseColors: {
+        background: "hsl(var(--background))",
+        accent: "hsl(var(--fo-a))",
+        red: "rgb(var(--color-red))",
+        transparent: "transparent",
+      },
+    }),
   ],
 } satisfies Config
 

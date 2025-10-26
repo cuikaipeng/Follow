@@ -8,11 +8,9 @@ import { toast } from "sonner"
 
 import { ROUTE_FEED_IN_FOLDER, ROUTE_FEED_PENDING } from "~/constants"
 import { useAuthQuery } from "~/hooks/common"
-import { apiClient } from "~/lib/api-fetch"
+import { followClient } from "~/lib/api-client"
 import { defineQuery } from "~/lib/defineQuery"
 import { toastFetchError } from "~/lib/error-parser"
-
-import { entries } from "./entries"
 
 type FeedQueryParams = { id?: string; url?: string }
 
@@ -31,7 +29,7 @@ export const feed = {
     ),
   claimMessage: ({ feedId }: { feedId: string }) =>
     defineQuery(["feed", "claimMessage", feedId], async () =>
-      apiClient.feeds.claim.message.$get({ query: { feedId } }).then((res) => {
+      followClient.api.feeds.claim.message({ feedId }).then((res) => {
         res.data.json = JSON.stringify(JSON.parse(res.data.json), null, 2)
         const $document = new DOMParser().parseFromString(res.data.xml, "text/xml")
         res.data.xml = formatXml(new XMLSerializer().serializeToString($document))
@@ -40,7 +38,7 @@ export const feed = {
     ),
   claimedList: () =>
     defineQuery(["feed", "claimedList"], async () => {
-      const res = await apiClient.feeds.claim.list.$get()
+      const res = await followClient.api.feeds.claim.list()
       return res.data
     }),
 }
@@ -75,16 +73,7 @@ export const useClaimFeedMutation = (feedId: string) =>
 export const useRefreshFeedMutation = (feedId?: string) =>
   useMutation({
     mutationKey: ["refreshFeed", feedId],
-    mutationFn: () => apiClient.feeds.refresh.$get({ query: { id: feedId! } }),
-
-    onSuccess() {
-      if (!feedId) return
-      entries
-        .entries({
-          feedId: feedId!,
-        })
-        .invalidateRoot()
-    },
+    mutationFn: () => followClient.api.feeds.refresh({ id: feedId! }),
     async onError(err) {
       toastFetchError(err)
     },
@@ -97,10 +86,9 @@ export const useResetFeed = () => {
   return useMutation({
     mutationFn: async (feedId: string) => {
       toastIDRef.current = toast.loading(t("sidebar.feed_actions.resetting_feed"))
-      await apiClient.feeds.reset.$get({ query: { id: feedId } })
+      await followClient.api.feeds.reset({ id: feedId })
     },
-    onSuccess: (_, feedId) => {
-      entries.entries({ feedId }).invalidateRoot()
+    onSuccess: () => {
       toast.success(
         t("sidebar.feed_actions.reset_feed_success"),
         toastIDRef.current ? { id: toastIDRef.current } : undefined,

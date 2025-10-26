@@ -1,8 +1,8 @@
 import { execSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
-import path from "node:path"
 
+import path from "pathe"
 import * as tar from "tar"
 import type { Plugin } from "vite"
 
@@ -44,7 +44,7 @@ function compressAndFingerprintPlugin(outDir: string): Plugin {
       // Get the current git tag version
       let version = "unknown"
       try {
-        version = execSync("git describe --tags").toString().trim()
+        version = execSync("git describe --tags").toString().trim().replace("desktop/", "")
       } catch (error) {
         console.warn("Could not retrieve git tag version:", error)
       }

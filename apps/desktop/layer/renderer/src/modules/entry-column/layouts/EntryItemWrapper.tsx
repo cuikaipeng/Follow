@@ -1,33 +1,32 @@
 import { useGlobalFocusableScopeSelector } from "@follow/components/common/Focusable/hooks.js"
 import { useMobile } from "@follow/components/hooks/useMobile.js"
-import type { FeedViewType } from "@follow/constants"
-import { views } from "@follow/constants"
+import { getMousePosition } from "@follow/components/hooks/useMouse.js"
+import { ActionButton } from "@follow/components/ui/button/action-button.js"
+import { FeedViewType } from "@follow/constants"
 import { useEntry } from "@follow/store/entry/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
-import { EventBus } from "@follow/utils/event-bus"
 import { cn } from "@follow/utils/utils"
-import type { FC, PropsWithChildren } from "react"
-import { useCallback, useState } from "react"
-import { useTranslation } from "react-i18next"
+import { AnimatePresence } from "motion/react"
+import type { FC, MouseEvent, PropsWithChildren, TouchEvent } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { NavLink } from "react-router"
 import { useDebounceCallback } from "usehooks-ts"
 
-import {
-  MENU_ITEM_SEPARATOR,
-  MenuItemSeparator,
-  MenuItemText,
-  useShowContextMenu,
-} from "~/atoms/context-menu"
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { FocusablePresets } from "~/components/common/Focusable"
+import { CommandActionButton } from "~/components/ui/button/CommandActionButton"
 import { useEntryIsRead } from "~/hooks/biz/useAsRead"
 import { useContextMenuActionShortCutTrigger } from "~/hooks/biz/useContextMenuActionShortCutTrigger"
-import { useEntryActions } from "~/hooks/biz/useEntryActions"
-import { useFeedActions } from "~/hooks/biz/useFeedActions"
-import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
-import { getRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useContextMenu } from "~/hooks/common/useContextMenu"
-import { copyToClipboard } from "~/lib/clipboard"
-import { COMMAND_ID } from "~/modules/command/commands/id"
+import {
+  EntryActionMenuItem,
+  HIDE_ACTIONS_IN_ENTRY_TOOLBAR_ACTIONS,
+  useEntryActions,
+  useSortedEntryActions,
+} from "~/hooks/biz/useEntryActions"
+import { useEntryContextMenu } from "~/hooks/biz/useEntryContextMenu"
+import { getNavigateEntryPath, useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
+import { getRouteParams, useRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
+import { useShowEntryDetailsColumn } from "~/hooks/biz/useShowEntryDetailsColumn"
 
 export const EntryItemWrapper: FC<
   {
@@ -38,29 +37,23 @@ export const EntryItemWrapper: FC<
   } & PropsWithChildren
 > = ({ entryId, view, children, itemClassName, style }) => {
   const entry = useEntry(entryId, (state) => {
-    const { feedId, inboxHandle, read } = state
+    const { feedId, inboxHandle } = state
     const { id, url } = state
-    return { feedId, id, inboxId: inboxHandle, read, url }
+    return { feedId, id, inboxId: inboxHandle, url }
   })
   const actionConfigs = useEntryActions({ entryId, view })
-
-  const feedItems = useFeedActions({
-    feedId: entry?.feedId || entry?.inboxId || "",
-    view,
-    type: "entryList",
-  })
   const isMobile = useMobile()
-
-  const { t } = useTranslation("common")
 
   const isActive = useRouteParamsSelector(({ entryId }) => entryId === entry?.id, [entry?.id])
   const when = useGlobalFocusableScopeSelector(FocusablePresets.isTimeline)
   useContextMenuActionShortCutTrigger(actionConfigs, isActive && when)
+  const showEntryDetailsColumn = useShowEntryDetailsColumn()
 
-  const asRead = useEntryIsRead(entry)
+  const asRead = useEntryIsRead(entryId)
   const hoverMarkUnread = useGeneralSettingKey("hoverMarkUnread")
 
-  const handleMouseEnter = useDebounceCallback(
+  const [showAction, setShowAction] = useState(false)
+  const handleMouseEnterMarkRead = useDebounceCallback(
     () => {
       if (!hoverMarkUnread) return
       if (!document.hasFocus()) return
@@ -75,116 +68,157 @@ export const EntryItemWrapper: FC<
     },
   )
 
+  const handleMouseEnter = useMemo(() => {
+    return () => {
+      setShowAction(true)
+      handleMouseEnterMarkRead()
+    }
+  }, [handleMouseEnterMarkRead])
+  const handleMouseLeave = useMemo(() => {
+    return (e: React.MouseEvent) => {
+      handleMouseEnterMarkRead.cancel()
+      // If the mouse is over the action bar, don't hide the action bar
+      const { relatedTarget, currentTarget } = e
+      if (relatedTarget && relatedTarget instanceof Node && currentTarget.contains(relatedTarget)) {
+        return
+      }
+      setShowAction(false)
+    }
+  }, [handleMouseEnterMarkRead])
+
+  const isDropdownMenuOpen = useGlobalFocusableScopeSelector(
+    FocusablePresets.isNotFloatingLayerScope,
+  )
+
+  useEffect(() => {
+    // Hide the action bar when dropdown menu is open and click outside
+    if (isDropdownMenuOpen) {
+      setShowAction(false)
+    }
+  }, [isDropdownMenuOpen])
+
   const navigate = useNavigateEntry()
+  const navigationPath = useMemo(() => {
+    if (!entry?.id) return "#"
+    return getNavigateEntryPath({
+      entryId: entry?.id,
+    })
+  }, [entry?.id])
+
+  const handleDoubleClick = useCallback(
+    (e: MouseEvent<HTMLElement>) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!entry?.url) return
+      if (!entry?.id) return
+      window.open(entry?.url, "_blank", "noopener,noreferrer")
+    },
+    [entry?.id, entry?.url],
+  )
+
   const handleClick = useCallback(
-    (e) => {
+    (e: TouchEvent<HTMLElement> | MouseEvent<HTMLElement>) => {
+      e.preventDefault()
       e.stopPropagation()
 
       const shouldNavigate = getRouteParams().entryId !== entry?.id
+
       if (!shouldNavigate) return
       if (!entry?.feedId) return
       if (!asRead) {
         unreadSyncService.markEntryAsRead(entry.id)
       }
 
-      setTimeout(
-        () => EventBus.dispatch(COMMAND_ID.layout.focusToEntryRender, { highlightBoundary: false }),
-        60,
-      )
-
       navigate({
+        view,
         entryId: entry.id,
       })
     },
-    [asRead, entry?.id, entry?.feedId, navigate],
+    [asRead, entry?.id, entry?.feedId, navigate, view],
   )
-  const handleDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback(
-    () => entry?.url && window.open(entry.url, "_blank"),
-    [entry?.url],
-  )
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
-  const showContextMenu = useShowContextMenu()
-
-  const contextMenuProps = useContextMenu({
-    onContextMenu: async (e) => {
-      const $target = e.target as HTMLElement
-      const selection = window.getSelection()
-      if (selection) {
-        const targetHasSelection =
-          selection?.toString().length > 0 && $target.contains(selection?.anchorNode)
-        if (targetHasSelection) {
-          e.stopPropagation()
-          return
-        }
-      }
-
-      e.preventDefault()
-      setIsContextMenuOpen(true)
-
-      await showContextMenu(
-        [
-          ...actionConfigs.filter((item) => {
-            if (item instanceof MenuItemSeparator) {
-              return true
-            }
-            return ![
-              COMMAND_ID.entry.viewSourceContent,
-              COMMAND_ID.entry.toggleAISummary,
-              COMMAND_ID.entry.toggleAITranslation,
-              COMMAND_ID.settings.customizeToolbar,
-              COMMAND_ID.entry.readability,
-              COMMAND_ID.entry.exportAsPDF,
-              // Copy
-              COMMAND_ID.entry.copyTitle,
-              COMMAND_ID.entry.copyLink,
-            ].includes(item.id as any)
-          }),
-          MENU_ITEM_SEPARATOR,
-          ...feedItems.filter((item) => {
-            if (item instanceof MenuItemSeparator) {
-              return true
-            }
-            return item && !item.disabled
-          }),
-
-          MENU_ITEM_SEPARATOR,
-          // Copy
-          ...actionConfigs.filter((item) => {
-            if (item instanceof MenuItemSeparator) {
-              return false
-            }
-            return [COMMAND_ID.entry.copyTitle, COMMAND_ID.entry.copyLink].includes(item.id as any)
-          }),
-          new MenuItemText({
-            label: `${t("words.copy")}${t("space")}${t("words.entry")} ${t("words.id")}`,
-            click: () => {
-              copyToClipboard(entry?.id || "")
-            },
-          }),
-        ],
-        e,
-      )
-      setIsContextMenuOpen(false)
-    },
+  const { contextMenuProps, isContextMenuOpen, openContextMenuAt } = useEntryContextMenu({
+    entryId,
+    view,
+    feedId: entry?.feedId || entry?.inboxId || "",
   })
 
+  const isWide = !showEntryDetailsColumn
+
+  const Link = view === FeedViewType.SocialMedia ? "article" : NavLink
+  const isAll = view === FeedViewType.All
   return (
     <div data-entry-id={entry?.id} style={style}>
-      <div
+      <Link
+        to={navigationPath}
         className={cn(
-          "hover:bg-theme-item-hover relative duration-200",
-          views[view as FeedViewType]?.wideMode ? "rounded-md" : "px-2",
+          "relative block cursor-button overflow-visible duration-200 hover:bg-theme-item-hover",
+          isWide ? "rounded-none @[650px]:rounded-md" : "",
+          isAll && "!rounded-none",
           (isActive || isContextMenuOpen) && "!bg-theme-item-active",
           itemClassName,
         )}
         onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseEnter.cancel}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         {...contextMenuProps}
         {...(!isMobile ? { onTouchStart: handleClick } : {})}
       >
         {children}
+        <AnimatePresence>
+          {showAction && isWide && (
+            <ActionBar
+              openContextMenu={() => {
+                const { x, y } = getMousePosition()
+                void openContextMenuAt(x, y)
+              }}
+              entryId={entryId}
+            />
+          )}
+        </AnimatePresence>
+      </Link>
+    </div>
+  )
+}
+
+const ActionBar = ({
+  entryId,
+  openContextMenu,
+}: {
+  entryId: string
+  openContextMenu: () => void
+}) => {
+  const { view } = useRouteParams()
+
+  const { mainAction } = useSortedEntryActions({ entryId, view })
+
+  return (
+    <div
+      className={cn(
+        "absolute -right-2 top-0 -translate-y-1/2 rounded-lg border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur-sm dark:border-neutral-900 dark:bg-neutral-900",
+        view === FeedViewType.All && "right-1 top-1/2",
+      )}
+      onClick={(e) => {
+        e.stopPropagation()
+        e.preventDefault()
+      }}
+    >
+      <div className="flex items-center gap-1">
+        {(
+          mainAction.filter(
+            (item) =>
+              item instanceof EntryActionMenuItem &&
+              !HIDE_ACTIONS_IN_ENTRY_TOOLBAR_ACTIONS.includes(item.id),
+          ) as EntryActionMenuItem[]
+        ).map((item) => (
+          <CommandActionButton key={item.id} onClick={item.onClick} size="xs" commandId={item.id} />
+        ))}
+
+        <ActionButton
+          onClick={openContextMenu}
+          size="xs"
+          icon={<i className="i-mingcute-more-1-fill" />}
+        />
       </div>
     </div>
   )

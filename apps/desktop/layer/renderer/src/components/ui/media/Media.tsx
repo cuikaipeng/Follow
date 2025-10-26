@@ -1,6 +1,7 @@
 import { nextFrame } from "@follow/utils/dom"
 import { getImageProxyUrl } from "@follow/utils/img-proxy"
 import { cn } from "@follow/utils/utils"
+import { ErrorBoundary } from "@sentry/react"
 import { useForceUpdate } from "motion/react"
 import type { FC, ImgHTMLAttributes, VideoHTMLAttributes } from "react"
 import * as React from "react"
@@ -22,6 +23,8 @@ type BaseProps = {
   blurhash?: string
   inline?: boolean
   fitContent?: boolean
+  fitContainer?: boolean
+  videoClassName?: string
 }
 
 const isImageLoadedSet = new Set<string>()
@@ -70,6 +73,8 @@ const MediaImpl: FC<MediaProps> = ({
     width,
     inline,
     fitContent,
+    fitContainer,
+    videoClassName,
     ...rest
   } = props
 
@@ -281,12 +286,17 @@ const MediaImpl: FC<MediaProps> = ({
             className={cn(
               "center",
               !(finalWidth || finalHeight) && "size-full",
-              "cursor-card relative bg-stone-100 object-cover",
+              "relative cursor-card object-cover",
               mediaContainerClassName,
             )}
             onClick={handleClick}
           >
-            <VideoPreview src={src!} previewImageUrl={previewImageSrc} thumbnail={thumbnail} />
+            <VideoPreview
+              src={src!}
+              previewImageUrl={previewImageSrc}
+              thumbnail={thumbnail}
+              videoClassName={videoClassName}
+            />
           </span>
         )
       }
@@ -333,7 +343,7 @@ const MediaImpl: FC<MediaProps> = ({
         >
           <span
             className={cn(
-              "bg-material-ultra-thick relative inline-block max-w-full",
+              "relative inline-block max-w-full bg-material-ultra-thick",
               mediaContainerClassName,
             )}
             style={{
@@ -343,14 +353,16 @@ const MediaImpl: FC<MediaProps> = ({
             }}
           >
             {props.blurhash && (
-              <span
-                className={cn(
-                  "absolute inset-0 overflow-hidden rounded",
-                  mediaLoadState === "loaded" && "animate-out fade-out-0 fill-mode-forwards",
-                )}
-              >
-                <BlurhashCanvas hash={props.blurhash} className="size-full" />
-              </span>
+              <ErrorBoundary>
+                <span
+                  className={cn(
+                    "absolute inset-0 overflow-hidden rounded",
+                    mediaLoadState === "loaded" && "animate-out fade-out-0 fill-mode-forwards",
+                  )}
+                >
+                  <BlurhashCanvas hash={props.blurhash} className="size-full" />
+                </span>
+              </ErrorBoundary>
             )}
           </span>
         </div>
@@ -383,6 +395,7 @@ const MediaImpl: FC<MediaProps> = ({
           height={Number.parseInt(props.height as string)}
           containerWidth={containerWidth}
           fitContent={fitContent}
+          fitContainer={fitContainer}
         >
           <div
             className={cn(
@@ -394,7 +407,7 @@ const MediaImpl: FC<MediaProps> = ({
             {blurhash ? (
               <Blurhash hash={blurhash} width="100%" height="100%" />
             ) : (
-              <div className="bg-border size-full" />
+              <div className="size-full bg-border" />
             )}
           </div>
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded">
@@ -415,13 +428,13 @@ const FallbackMedia: FC<MediaProps> = ({ type, mediaContainerClassName, classNam
     <div
       className={cn(
         "size-full",
-        "center bg-material-ultra-thick rounded",
-        "not-prose @container !flex max-h-full flex-col space-y-1 p-4",
+        "center rounded bg-material-ultra-thick",
+        "not-prose !flex max-h-full flex-col space-y-1 p-4 @container",
         mediaContainerClassName,
       )}
     >
-      <div className="@sm:hidden @md:contents hidden">
-        <i className="i-mgc-close-cute-re text-red text-xl" />
+      <div className="hidden @sm:hidden @md:contents">
+        <i className="i-mgc-close-cute-re text-xl text-red" />
         <p>Media loaded failed</p>
         <div className="space-x-1 break-all px-4 text-sm">
           Go to{" "}
@@ -442,6 +455,7 @@ const AspectRatio = ({
   children,
   style,
   fitContent,
+  fitContainer,
   ...props
 }: {
   width: number
@@ -453,6 +467,7 @@ const AspectRatio = ({
    * If `fit` is true, the content width may be increased to fit the container width
    */
   fitContent?: boolean
+  fitContainer?: boolean
   [key: string]: any
 }) => {
   const scaleFactor =
@@ -469,8 +484,8 @@ const AspectRatio = ({
     <div
       style={{
         position: "relative",
-        width: scaledWidth ? `${scaledWidth}px` : "100%",
-        height: scaledHeight ? `${scaledHeight}px` : "auto",
+        width: fitContainer ? "100%" : scaledWidth ? `${scaledWidth}px` : "100%",
+        height: fitContainer ? "100%" : scaledHeight ? `${scaledHeight}px` : "auto",
         ...style,
       }}
       {...props}
@@ -484,7 +499,8 @@ const VideoPreview: FC<{
   src: string
   previewImageUrl?: string
   thumbnail?: boolean
-}> = ({ src, previewImageUrl, thumbnail = false }) => {
+  videoClassName?: string
+}> = ({ src, previewImageUrl, thumbnail = false, videoClassName }) => {
   const [isInitVideoPlayer, setIsInitVideoPlayer] = useState(!previewImageUrl)
 
   const [videoRef, setVideoRef] = useState<VideoPlayerRef | null>(null)
@@ -504,7 +520,7 @@ const VideoPreview: FC<{
       {!isInitVideoPlayer ? (
         <img
           src={previewImageUrl}
-          className="size-full object-cover"
+          className={cn("size-full object-cover", videoClassName)}
           onMouseEnter={() => {
             setIsInitVideoPlayer(true)
           }}
@@ -517,7 +533,7 @@ const VideoPreview: FC<{
           poster={previewImageUrl}
           ref={setVideoRef}
           muted
-          className="relative size-full object-cover"
+          className={cn("not-prose relative size-full object-cover", videoClassName)}
         />
       )}
 

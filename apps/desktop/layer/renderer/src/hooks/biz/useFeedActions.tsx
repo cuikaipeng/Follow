@@ -12,6 +12,7 @@ import {
   useSubscriptionsByFeedIds,
 } from "@follow/store/subscription/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
+import { whoami } from "@follow/store/user/getters"
 import { isBizId } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { useMemo } from "react"
@@ -20,12 +21,9 @@ import { toast } from "sonner"
 
 import type { FollowMenuItem, MenuItemInput } from "~/atoms/context-menu"
 import { MenuItemSeparator, MenuItemText } from "~/atoms/context-menu"
-import { useIsInMASReview } from "~/atoms/server-configs"
-import { whoami } from "~/atoms/user"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { copyToClipboard } from "~/lib/clipboard"
 import { UrlBuilder } from "~/lib/url-builder"
-import { useBoostModal } from "~/modules/boost/hooks"
 import { useFeedClaimModal } from "~/modules/claim"
 import { COMMAND_ID } from "~/modules/command/commands/id"
 import { useCommandShortcuts } from "~/modules/command/hooks/use-command-binding"
@@ -83,14 +81,11 @@ export const useFeedActions = ({
   const { mutateAsync: resetFeed } = useResetFeed()
   const { mutate: addFeedsToCategoryMutation } = useBatchUpdateSubscription()
   const presentCategoryCreationModal = useCategoryCreationModal()
-  const openBoostModal = useBoostModal()
 
   const listByView = useOwnedListByView(view!)
   const categories = useCategoriesByView(view!)
 
   const isMultipleSelection = feedIds && feedIds.length > 1 && feedIds.includes(feedId)
-
-  const isInMASReview = useIsInMASReview()
 
   const shortcuts = useCommandShortcuts()
 
@@ -136,17 +131,6 @@ export const useFeedActions = ({
             MenuItemSeparator.default,
           ]
         : []),
-      ...(!isInMASReview
-        ? [
-            new MenuItemText({
-              label: t("words.boost"),
-              click: () => {
-                openBoostModal(feedId)
-              },
-            }),
-          ]
-        : []),
-
       new MenuItemSeparator(isEntryList),
       new MenuItemText({
         label: t("sidebar.feed_column.context_menu.add_feeds_to_list"),
@@ -310,7 +294,7 @@ export const useFeedActions = ({
         disabled: isEntryList,
         click: () => {
           copyToClipboard(
-            `https://badge.follow.is/feed/${feedId}?color=FF5C00&labelColor=black&style=flat-square`,
+            `https://badge.folo.is/feed/${feedId}?color=FF5C00&labelColor=black&style=flat-square`,
           )
         },
       }),
@@ -335,12 +319,10 @@ export const useFeedActions = ({
     feedIds,
     inbox,
     isEntryList,
-    isInMASReview,
     isInbox,
     isMultipleSelection,
     listByView,
     navigateEntry,
-    openBoostModal,
     present,
     presentCategoryCreationModal,
     presentDeleteSubscription,

@@ -12,14 +12,14 @@ import { Input } from "@follow/components/ui/input/index.js"
 import { LoadingCircle } from "@follow/components/ui/loading/index.jsx"
 import { Switch } from "@follow/components/ui/switch/index.jsx"
 import { FeedViewType } from "@follow/constants"
-import type { ListAnalyticsModel } from "@follow/models/types"
 import { useListById, usePrefetchListById } from "@follow/store/list/hooks"
 import type { ListModel } from "@follow/store/list/types"
 import { useSubscriptionByFeedId } from "@follow/store/subscription/hooks"
 import { subscriptionSyncService } from "@follow/store/subscription/store"
-import { unreadActions } from "@follow/store/unread/store"
+import { whoami } from "@follow/store/user/getters"
 import { tracker } from "@follow/tracker"
 import { cn } from "@follow/utils/utils"
+import type { ListAnalyticsSchema } from "@follow-app/client-sdk"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { useEffect, useRef } from "react"
@@ -28,13 +28,10 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { getGeneralSettings } from "~/atoms/settings/general"
 import { useCurrentModal } from "~/components/ui/modal/stacked/hooks"
 import { useI18n } from "~/hooks/common"
-import { apiClient } from "~/lib/api-fetch"
 import { getFetchErrorMessage, toastFetchError } from "~/lib/error-parser"
 import { getNewIssueUrl } from "~/lib/issues"
-import { entries as entriesQuery } from "~/queries/entries"
 
 import { useTOTPModalWrapper } from "../profile/hooks"
 import { ViewSelectorRadioGroup } from "../shared/ViewSelectorRadioGroup"
@@ -44,6 +41,7 @@ const formSchema = z.object({
   view: z.string(),
   category: z.string().nullable().optional(),
   isPrivate: z.boolean().optional(),
+  hideFromTimeline: z.boolean().optional(),
   title: z.string().optional(),
 })
 
@@ -90,6 +88,7 @@ export const ListForm: Component<{
             subscriptionData: feedQuery.data?.subscription,
             analytics: feedQuery.data?.analytics,
             list,
+            isLoading: feedQuery.isLoading,
           }}
         />
       ) : feedQuery.isLoading ? (
@@ -163,6 +162,7 @@ const ListInnerForm = ({
   subscriptionData,
   list,
   analytics,
+  isLoading,
 }: {
   defaultValues?: z.infer<typeof formSchema>
   id?: string
@@ -173,9 +173,11 @@ const ListInnerForm = ({
     category?: string | null
     isPrivate?: boolean
     title?: string | null
+    hideFromTimeline?: boolean | null
   }
   list: ListModel
-  analytics?: ListAnalyticsModel
+  analytics?: ListAnalyticsSchema
+  isLoading: boolean
 }) => {
   const subscription = useSubscriptionByFeedId(id || "") || subscriptionData
   const isSubscribed = !!subscription
@@ -198,58 +200,41 @@ const ListInnerForm = ({
   useEffect(() => {
     if (subscription) {
       form.setValue("view", `${subscription?.view}`)
-      form.setValue("isPrivate", subscription?.isPrivate || false)
-      form.setValue("title", subscription?.title || "")
+      typeof subscription.isPrivate === "boolean" &&
+        form.setValue("isPrivate", subscription.isPrivate)
+      subscription?.title && form.setValue("title", subscription.title)
+      typeof subscription.hideFromTimeline === "boolean" &&
+        form.setValue("hideFromTimeline", subscription.hideFromTimeline)
     }
   }, [subscription])
 
   const followMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema> & { TOTPCode?: string }) => {
+      const userId = whoami()?.id || ""
       const body = {
         listId: list.id,
         view: Number.parseInt(values.view),
         category: values.category,
-        isPrivate: values.isPrivate,
+        isPrivate: values.isPrivate || false,
+        hideFromTimeline: values.hideFromTimeline,
         title: values.title,
         TOTPCode: values.TOTPCode,
-      }
-      const $method = isSubscribed ? apiClient.subscriptions.$patch : apiClient.subscriptions.$post
+        userId,
+        type: "list",
+        url: undefined,
+        feedId: undefined,
+      } as const
 
-      return $method({
-        json: body,
-      }) as unknown as Promise<
-        | ReturnType<typeof apiClient.subscriptions.$post>
-        | ReturnType<typeof apiClient.subscriptions.$patch>
-      >
+      if (isSubscribed) {
+        return subscriptionSyncService.edit(body)
+      } else {
+        return subscriptionSyncService.subscribe(body)
+      }
     },
-    onSuccess: (data, variables) => {
-      if (getGeneralSettings().hidePrivateSubscriptionsInTimeline) {
-        entriesQuery
-          .entries({
-            feedId: "all",
-            view: Number(variables.view),
-            excludePrivate: true,
-          })
-          .invalidate({ exact: true })
-      }
-
-      if ("unread" in data) {
-        const { unread } = data
-        unreadActions.upsertMany(unread)
-      }
-      subscriptionSyncService.fetch()
-
-      const listId = list.id
-      if (listId) {
-        // listsQuery.byId({ id: listId }).invalidate()
-      }
+    onSuccess: () => {
       toast(isSubscribed ? t("feed_form.updated") : t("feed_form.followed"), {
         duration: 1000,
       })
-
-      if (!isSubscribed) {
-        tracker.subscribe({ listId: list.id, view: Number.parseInt(variables.view) })
-      }
 
       onSuccess?.()
     },
@@ -272,11 +257,10 @@ const ListInnerForm = ({
   return (
     <div className="flex flex-1 flex-col gap-y-4">
       <FeedSummary
+        isLoading={isLoading}
         feed={{
           ...list,
           fee: list.fee || 0,
-          createdAt: null,
-          updatedAt: null,
         }}
         analytics={analytics}
         showAnalytics
@@ -336,13 +320,36 @@ const ListInnerForm = ({
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="hideFromTimeline"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>{t("feed_form.hide_from_timeline")}</FormLabel>
+                    <FormDescription>
+                      {t("feed_form.hide_from_timeline_description")}
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      className="shrink-0"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </div>
+              </FormItem>
+            )}
+          />
           {!!list.fee && !isSubscribed && (
             <div>
               <FormLabel className="flex items-center gap-1">
                 {t("feed_form.fee")}{" "}
                 <div className="ml-2 flex scale-[0.85] items-center gap-1">
                   {list.fee}
-                  <i className="i-mgc-power text-accent size-4" />
+                  <i className="i-mgc-power size-4 text-folo" />
                 </div>
               </FormLabel>
               <FormDescription className="mt-0.5">{t("feed_form.fee_description")}</FormDescription>

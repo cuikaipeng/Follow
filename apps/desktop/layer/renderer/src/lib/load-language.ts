@@ -74,12 +74,12 @@ export const loadLanguageAndApply = async (lang: string) => {
     }
     EventBus.dispatch("I18N_UPDATE", "")
   } else {
+    if (ELECTRON) return
     let importFilePath = ""
 
     if (IN_ELECTRON) {
       importFilePath =
-        (await (ipcServices as any)?.app.resolveAppAsarPath(`dist/renderer/locales/${lang}.js`)) ||
-        ""
+        (await ipcServices?.app.resolveAppAsarPath(`dist/renderer/locales/${lang}.js`)) || ""
     } else {
       importFilePath = `/locales/${lang}.js`
     }

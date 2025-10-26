@@ -1,10 +1,16 @@
+import { stripeClient } from "@better-auth/stripe/client"
 import { IN_ELECTRON } from "@follow/shared"
-import type { authPlugins } from "@follow/shared/hono"
-import type { BetterAuthClientPlugin } from "better-auth/client"
-import { inferAdditionalFields, twoFactorClient } from "better-auth/client/plugins"
-import { createAuthClient } from "better-auth/react"
+import type { AuthPlugins } from "@follow-app/client-sdk/auth"
+import type { BetterAuthClientPlugin, BetterFetchOption } from "better-auth/client"
+import { createAuthClient } from "better-auth/client"
+import {
+  inferAdditionalFields,
+  lastLoginMethodClient,
+  twoFactorClient,
+} from "better-auth/client/plugins"
 
-type AuthPlugin = (typeof authPlugins)[number]
+type AuthPlugin = AuthPlugins[number]
+
 export const baseAuthPlugins = [
   {
     id: "customGetProviders",
@@ -15,18 +21,37 @@ export const baseAuthPlugins = [
     $InferServerPlugin: {} as Extract<AuthPlugin, { id: "getAccountInfo" }>,
   },
   {
+    id: "deleteUserCustom",
+    $InferServerPlugin: {} as Extract<AuthPlugin, { id: "deleteUserCustom" }>,
+  },
+  {
     id: "oneTimeToken",
     $InferServerPlugin: {} as Extract<AuthPlugin, { id: "oneTimeToken" }>,
   },
+
   inferAdditionalFields({
     user: {
       handle: {
         type: "string",
         required: false,
       },
+      bio: {
+        type: "string",
+        required: false,
+      },
+      website: {
+        type: "string",
+        required: false,
+      },
+      socialLinks: {
+        type: "json",
+        required: false,
+      },
     },
   }),
   twoFactorClient(),
+  stripeClient({ subscription: true }),
+  lastLoginMethodClient(),
 ] satisfies BetterAuthClientPlugin[]
 
 export type AuthClient<ExtraPlugins extends BetterAuthClientPlugin[] = []> = ReturnType<
@@ -44,11 +69,26 @@ export class Auth {
     private readonly options: {
       apiURL: string
       webURL: string
+      fetchOptions?: BetterFetchOption
     },
   ) {
     this.authClient = createAuthClient({
       baseURL: `${this.options.apiURL}/better-auth`,
       plugins: baseAuthPlugins,
+      fetchOptions: {
+        ...this.options.fetchOptions,
+        cache: "no-store",
+        onRequest: (context) => {
+          const referralCode = localStorage.getItem(getStorageNS("referral-code"))
+          if (referralCode) {
+            context.headers.set("folo-referral-code", referralCode)
+          }
+
+          this.options.fetchOptions?.onRequest?.(context)
+
+          return context
+        },
+      },
     })
   }
 
@@ -80,3 +120,7 @@ export class Auth {
     }
   }
 }
+
+// copy from packages/internal/utils/src/ns.ts
+const ns = "follow"
+const getStorageNS = (key: string) => `${ns}:${key}`

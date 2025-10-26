@@ -1,5 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import type { env as EnvType } from "@follow/shared/env.desktop"
@@ -7,12 +6,13 @@ import legacy from "@vitejs/plugin-legacy"
 import { minify as htmlMinify } from "html-minifier-terser"
 import { cyan, dim, green } from "kolorist"
 import { parseHTML } from "linkedom"
-import { tsImport } from "tsx/esm/api"
+import { join, resolve } from "pathe"
 import type { PluginOption, ResolvedConfig, ViteDevServer } from "vite"
 import { defineConfig, loadEnv } from "vite"
 import { analyzer } from "vite-bundle-analyzer"
 import mkcert from "vite-plugin-mkcert"
 import { VitePWA } from "vite-plugin-pwa"
+import { routeBuilderPlugin } from "vite-plugin-route-builder"
 
 import { viteRenderBaseConfig } from "./configs/vite.render.config"
 import { createDependencyChunksPlugin } from "./plugins/vite/deps"
@@ -20,11 +20,6 @@ import { htmlInjectPlugin } from "./plugins/vite/html-inject"
 import { localesPlugin } from "./plugins/vite/locales"
 import manifestPlugin from "./plugins/vite/manifest"
 import { createPlatformSpecificImportPlugin } from "./plugins/vite/specific-import"
-
-const routeBuilderPluginV2 = await tsImport(
-  "@follow-app/vite-plugin-route-builder",
-  import.meta.url,
-).then((m) => m.default)
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 const isCI = process.env.CI === "true" || process.env.CI === "1"
@@ -37,9 +32,7 @@ const devPrint = (): PluginOption => ({
     server.printUrls = () => {
       _printUrls()
       console.info(
-        `  ${green("➜")}  ${dim("Production debug")}: ${cyan(
-          "https://app.follow.is/__debug_proxy",
-        )}`,
+        `  ${green("➜")}  ${dim("Production debug")}: ${cyan("https://app.folo.is/__debug_proxy")}`,
       )
       console.info(
         `  ${green("➜")}  ${dim("Development debug")}: ${cyan(
@@ -110,6 +103,7 @@ export default ({ mode }) => {
         },
       },
     },
+
     server: {
       host: true,
       port: 2233,
@@ -144,9 +138,9 @@ export default ({ mode }) => {
     plugins: [
       ...((viteRenderBaseConfig.plugins ?? []) as any),
 
-      routeBuilderPluginV2({
-        pagePattern: `${resolve(ROOT, "./src/pages")}/**/*.tsx`,
-        outputPath: `${resolve(ROOT, "./src/generated-routes.ts")}`,
+      routeBuilderPlugin({
+        pagePattern: "src/pages/**/*.tsx",
+        outputPath: "src/generated-routes.ts",
         enableInDev: true,
       }),
       localesPlugin(),
@@ -313,7 +307,7 @@ function checkBrowserSupport() {
       "Folo is not compatible with your browser because your browser version is too old. You can download and use the Folo app or continue using it with the latest browser.",
     )
 
-    window.location.href = "https://follow.is/download"
+    window.location.href = "https://folo.is/download"
   }
 }
 
@@ -328,14 +322,14 @@ const htmlPlugin: (env: any) => PluginOption = (env) => {
     closeBundle() {
       const { root } = config
       const dist = config.build.outDir
-      const debugProxyHtml = resolve(root, "debug_proxy.html")
+      const debugProxyHtml = join(root, "debug_proxy.html")
 
       if (existsSync(debugProxyHtml)) {
         const content = readFileSync(debugProxyHtml, "utf-8")
 
+        mkdirSync(dist, { recursive: true })
         writeFileSync(
-          resolve(dist, "__debug_proxy.html"),
-
+          join(dist, "__debug_proxy.html"),
           content.replace("import.meta.env.VITE_API_URL", `"${env.VITE_API_URL}"`),
         )
       }

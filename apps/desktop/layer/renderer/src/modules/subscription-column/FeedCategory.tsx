@@ -3,8 +3,9 @@ import { useMobile } from "@follow/components/hooks/useMobile.js"
 import { MotionButtonBase } from "@follow/components/ui/button/index.js"
 import { LoadingCircle } from "@follow/components/ui/loading/index.jsx"
 import { useScrollViewElement } from "@follow/components/ui/scroll-area/hooks.js"
+import { ShrinkingFocusBorder } from "@follow/components/ui/shrinking-focus-border/index.js"
 import type { FeedViewType } from "@follow/constants"
-import { views } from "@follow/constants"
+import { getViewList } from "@follow/constants"
 import { useInputComposition, useRefValue } from "@follow/hooks"
 import { useFeedStore } from "@follow/store/feed/store"
 import { useOwnedListByView } from "@follow/store/list/hooks"
@@ -16,7 +17,7 @@ import { subscriptionActions, subscriptionSyncService } from "@follow/store/subs
 import { getDefaultCategory } from "@follow/store/subscription/utils"
 import { useSortedIdsByUnread, useUnreadByIds } from "@follow/store/unread/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
-import { stopPropagation } from "@follow/utils/dom"
+import { nextFrame, stopPropagation } from "@follow/utils/dom"
 import { cn, sortByAlphabet } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { AnimatePresence, m } from "motion/react"
@@ -35,7 +36,6 @@ import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { getRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { useContextMenu } from "~/hooks/common/useContextMenu"
 import { createErrorToaster } from "~/lib/error-parser"
-import { invalidateEntriesQuery } from "~/queries/entries"
 import { getPreferredTitle } from "~/store/feed/hooks"
 
 import { useModalStack } from "../../components/ui/modal/stacked/hooks"
@@ -162,12 +162,6 @@ function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCatego
         newView: nextView,
       })
     },
-
-    onSuccess(_data, variables) {
-      invalidateEntriesQuery({
-        views: [view, variables],
-      })
-    },
   })
 
   const [isCategoryEditing, setIsCategoryEditing] = useState(false)
@@ -234,8 +228,8 @@ function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCatego
           MenuItemSeparator.default,
           new MenuItemText({
             label: t("sidebar.feed_column.context_menu.change_to_other_view"),
-            submenu: views
-              .filter((v) => v.view !== view)
+            submenu: getViewList()
+              .filter((v) => v.view !== view && v.switchable)
               .map(
                 (v) =>
                   new MenuItemText({
@@ -280,7 +274,7 @@ function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCatego
           ref={setNodeRef}
           data-active={isActive || isContextMenuOpen}
           className={cn(
-            isOver && "border-theme-accent-400 bg-theme-accent-400/60",
+            isOver && "border-orange-400 bg-orange-400/60",
             "my-px px-2.5",
             feedColumnStyles.item,
           )}
@@ -311,7 +305,7 @@ function FeedCategoryImpl({ data: ids, view, categoryOpenStateData }: FeedCatego
                   onClick={() => {
                     setIsCategoryEditing(false)
                   }}
-                  className="center hover:bg-material-ultra-thick -ml-1 flex size-5 shrink-0 rounded-lg"
+                  className="center -ml-1 flex size-5 shrink-0 rounded-lg hover:bg-material-ultra-thick"
                 >
                   <i className="i-mgc-close-cute-re text-red" />
                 </MotionButtonBase>
@@ -417,6 +411,8 @@ const RenameCategoryForm: FC<{
     },
   })
   const formRef = useRef<HTMLFormElement | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
+
   useOnClickOutside(
     formRef as React.RefObject<HTMLElement>,
     () => {
@@ -426,7 +422,10 @@ const RenameCategoryForm: FC<{
   )
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    inputRef.current?.focus()
+    nextFrame(() => {
+      inputRef.current?.focus()
+      setIsFocused(true)
+    })
   }, [])
   const compositionInputProps = useInputComposition({
     onKeyDown: (e) => {
@@ -436,33 +435,37 @@ const RenameCategoryForm: FC<{
     },
   })
   return (
-    <form
-      ref={formRef}
-      className="ml-3 flex w-full items-center"
-      onSubmit={(e) => {
-        e.preventDefault()
+    <div className="relative ml-3 flex h-8 w-full items-center">
+      <ShrinkingFocusBorder isVisible={isFocused} containerRef={inputRef} persistBorder />
+      <form
+        className="flex w-full items-center"
+        onSubmit={(e) => {
+          e.preventDefault()
 
-        return renameMutation.mutateAsync({
-          lastCategory: currentCategory!,
-          newCategory: e.currentTarget.category.value,
-        })
-      }}
-    >
-      <input
-        {...compositionInputProps}
-        ref={inputRef}
-        name="category"
-        autoFocus
-        defaultValue={currentCategory}
-        className="caret-accent w-full appearance-none bg-transparent"
-      />
-      <MotionButtonBase
-        type="submit"
-        className="center hover:bg-material-ultra-thick text-green -mr-1 flex size-5 shrink-0 rounded-lg"
+          return renameMutation.mutateAsync({
+            lastCategory: currentCategory!,
+            newCategory: e.currentTarget.category.value,
+          })
+        }}
       >
-        <i className="i-mgc-check-filled size-3" />
-      </MotionButtonBase>
-    </form>
+        <input
+          {...compositionInputProps}
+          ref={inputRef}
+          name="category"
+          autoFocus
+          defaultValue={currentCategory}
+          className="w-full appearance-none bg-transparent px-2 py-1 caret-accent"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+        <MotionButtonBase
+          type="submit"
+          className="center -mr-1 flex size-5 shrink-0 rounded-lg text-green hover:bg-material-ultra-thick"
+        >
+          <i className="i-mgc-check-filled size-3" />
+        </MotionButtonBase>
+      </form>
+    </div>
   )
 }
 

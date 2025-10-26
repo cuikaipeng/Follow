@@ -1,11 +1,15 @@
 import { isMobile } from "@follow/components/hooks/useMobile.js"
+import { useIsDark } from "@follow/hooks"
+import { getAccentColorValue } from "@follow/shared/settings/constants"
 import type { UISettings } from "@follow/shared/settings/interface"
 import { useUnreadAll } from "@follow/store/unread/hooks"
+import { hexToHslString } from "@follow/utils"
 import i18next from "i18next"
 import { useEffect, useInsertionEffect, useLayoutEffect, useRef } from "react"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { useUISettingValue } from "~/atoms/settings/ui"
+import { useSubscriptionColumnShow } from "~/atoms/sidebar"
 import { I18N_LOCALE_KEY } from "~/constants"
 import { useReduceMotion } from "~/hooks/biz/useReduceMotion"
 import { useSyncTheme } from "~/hooks/common"
@@ -41,7 +45,6 @@ const useUpdateDockBadge = (setting: UISettings) => {
     })
   }, [unreadCount, setting.showDockBadge])
 }
-
 const useUISettingSync = () => {
   const setting = useUISettingValue()
   const mobile = isMobile()
@@ -50,6 +53,16 @@ const useUISettingSync = () => {
     const root = document.documentElement
     root.style.fontSize = `${setting.uiTextSize * (mobile ? 1.125 : 1)}px`
   }, [setting.uiTextSize])
+
+  const isDark = useIsDark()
+  useInsertionEffect(() => {
+    const root = document.documentElement
+    // 21.6 100% 50%;
+    root.style.setProperty(
+      "--fo-a",
+      hexToHslString(getAccentColorValue(setting.accentColor)[isDark ? "dark" : "light"]),
+    )
+  }, [setting.accentColor, isDark])
 
   useInsertionEffect(() => {
     const root = document.documentElement
@@ -67,6 +80,13 @@ const useUISettingSync = () => {
   }, [setting.uiFontFamily, setting.usePointerCursor])
 
   useUpdateDockBadge(setting)
+}
+
+const useDataAttrSync = () => {
+  const columnShow = useSubscriptionColumnShow()
+  useEffect(() => {
+    document.documentElement.dataset.leftColumnHidden = (!columnShow).toString()
+  }, [columnShow])
 }
 
 const useUXSettingSync = () => {
@@ -107,5 +127,6 @@ export const SettingSync = () => {
   useUXSettingSync()
   useLanguageSync()
   useGeneralSettingSync()
+  useDataAttrSync()
   return null
 }

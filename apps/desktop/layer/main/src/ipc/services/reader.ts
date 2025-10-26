@@ -1,15 +1,15 @@
 import fs from "node:fs"
-import path from "node:path"
 
 import { callWindowExpose } from "@follow/shared/bridge"
 import { readability } from "@follow-app/readability"
 import { app, BrowserWindow } from "electron"
+import type { IpcContext } from "electron-ipc-decorator"
+import { IpcMethod, IpcService } from "electron-ipc-decorator"
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts"
+import path from "pathe"
 import type { ModelResult } from "vscode-languagedetection"
 
 import { detectCodeStringLanguage } from "../../modules/language-detection"
-import type { IpcContext } from "../base"
-import { IpcMethod, IpcService } from "../base"
 
 const tts = new MsEdgeTTS()
 
@@ -29,9 +29,7 @@ interface DetectCodeStringLanguageInput {
 }
 
 export class ReaderService extends IpcService {
-  constructor() {
-    super("reader")
-  }
+  static override readonly groupName = "reader"
 
   @IpcMethod()
   async readability(_context: IpcContext, input: ReadabilityInput) {
@@ -56,7 +54,7 @@ export class ReaderService extends IpcService {
     if (!window) return null
 
     try {
-      await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3)
+      await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3, {})
     } catch (error: unknown) {
       console.error("Failed to set voice", error)
       if (error instanceof Error) {

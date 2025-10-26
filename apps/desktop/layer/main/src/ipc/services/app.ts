@@ -1,21 +1,25 @@
-import path from "node:path"
+import fsp from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 
 import { callWindowExpose } from "@follow/shared/bridge"
 import { DEV } from "@follow/shared/constants"
-import { app, BrowserWindow, clipboard, dialog } from "electron"
+import { app, BrowserWindow, clipboard, dialog, shell } from "electron"
+import type { IpcContext } from "electron-ipc-decorator"
+import { IpcMethod, IpcService } from "electron-ipc-decorator"
+import path from "pathe"
 
+import { START_IN_TRAY_ARGS } from "~/constants/app"
+import { getCacheSize } from "~/lib/cleaner"
 import { i18n } from "~/lib/i18n"
+import { store, StoreKey } from "~/lib/store"
 import { registerAppTray } from "~/lib/tray"
-import { logger } from "~/logger"
+import { logger, revealLogFile } from "~/logger"
 import { AppManager } from "~/manager/app"
 import { WindowManager } from "~/manager/window"
 import { cleanupOldRender, loadDynamicRenderEntry } from "~/updater/hot-updater"
 
 import { downloadFile } from "../../lib/download"
 import { checkForAppUpdates, quitAndInstall } from "../../updater"
-import type { IpcContext } from "../base"
-import { IpcMethod, IpcService } from "../base"
 
 interface WindowActionInput {
   action: "close" | "minimize" | "maximum"
@@ -31,9 +35,7 @@ interface Sender extends Electron.WebContents {
 }
 
 export class AppService extends IpcService {
-  constructor() {
-    super("app")
-  }
+  static override readonly groupName = "app"
 
   @IpcMethod()
   getAppVersion(): string {
@@ -41,8 +43,8 @@ export class AppService extends IpcService {
   }
 
   @IpcMethod()
-  checkForUpdates(): void {
-    checkForAppUpdates()
+  async checkForUpdates(): Promise<{ hasUpdate: boolean; error?: string }> {
+    return checkForAppUpdates()
   }
 
   @IpcMethod()
@@ -178,5 +180,68 @@ export class AppService extends IpcService {
     }
 
     return path.join(app.getAppPath(), input)
+  }
+
+  @IpcMethod()
+  readyToShowMainWindow(_context: IpcContext) {
+    const shouldShowWindow =
+      !app.getLoginItemSettings().wasOpenedAsHidden && !process.argv.includes(START_IN_TRAY_ARGS)
+    if (shouldShowWindow) {
+      const window = WindowManager.getMainWindow()
+      if (window) window.show()
+    }
+  }
+
+  @IpcMethod()
+  openCacheFolder(_context: IpcContext): void {
+    const dir = path.join(app.getPath("userData"), "cache")
+    shell.openPath(dir)
+  }
+
+  @IpcMethod()
+  getCacheLimit(_context: IpcContext): number {
+    return store.get(StoreKey.CacheSizeLimit) || 0
+  }
+
+  @IpcMethod()
+  async clearCache(_context: IpcContext): Promise<void> {
+    const cachePath = path.join(app.getPath("userData"), "cache", "Cache_Data")
+    if (process.platform === "win32") {
+      // Request elevation on Windows
+
+      try {
+        // Create a bat file to delete cache with elevated privileges
+        const batPath = path.join(app.getPath("temp"), "clear_cache.bat")
+        await fsp.writeFile(batPath, `@echo off\nrd /s /q "${cachePath}"\ndel "%~f0"`, "utf-8")
+
+        // Execute the bat file with admin privileges
+        await shell.openPath(batPath)
+        return
+      } catch (err) {
+        logger.error("Failed to clear cache with elevation", { error: err })
+      }
+    }
+    await fsp.rm(cachePath, { recursive: true, force: true }).catch(() => {
+      logger.error("Failed to clear cache")
+    })
+  }
+
+  @IpcMethod()
+  limitCacheSize(_context: IpcContext, input: number): void {
+    if (input === 0) {
+      store.delete(StoreKey.CacheSizeLimit)
+    } else {
+      store.set(StoreKey.CacheSizeLimit, input)
+    }
+  }
+
+  @IpcMethod()
+  revealLogFile(_context: IpcContext) {
+    return revealLogFile()
+  }
+
+  @IpcMethod()
+  getCacheSize(_context: IpcContext) {
+    return getCacheSize()
   }
 }

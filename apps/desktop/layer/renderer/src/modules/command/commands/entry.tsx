@@ -6,6 +6,7 @@ import { collectionSyncService } from "@follow/store/collection/store"
 import { getEntry } from "@follow/store/entry/getter"
 import { entrySyncServices } from "@follow/store/entry/store"
 import { unreadSyncService } from "@follow/store/unread/store"
+import { useUserRole } from "@follow/store/user/hooks"
 import { cn, resolveUrlWithBase } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
@@ -15,14 +16,12 @@ import { toggleShowAISummaryOnce } from "~/atoms/ai-summary"
 import { toggleShowAITranslationOnce } from "~/atoms/ai-translation"
 import { AudioPlayer, getAudioPlayerAtomValue } from "~/atoms/player"
 import { showPopover } from "~/atoms/popover"
-import { useIsInMASReview } from "~/atoms/server-configs"
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import {
   getShowSourceContent,
   toggleShowSourceContent,
   useSourceContentModal,
 } from "~/atoms/source-content"
-import { useUserRole } from "~/atoms/user"
 import { SharePanel } from "~/components/common/SharePanel"
 import { toggleEntryReadability } from "~/hooks/biz/useEntryActions"
 import { navigateEntry } from "~/hooks/biz/useNavigateEntry"
@@ -33,7 +32,6 @@ import { parseHtml } from "~/lib/parse-html"
 import { useActivationModal } from "~/modules/activation"
 import { markAllByRoute } from "~/modules/entry-column/hooks/useMarkAll"
 import { useGalleryModal } from "~/modules/entry-content/hooks"
-import { useTipModal } from "~/modules/wallet/hooks"
 
 import { useRegisterFollowCommand } from "../hooks/use-register-command"
 import type { Command, CommandCategory } from "../types"
@@ -44,12 +42,14 @@ const category: CommandCategory = "category.entry"
 const useCollect = () => {
   const { t } = useTranslation()
   return useMutation({
-    mutationFn: async ({ entryId, view }: { entryId: string; view: FeedViewType }) =>
-      collectionSyncService.starEntry({
+    mutationFn: async ({ entryId, view }: { entryId: string; view: FeedViewType }) => {
+      const { isCollection } = getRouteParams()
+      return collectionSyncService.starEntry({
         entryId,
         view,
-      }),
-
+        invalidate: !isCollection,
+      })
+    },
     onSuccess: () => {
       toast.success(t("entry_actions.starred"), {
         duration: 1000,
@@ -61,7 +61,10 @@ const useCollect = () => {
 const useUnCollect = () => {
   const { t } = useTranslation()
   return useMutation({
-    mutationFn: async (entryId: string) => collectionSyncService.unstarEntry(entryId),
+    mutationFn: async (entryId: string) => {
+      const { isCollection } = getRouteParams()
+      return collectionSyncService.unstarEntry({ entryId, invalidate: !isCollection })
+    },
 
     onSuccess: () => {
       toast.success(t("entry_actions.unstarred"), {
@@ -104,7 +107,6 @@ export const useRegisterEntryCommands = () => {
   const uncollect = useUnCollect()
   const deleteInboxEntry = useDeleteInboxEntry()
   const showSourceContentModal = useSourceContentModal()
-  const openTipModal = useTipModal()
   const openGalleryModal = useGalleryModal()
   const read = useRead()
   const unread = useUnread()
@@ -114,27 +116,8 @@ export const useRegisterEntryCommands = () => {
 
   const voice = useGeneralSettingKey("voice")
 
-  const isInMASReview = useIsInMASReview()
-
   useRegisterFollowCommand(
     [
-      ...(isInMASReview
-        ? ([] as any[])
-        : [
-            {
-              id: COMMAND_ID.entry.tip,
-              label: t("entry_actions.tip"),
-              icon: <i className="i-mgc-power-outline" />,
-              category,
-              run: ({ userId, feedId, entryId }) => {
-                openTipModal({
-                  userId,
-                  feedId,
-                  entryId,
-                })
-              },
-            },
-          ]),
       {
         id: COMMAND_ID.entry.star,
         label: t("entry_actions.star"),
@@ -306,7 +289,7 @@ export const useRegisterEntryCommands = () => {
         label: t("entry_actions.mark_above_as_read"),
         category,
         run: ({ publishedAt }: { publishedAt: string }) => {
-          return markAllByRoute({
+          return markAllByRoute(getRouteParams(), {
             startTime: new Date(publishedAt).getTime() + 1,
             endTime: Date.now(),
           })
@@ -337,7 +320,7 @@ export const useRegisterEntryCommands = () => {
         label: t("entry_actions.mark_below_as_read"),
         category,
         run: ({ publishedAt }: { publishedAt: string }) => {
-          return markAllByRoute({
+          return markAllByRoute(getRouteParams(), {
             startTime: 1,
             endTime: new Date(publishedAt).getTime() - 1,
           })
@@ -405,9 +388,7 @@ export const useRegisterEntryCommands = () => {
         },
       },
     ],
-    {
-      deps: [isInMASReview],
-    },
+    {},
   )
 
   useRegisterFollowCommand(
@@ -418,7 +399,7 @@ export const useRegisterEntryCommands = () => {
         icon: <i className="i-mgc-ai-cute-re" />,
         category,
         run: () => {
-          if (role === UserRole.Trial) {
+          if (role === UserRole.Free || role === UserRole.Trial) {
             presentActivationModal()
             return
           }
@@ -431,7 +412,7 @@ export const useRegisterEntryCommands = () => {
         icon: <i className="i-mgc-translate-2-ai-cute-re" />,
         category,
         run: () => {
-          if (role === UserRole.Trial) {
+          if (role === UserRole.Free || role === UserRole.Trial) {
             presentActivationModal()
             return
           }
@@ -445,14 +426,9 @@ export const useRegisterEntryCommands = () => {
   )
 }
 
-export type TipCommand = Command<{
-  id: typeof COMMAND_ID.entry.tip
-  fn: (data: { userId?: string | null; feedId?: string; entryId?: string }) => void
-}>
-
 export type StarCommand = Command<{
   id: typeof COMMAND_ID.entry.star
-  fn: (data: { entryId: string; view?: FeedViewType }) => void
+  fn: (data: { entryId: string; view: FeedViewType }) => void
 }>
 
 export type DeleteCommand = Command<{
@@ -531,7 +507,6 @@ export type ReadabilityCommand = Command<{
 }>
 
 export type EntryCommand =
-  | TipCommand
   | StarCommand
   | DeleteCommand
   | CopyLinkCommand

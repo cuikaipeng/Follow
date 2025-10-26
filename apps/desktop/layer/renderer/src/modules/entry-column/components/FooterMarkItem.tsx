@@ -1,48 +1,73 @@
-import { FeedViewType, views } from "@follow/constants"
+import { FeedViewType, getView } from "@follow/constants"
+
+import { readableContentMaxWidthClassName } from "~/constants/ui"
 
 import { FlatMarkAllReadButton } from "./mark-all-button"
 
-export const FooterMarkItem = ({ view }: { view: FeedViewType }) => {
+export const FooterMarkItem = ({
+  view,
+  fetchedTime,
+}: {
+  view: FeedViewType
+  fetchedTime?: number
+}) => {
+  const filter = fetchedTime
+    ? {
+        insertedBefore: fetchedTime,
+      }
+    : undefined
+
   if (view === FeedViewType.SocialMedia) {
-    return <SocialMediaFooterMarkItem />
-  } else if (views[view]!.gridMode) {
-    return <GridFooterMarkItem />
+    return <SocialMediaFooterMarkItem filter={filter} />
+  } else if (getView(view)?.gridMode || view === FeedViewType.All) {
+    return <GridFooterMarkItem filter={filter} />
   }
-  return <CommonFooterMarkItem />
+  return <CommonFooterMarkItem filter={filter} />
 }
 
-const SocialMediaFooterMarkItem = () => {
+interface FooterMarkItemProps {
+  filter?: {
+    insertedBefore: number
+  }
+}
+
+const SocialMediaFooterMarkItem = ({ filter }: FooterMarkItemProps) => {
   return (
     <div className="relative flex w-full">
       <FlatMarkAllReadButton
         className="justify-center"
-        buttonClassName="w-[645px] mx-auto mb-4 pl-7 py-4"
+        buttonClassName="w-[645px] mx-auto mb-4 pl-4 py-4 @[700px]:pl-6"
         iconClassName="mr-1 text-lg"
         which="above"
+        filter={filter}
       />
     </div>
   )
 }
 
-const GridFooterMarkItem = () => {
+const GridFooterMarkItem = ({ filter }: FooterMarkItemProps) => {
   return (
     <div className="relative flex w-full">
       <FlatMarkAllReadButton
         buttonClassName="w-full py-4"
         iconClassName="mr-1 text-base"
         which="above"
+        filter={filter}
       />
     </div>
   )
 }
 
-const CommonFooterMarkItem = () => {
+const CommonFooterMarkItem = ({ filter }: FooterMarkItemProps) => {
   return (
-    <FlatMarkAllReadButton
-      className="justify-start"
-      buttonClassName="w-full rounded-none px-6 py-4"
-      iconClassName="mr-1 text-base"
-      which="above"
-    />
+    <div className={`relative flex w-full ${readableContentMaxWidthClassName} mx-auto`}>
+      <FlatMarkAllReadButton
+        className="justify-start"
+        buttonClassName="w-full px-4 pl-3 py-4"
+        iconClassName="w-7 mr-3 text-base"
+        which="above"
+        filter={filter}
+      />
+    </div>
   )
 }

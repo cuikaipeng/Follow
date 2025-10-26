@@ -2,12 +2,11 @@ import "./load-env"
 
 import { requestContext } from "@fastify/request-context"
 import { env } from "@follow/shared/env.ssr"
-import type { AppType } from "@follow/shared/hono"
-import { hc } from "hono/client"
+import { createSSRAPIHeaders } from "@follow/utils/headers"
+import { FollowClient } from "@follow-app/client-sdk"
 import { ofetch } from "ofetch"
 
 import PKG from "../../../desktop/package.json"
-import { isDev } from "./env"
 
 const getBaseURL = () => {
   const req = requestContext.get("req")!
@@ -33,10 +32,19 @@ export const createApiFetch = () => {
   return ofetch.create({
     credentials: "include",
     retry: false,
+    cache: "no-store",
     onRequest(context) {
-      if (isDev) console.info(`request: ${context.request}`)
+      if (__DEV__) console.info(`request: ${context.request}`)
 
-      context.options.headers.set("User-Agent", `Folo External Server Api Client/${PKG.version}`)
+      const header = new Headers(context.options.headers)
+
+      const headers = createSSRAPIHeaders({ version: PKG.version })
+
+      Object.entries(headers).forEach(([key, value]) => {
+        header.set(key, value)
+      })
+
+      context.options.headers = header
     },
     onRequestError(context) {
       if (context.error.name === "AbortError") {
@@ -46,24 +54,38 @@ export const createApiFetch = () => {
     baseURL,
   })
 }
-export const createApiClient = () => {
+
+export const createFollowClient = () => {
   const authSessionToken = getTokenFromCookie(requestContext.get("req")?.headers.cookie || "")
 
   const baseURL = getBaseURL()
-  const apiFetch = createApiFetch()
 
-  const apiClient = hc<AppType>(baseURL, {
-    fetch: async (input: any, options = {}) => apiFetch(input.toString(), options),
-    headers() {
-      return {
-        "X-App-Version": PKG.version,
-        "X-App-Dev": isDev ? "1" : "0",
-        "User-Agent": `Folo External Server Api Client/${PKG.version}`,
-        Cookie: authSessionToken ? `__Secure-better-auth.session_token=${authSessionToken}` : "",
-      }
-    },
+  const client = new FollowClient({
+    credentials: "include",
+    timeout: 10000,
+    baseURL,
+    fetch: async (input: any, options = {}) => fetch(input.toString(), options),
   })
-  return apiClient
+
+  client.addRequestInterceptor(async (ctx) => {
+    const { options } = ctx
+    const header = new Headers(options.headers)
+
+    const headers = createSSRAPIHeaders({ version: PKG.version })
+
+    Object.entries(headers).forEach(([key, value]) => {
+      header.set(key, value)
+    })
+
+    if (authSessionToken) {
+      header.set("Cookie", `__Secure-better-auth.session_token=${authSessionToken}`)
+    }
+
+    options.headers = Object.fromEntries(header.entries())
+    return ctx
+  })
+
+  return client
 }
 
 export const getTokenFromCookie = (cookie: string) => {
@@ -80,5 +102,3 @@ export const getTokenFromCookie = (cookie: string) => {
     )
   return parsedCookieMap["__Secure-better-auth.session_token"]
 }
-
-export type ApiClient = ReturnType<typeof createApiClient>

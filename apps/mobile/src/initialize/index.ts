@@ -7,12 +7,12 @@ import { settingSyncQueue } from "../modules/settings/sync-queue"
 import { initAnalytics } from "./analytics"
 import { initializeAppCheck } from "./app-check"
 import { initBackgroundTask } from "./background"
-import { initCrashlytics } from "./crashlytics"
 import { initializeDayjs } from "./dayjs"
 import { initDeviceType } from "./device"
 import { hydrateQueryClient, hydrateSettings } from "./hydrate"
 import { migrateDatabase } from "./migration"
 import { initializePlayer } from "./player"
+import { initializeSentry } from "./sentry"
 
 /* eslint-disable no-console */
 export const initializeApp = async () => {
@@ -20,8 +20,10 @@ export const initializeApp = async () => {
 
   const now = Date.now()
 
+  initializeSentry()
+
   await initDeviceType()
-  initializeDB()
+  await initializeDB()
 
   await apm("migrateDatabase", migrateDatabase)
   initializeDayjs()
@@ -35,7 +37,12 @@ export const initializeApp = async () => {
   dataHydratedTime = Date.now() - dataHydratedTime
   await apm("hydrateQueryClient", hydrateQueryClient)
   await apm("initializeAppCheck", initializeAppCheck)
-  await apm("initializePlayer", initializePlayer)
+  requestIdleCallback(
+    () => {
+      apm("initializePlayer", initializePlayer)
+    },
+    { timeout: 5000 }, // Max delay of 5 seconds
+  )
 
   apm("setting sync", () => {
     settingSyncQueue.init()
@@ -52,7 +59,7 @@ export const initializeApp = async () => {
     electron: false,
     using_indexed_db: true,
   })
-  initCrashlytics()
+
   initBackgroundTask()
   console.log(`Initialize done,`, `${loadingTime}ms`)
 }

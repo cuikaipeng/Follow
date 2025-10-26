@@ -1,27 +1,32 @@
+import "client-only"
+
 import { env } from "@follow/shared/env.ssr"
-import type { AppType } from "@follow/shared/hono"
-import { hc } from "hono/client"
-import { ofetch } from "ofetch"
+import { createSSRAPIHeaders } from "@follow/utils/headers"
+import { FollowClient } from "@follow-app/client-sdk"
 
-const apiFetch = ofetch.create({
+import PKG from "../../../desktop/package.json"
+
+export const followClient = new FollowClient({
   credentials: "include",
-  retry: false,
-  onRequest: ({ options }) => {
-    const header = new Headers(options.headers)
-
-    header.set("x-app-version", "Web External")
-    options.headers = header
-  },
+  timeout: 10000,
+  baseURL: env.VITE_EXTERNAL_API_URL || env.VITE_API_URL,
+  fetch: async (input: any, options = {}) =>
+    fetch(input.toString(), {
+      ...options,
+      cache: "no-store",
+    }),
 })
 
-export const apiClient = hc<AppType>(env.VITE_EXTERNAL_API_URL || env.VITE_API_URL, {
-  fetch: async (input: any, options = {}) =>
-    apiFetch(input.toString(), options).catch((err) => {
-      throw err
-    }),
-  headers() {
-    return {
-      "X-App-Version": "Web External",
-    }
-  },
+followClient.addRequestInterceptor(async (ctx) => {
+  const { options } = ctx
+  const header = new Headers(options.headers)
+
+  const headers = createSSRAPIHeaders({ version: PKG.version })
+
+  Object.entries(headers).forEach(([key, value]) => {
+    header.set(key, value)
+  })
+
+  options.headers = Object.fromEntries(header.entries())
+  return ctx
 })

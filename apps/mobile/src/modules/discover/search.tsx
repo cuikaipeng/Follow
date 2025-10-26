@@ -33,22 +33,25 @@ const DynamicBlurEffect = () => {
     </Animated.View>
   )
 }
-
 export const DiscoverHeader = () => {
   const frame = useSafeAreaFrame()
   const insets = useSafeAreaInsets()
   const sheetModal = useScreenIsInSheetModal()
-  const headerHeight = getDefaultHeaderHeight(frame, sheetModal, insets.top)
-
+  const headerHeight = getDefaultHeaderHeight({
+    landscape: frame.width > frame.height,
+    modalPresentation: sheetModal,
+    topInset: insets.top,
+  })
   const scrollContainerAnimatedX = useSearchPageScrollContainerAnimatedX()
   const { searchFocusedAtom } = useSearchPageContext()
   const isFocused = useAtomValue(searchFocusedAtom)
-
   const setHeaderHeight = use(SetNavigationHeaderHeightContext)
-
   return (
     <View
-      style={{ minHeight: headerHeight, paddingTop: insets.top }}
+      style={{
+        minHeight: headerHeight,
+        paddingTop: insets.top,
+      }}
       className="relative"
       onLayout={(e) => {
         setHeaderHeight(e.nativeEvent.layout.height)
@@ -63,7 +66,6 @@ export const DiscoverHeader = () => {
     </View>
   )
 }
-
 const SearchInput = () => {
   const { t } = useTranslation("common")
   const { searchFocusedAtom, searchValueAtom } = useSearchPageContext()
@@ -72,36 +74,48 @@ const SearchInput = () => {
   const searchValue = useAtomValue(searchValueAtom)
   const setSearchValue = useSetAtom(searchValueAtom)
   const inputRef = useRef<TextInput>(null)
-
   const skeletonOpacity = useSharedValue(0)
   const skeletonTranslateX = useSharedValue(0)
   const placeholderOpacity = useSharedValue(0)
   const marginRight = useSharedValue(0)
   const cancelButtonTranslateX = useSharedValue(20)
-
   const [tempSearchValue, setTempSearchValue] = useState(searchValue)
-
   const focusOrHasValue = isFocused || searchValue || tempSearchValue
-
   useEffect(() => {
     if (focusOrHasValue) {
-      skeletonOpacity.value = withTiming(0, { duration: 100 })
+      skeletonOpacity.value = withTiming(0, {
+        duration: 100,
+      })
       skeletonTranslateX.value = withTiming(-150, {
         duration: 100,
         easing: Easing.inOut(Easing.ease),
       })
-      placeholderOpacity.value = withTiming(1, { duration: 200 })
-      marginRight.value = withTiming(64, { duration: 200 })
-      cancelButtonTranslateX.value = withTiming(0, { duration: 200 })
+      placeholderOpacity.value = withTiming(1, {
+        duration: 200,
+      })
+      marginRight.value = withTiming(64, {
+        duration: 200,
+      })
+      cancelButtonTranslateX.value = withTiming(0, {
+        duration: 200,
+      })
     } else {
-      skeletonOpacity.value = withTiming(1, { duration: 100 })
+      skeletonOpacity.value = withTiming(1, {
+        duration: 100,
+      })
       skeletonTranslateX.value = withTiming(0, {
         duration: 100,
         easing: Easing.inOut(Easing.ease),
       })
-      placeholderOpacity.value = withTiming(0, { duration: 200 })
-      marginRight.value = withTiming(0, { duration: 200 })
-      cancelButtonTranslateX.value = withTiming(20, { duration: 200 })
+      placeholderOpacity.value = withTiming(0, {
+        duration: 200,
+      })
+      marginRight.value = withTiming(0, {
+        duration: 200,
+      })
+      cancelButtonTranslateX.value = withTiming(20, {
+        duration: 200,
+      })
     }
   }, [
     focusOrHasValue,
@@ -111,7 +125,6 @@ const SearchInput = () => {
     marginRight,
     cancelButtonTranslateX,
   ])
-
   const skeletonAnimatedStyle = useAnimatedStyle(() => ({
     opacity: skeletonOpacity.value,
     position: "absolute",
@@ -122,12 +135,14 @@ const SearchInput = () => {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ translateX: skeletonTranslateX.value }],
+    transform: [
+      {
+        translateX: skeletonTranslateX.value,
+      },
+    ],
   }))
-
   const placeholderAnimatedStyle = useAnimatedStyle(() => ({
     opacity: placeholderOpacity.value,
-
     position: "absolute",
     top: 0,
     bottom: 0,
@@ -136,15 +151,16 @@ const SearchInput = () => {
     alignItems: "center",
     justifyContent: "center",
   }))
-
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     marginRight: marginRight.value,
   }))
-
   const cancelButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: cancelButtonTranslateX.value }],
+    transform: [
+      {
+        translateX: cancelButtonTranslateX.value,
+      },
+    ],
   }))
-
   useEffect(() => {
     if (!isFocused) {
       inputRef.current?.blur()
@@ -152,7 +168,6 @@ const SearchInput = () => {
       inputRef.current?.focus()
     }
   }, [isFocused])
-
   return (
     <Animated.View className="flex-row items-center justify-center" style={containerAnimatedStyle}>
       <View style={styles.searchbar} className="bg-tertiary-system-fill">
@@ -160,13 +175,14 @@ const SearchInput = () => {
           <Animated.View style={placeholderAnimatedStyle}>
             <Search2CuteReIcon color={placeholderTextColor} height={18} width={18} />
             {!searchValue && !tempSearchValue && (
-              <Text className="text-secondary-label ml-2" style={styles.searchPlaceholderText}>
+              <Text className="ml-2 text-secondary-label" style={styles.searchPlaceholderText}>
                 {t("words.search")}
               </Text>
             )}
           </Animated.View>
         )}
         <TextInput
+          allowFontScaling={false}
           textAlignVertical="center"
           enterKeyHint="search"
           autoFocus={isFocused}
@@ -188,7 +204,11 @@ const SearchInput = () => {
 
         <Animated.View style={skeletonAnimatedStyle} pointerEvents="none">
           <Search2CuteReIcon color={placeholderTextColor} height={18} width={18} />
-          <Text className="text-secondary-label ml-1" style={styles.searchPlaceholderText}>
+          <Text
+            allowFontScaling={false}
+            className="ml-1 text-secondary-label"
+            style={styles.searchPlaceholderText}
+          >
             {t("words.search")}
           </Text>
         </Animated.View>
@@ -207,7 +227,7 @@ const SearchInput = () => {
         <Text
           // Fix font scaling issues on Android
           allowFontScaling={false}
-          className="text-accent text-lg font-medium"
+          className="text-[16px] font-medium text-accent"
         >
           Cancel
         </Text>
@@ -225,7 +245,6 @@ const styles = StyleSheet.create({
     position: "relative",
     marginTop: 4,
   },
-
   searchbar: {
     flex: 1,
     display: "flex",

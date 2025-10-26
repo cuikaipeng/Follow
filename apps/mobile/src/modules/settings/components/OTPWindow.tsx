@@ -4,7 +4,6 @@ import {
   Animated,
   Keyboard,
   StyleSheet,
-  Text,
   useAnimatedValue,
   useWindowDimensions,
   View,
@@ -16,6 +15,7 @@ import { useColor } from "react-native-uikit-colors"
 import { useEventCallback } from "usehooks-ts"
 
 import { FullWindowOverlay } from "@/src/components/common/FullWindowOverlay"
+import { Text } from "@/src/components/ui/typography/Text"
 import { isAuthCodeValid } from "@/src/lib/auth"
 import { toast } from "@/src/lib/toast"
 import { accentColor } from "@/src/theme/colors"
@@ -25,14 +25,12 @@ type OTPWindowProps<T> = {
   verifyFn: (code: string) => Promise<T>
   onDismiss: () => void
 }
-
 export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps<T>) => {
   const otpInputRef = useRef<OtpInputRef>(null)
   const label = useColor("label")
   const tertiaryLabel = useColor("tertiaryLabel")
   const secondaryBackground = useColor("gray5")
   const tertiaryBackground = useColor("gray6")
-
   const submitMutation = useMutation({
     onError(error) {
       toast.error(`Failed to verify: ${error.message}`)
@@ -45,23 +43,18 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
     },
     mutationFn: ({ code }: { code: string }) => verifyFn(code),
   })
-
   const windowScale = useAnimatedValue(1.1)
   const windowOpacity = useAnimatedValue(0)
-
   const [uiShow, setUiShow] = useState(false)
   const [componentRender, setComponentRender] = useState(true)
-
   useEffect(() => {
     setUiShow(true)
   }, [])
-
   const stableDismiss = useEventCallback(() => {
     onDismiss()
   })
   useEffect(() => {
     let timer: any
-
     if (uiShow) {
       Animated.parallel([
         Animated.spring(windowScale, {
@@ -84,25 +77,20 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
         duration: 500,
         useNativeDriver: true,
       }).start()
-
       timer = setTimeout(() => {
         setComponentRender(false)
         stableDismiss()
       }, 500)
     }
-
     return () => clearTimeout(timer)
   }, [stableDismiss, uiShow, windowOpacity, windowScale])
-
   const { height } = useWindowDimensions()
-
   const insets = useSafeAreaInsets()
   const [nextHeight, setNextHeight] = useState(height - insets.top)
   useEffect(() => {
     const sub = [
       Keyboard.addListener("keyboardDidShow", () => {
         const metrics = Keyboard.metrics()
-
         if (!metrics) return
         setNextHeight(height - metrics.height)
       }),
@@ -112,9 +100,7 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
     ]
     return () => sub.forEach((listener) => listener.remove())
   }, [height, insets.top])
-
   if (!componentRender) return null
-
   return (
     <FullWindowOverlay>
       <Animated.View
@@ -130,22 +116,31 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
       <View className={"flex-1"}>
         {/* Window */}
 
-        <View style={{ height: nextHeight }} className="pt-safe items-center justify-center">
+        <View
+          style={{
+            height: nextHeight,
+          }}
+          className="pt-safe items-center justify-center"
+        >
           <Animated.View
-            className="bg-system-background mx-5 overflow-hidden rounded-3xl"
+            className="mx-5 overflow-hidden rounded-3xl bg-system-background"
             style={[
               styles.window,
               {
-                transform: [{ scale: windowScale }],
+                transform: [
+                  {
+                    scale: windowScale,
+                  },
+                ],
                 opacity: windowOpacity,
               },
             ]}
           >
             <View className="px-6 pb-1 pt-6">
-              <Text className="text-label mb-1 text-center text-lg font-medium">
+              <Text className="mb-1 text-center text-lg font-medium text-label">
                 Verification Required
               </Text>
-              <Text className="text-secondary-label text-center text-base">
+              <Text className="text-center text-base text-secondary-label">
                 Please enter the code from your authenticator app.
               </Text>
             </View>
@@ -158,13 +153,17 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
                 autoFocus
                 focusColor={"#00000000"}
                 theme={{
-                  containerStyle: { marginVertical: 8 },
+                  containerStyle: {
+                    marginVertical: 8,
+                  },
                   pinCodeTextStyle: {
                     color: label,
                     fontSize: 22,
                     fontWeight: "500",
                   },
-                  placeholderTextStyle: { color: tertiaryLabel },
+                  placeholderTextStyle: {
+                    color: tertiaryLabel,
+                  },
                   filledPinCodeContainerStyle: {
                     borderColor: "transparent",
                     backgroundColor: secondaryBackground,
@@ -184,16 +183,18 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
                 }}
                 onFilled={(code) => {
                   if (isAuthCodeValid(code)) {
-                    submitMutation.mutate({ code })
+                    submitMutation.mutate({
+                      code,
+                    })
                   }
                 }}
               />
             </View>
 
-            <View className="border-non-opaque-separator border-t-hairline flex-row px-4 py-2">
+            <View className="border-t-hairline flex-row border-non-opaque-separator px-4 py-2">
               <View className="flex-1 items-center">
                 <Text
-                  className="text-accent px-5 py-2 text-base font-medium"
+                  className="px-5 py-2 text-base font-medium text-accent"
                   onPress={() => {
                     setUiShow(false)
                   }}
@@ -209,11 +210,13 @@ export const OTPWindow = <T,>({ onSuccess, verifyFn, onDismiss }: OTPWindowProps
     </FullWindowOverlay>
   )
 }
-
 const styles = StyleSheet.create({
   window: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 5,

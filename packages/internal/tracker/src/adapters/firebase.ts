@@ -1,6 +1,6 @@
 import type { FirebaseAnalyticsTypes } from "@react-native-firebase/analytics"
 
-import { TrackerMapper } from "../points"
+import { TrackerMapper } from "../enums"
 import type { IdentifyPayload, TrackerAdapter, TrackPayload } from "./base"
 
 export interface FirebaseAdapterConfig {
@@ -91,27 +91,9 @@ export class FirebaseAdapter implements TrackerAdapter {
         }
         break
       }
-      case TrackerMapper.BoostSent: {
-        await this.firebaseInstance.logEvent("purchase", {
-          currency: "POWER",
-          value: properties?.amount,
-          items: `feed/${properties?.feedId}`,
-          transaction_id: properties?.transactionId,
-        })
-        break
-      }
       case TrackerMapper.DailyRewardClaimed: {
         await this.firebaseInstance.logEvent("earn_virtual_currency", {
           virtual_currency_name: "POWER",
-        })
-        break
-      }
-      case TrackerMapper.TipSent: {
-        await this.firebaseInstance.logEvent("purchase", {
-          currency: "POWER",
-          value: properties?.amount,
-          items: `entry/${properties?.entryId}`,
-          transaction_id: properties?.transactionId,
         })
         break
       }

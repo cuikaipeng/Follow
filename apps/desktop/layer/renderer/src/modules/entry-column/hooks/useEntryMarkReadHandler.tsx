@@ -1,4 +1,4 @@
-import { views } from "@follow/constants"
+import { getView } from "@follow/constants"
 import { entryActions } from "@follow/store/entry/store"
 import { unreadSyncService } from "@follow/store/unread/store"
 import type { Range } from "@tanstack/react-virtual"
@@ -13,24 +13,27 @@ export const useEntryMarkReadHandler = (entriesIds: string[]) => {
   const scrollMarkUnread = useGeneralSettingKey("scrollMarkUnread")
   const feedView = useRouteParamsSelector((params) => params.view)
 
-  const indexKeyIsCalled = useMemo(() => new Set<string>(), [entriesIds])
+  const processedEntryIds = useMemo(() => new Set<string>(), [entriesIds])
 
   const handleRenderAsRead = useEventCallback(
     ({ startIndex, endIndex }: Range, enabled?: boolean) => {
       if (!enabled) return
-      if (indexKeyIsCalled.has(`${startIndex}-${endIndex}`)) return
       const idSlice = entriesIds?.slice(startIndex, endIndex)
-
-      indexKeyIsCalled.add(`${startIndex}-${endIndex}`)
-
       if (!idSlice) return
 
-      batchMarkRead(idSlice)
+      // Filter out entries that have already been processed
+      const newEntries = idSlice.filter((id) => !processedEntryIds.has(id))
+      if (newEntries.length === 0) return
+
+      // Mark these entries as processed to avoid duplicate processing
+      newEntries.forEach((id) => processedEntryIds.add(id))
+
+      batchMarkRead(newEntries)
     },
   )
 
   return useMemo(() => {
-    if (views[feedView]!.wideMode && renderAsRead) {
+    if (getView(feedView)?.wideMode && renderAsRead) {
       return handleRenderAsRead
     }
 

@@ -11,7 +11,7 @@ import { titleCase } from "title-case"
 
 import { AudioPlayer, useAudioPlayerAtomSelector } from "~/atoms/player"
 import { useGeneralSettingKey } from "~/atoms/settings/general"
-import { useRealInWideMode, useUISettingKey } from "~/atoms/settings/ui"
+import { useUISettingKey } from "~/atoms/settings/ui"
 import { RelativeTime } from "~/components/ui/datetime"
 import { Media } from "~/components/ui/media/Media"
 import { FEED_COLLECTION_LIST } from "~/constants"
@@ -27,8 +27,8 @@ import { StarIcon } from "../star-icon"
 import type { UniversalItemProps } from "../types"
 
 const entrySelector = (state: EntryModel) => {
-  const { feedId, inboxHandle, read } = state
-  const { authorAvatar, authorUrl, description, publishedAt, title } = state
+  /// keep-sorted
+  const { authorAvatar, authorUrl, description, feedId, inboxHandle, publishedAt, title } = state
 
   const audios = state.attachments?.filter((a) => a.mime_type?.startsWith("audio") && a.url)
   const firstAudio = audios?.[0]
@@ -36,26 +36,24 @@ const entrySelector = (state: EntryModel) => {
   const firstMedia = media?.[0]
   const photo = media.find((a) => a.type === "photo")
   const firstPhotoUrl = photo?.url
-  const iconEntry: FeedIconEntry = { firstPhotoUrl, authorAvatar }
 
-  const titleEntry = { authorUrl }
-
+  /// keep-sorted
   return {
+    authorAvatar,
+    authorUrl,
     description,
     feedId,
     firstAudio,
     firstMedia,
-    iconEntry,
+    firstPhotoUrl,
     inboxId: inboxHandle,
     publishedAt,
-    read,
     title,
-    titleEntry,
   }
 }
+
 export function ListItem({
   entryId,
-  entryPreview,
   translation,
   simple,
 }: UniversalItemProps & {
@@ -67,39 +65,58 @@ export function ListItem({
   const isInCollection = useIsEntryStarred(entryId)
   const collectionCreatedAt = useCollectionEntry(entryId)?.createdAt
 
-  const isRead = useEntryIsRead(entry)
+  const isRead = useEntryIsRead(entryId)
 
   const inInCollection = useRouteParamsSelector((s) => s.feedId === FEED_COLLECTION_LIST)
 
-  const feed =
-    useFeedById(entry?.feedId, (feed) => {
-      return {
-        type: feed.type,
-        ownerUserId: feed.ownerUserId,
-        id: feed.id,
-        title: feed.title,
-        url: (feed as any).url || "",
-        image: feed.image,
-        siteUrl: feed.siteUrl,
-      }
-    }) || entryPreview?.feeds
+  const feed = useFeedById(entry?.feedId, (feed) => {
+    return {
+      type: feed.type,
+      ownerUserId: feed.ownerUserId,
+      id: feed.id,
+      title: feed.title,
+      url: (feed as any).url || "",
+      image: feed.image,
+      siteUrl: feed.siteUrl,
+    }
+  })
 
   const inbox = useInboxById(entry?.inboxId)
 
-  const settingWideMode = useRealInWideMode()
   const thumbnailRatio = useUISettingKey("thumbnailRatio")
   const rid = `list-item-${entryId}`
 
   const bilingual = useGeneralSettingKey("translationMode") === "bilingual"
+
+  const iconEntry: FeedIconEntry = useMemo(
+    () => ({
+      firstPhotoUrl: entry?.firstPhotoUrl,
+      authorAvatar: entry?.authorAvatar,
+    }),
+    [entry?.firstPhotoUrl, entry?.authorAvatar],
+  )
+
+  const titleEntry = useMemo(
+    () => ({
+      authorUrl: entry?.authorUrl,
+    }),
+    [entry?.authorUrl],
+  )
+
   const lineClamp = useMemo(() => {
     const envIsSafari = isSafari()
-    let lineClampTitle = settingWideMode ? 1 : 2
-    let lineClampDescription = settingWideMode ? 1 : 2
+    let lineClampTitle = 1
+    let lineClampDescription = 2
 
-    if (translation?.title && !simple && bilingual) {
+    if (translation?.title && translation?.title !== entry?.title && !simple && bilingual) {
       lineClampTitle += 1
     }
-    if (translation?.description && !simple && bilingual) {
+    if (
+      translation?.description &&
+      translation?.description !== entry?.description &&
+      !simple &&
+      bilingual
+    ) {
       lineClampDescription += 1
     }
 
@@ -111,8 +128,16 @@ export function ListItem({
       title: envIsSafari ? `line-clamp-[${lineClampTitle}]` : "",
       description: envIsSafari ? `line-clamp-[${lineClampDescription}]` : "",
     }
-  }, [settingWideMode, simple, translation?.description, translation?.title, bilingual])
+  }, [
+    simple,
+    translation?.description,
+    translation?.title,
+    entry?.description,
+    entry?.title,
+    bilingual,
+  ])
 
+  const dimRead = useGeneralSettingKey("dimRead")
   // NOTE: prevent 0 height element, react virtuoso will not stop render any more
   if (!entry || !(feed || inbox)) return null
 
@@ -127,8 +152,8 @@ export function ListItem({
   // calculate the max width to have a correct truncation
   // FIXME: this is not easy to maintain, need to refactor
   const feedIconWidth = 20 + marginWidth
-  const audioCoverWidth = settingWideMode ? 65 : 80 + marginWidth
-  const mediaWidth = (settingWideMode ? 48 : 80) * (isMobile ? 1.125 : 1) + marginWidth
+  const audioCoverWidth = 80 + marginWidth
+  const mediaWidth = 80 * (isMobile ? 1.125 : 1) + marginWidth
 
   let savedWidth = 0
 
@@ -144,15 +169,14 @@ export function ListItem({
   return (
     <div
       className={cn(
-        "cursor-menu group relative flex pl-3 pr-2",
+        "group relative flex cursor-menu py-3",
         !isRead &&
-          "before:bg-accent before:absolute before:-left-0.5 before:top-[1.4375rem] before:block before:size-2 before:rounded-full",
-        settingWideMode ? "py-3" : "py-4",
+          "before:absolute before:-left-3 before:top-5 before:block before:size-2 before:rounded-full before:bg-accent",
       )}
     >
-      <FeedIcon feed={related} fallback entry={entry?.iconEntry} />
+      <FeedIcon target={related} fallback entry={iconEntry} size={24} />
       <div
-        className={cn("-mt-0.5 flex-1 text-sm leading-tight", lineClamp.global)}
+        className={cn("-mt-0.5 ml-1 h-fit flex-1 text-sm leading-tight", lineClamp.global)}
         style={{
           maxWidth: `calc(100% - ${savedWidth}px)`,
         }}
@@ -162,12 +186,13 @@ export function ListItem({
             "flex gap-1 text-[10px] font-bold",
             "text-text-secondary",
             isInCollection && "text-text-secondary",
+            isRead && dimRead && "text-text-tertiary",
           )}
         >
           <EllipsisHorizontalTextWithTooltip className="truncate">
             <FeedTitle
               feed={related}
-              title={getPreferredTitle(related, entry?.titleEntry)}
+              title={getPreferredTitle(related, titleEntry)}
               className="space-x-0.5"
             />
           </EllipsisHorizontalTextWithTooltip>
@@ -180,17 +205,18 @@ export function ListItem({
             "text-text",
             !!isInCollection && "pr-5",
             entry?.title ? "font-medium" : "text-[13px]",
+            isRead && dimRead && "text-text-secondary",
           )}
         >
           {entry?.title ? (
             <EntryTranslation
-              className={cn("hyphens-auto font-medium", lineClamp.title)}
+              className={cn("autospace-normal hyphens-auto font-medium", lineClamp.title)}
               source={titleCase(entry?.title ?? "")}
               target={titleCase(translation?.title ?? "")}
             />
           ) : (
             <EntryTranslation
-              className={cn("hyphens-auto", lineClamp.description)}
+              className={cn("autospace-normal hyphens-auto", lineClamp.description)}
               source={entry?.description}
               target={translation?.description}
             />
@@ -198,9 +224,15 @@ export function ListItem({
           {!!isInCollection && <StarIcon className="absolute right-0 top-0" />}
         </div>
         {!simple && (
-          <div className={cn("text-[13px]", "text-text-secondary")}>
+          <div
+            className={cn(
+              "text-[13px]",
+              "text-text-secondary",
+              isRead && dimRead && "text-text-tertiary",
+            )}
+          >
             <EntryTranslation
-              className={cn("hyphens-auto", lineClamp.description)}
+              className={cn("autospace-normal hyphens-auto", lineClamp.description)}
               source={entry?.description}
               target={translation?.description}
             />
@@ -217,17 +249,11 @@ export function ListItem({
             <FeedIcon
               fallback={true}
               fallbackElement={
-                <div
-                  className={clsx(
-                    "bg-material-ultra-thick",
-                    settingWideMode ? "size-[65px]" : "size-[80px]",
-                    "rounded",
-                  )}
-                />
+                <div className={clsx("bg-material-ultra-thick", "size-[80px]", "rounded")} />
               }
-              feed={feed || inbox}
-              entry={entry?.iconEntry}
-              size={settingWideMode ? 65 : 80}
+              target={feed || inbox}
+              entry={iconEntry}
+              size={80}
               className="m-0 rounded"
               useMedia
               noMargin
@@ -242,10 +268,7 @@ export function ListItem({
           src={entry.firstMedia.url}
           type={entry.firstMedia.type}
           previewImageUrl={entry.firstMedia.preview_image_url}
-          className={cn(
-            "center ml-2 flex shrink-0 rounded",
-            settingWideMode ? "size-12" : "size-20",
-          )}
+          className={cn("center ml-2 flex shrink-0 rounded", "size-20")}
           mediaContainerClassName={"w-auto h-auto rounded"}
           loading="lazy"
           key={`${rid}-media-${thumbnailRatio}`}
@@ -278,11 +301,17 @@ function AudioCover({
     playerValue.src === src && playerValue.show ? playerValue.status : false,
   )
 
+  const language = useGeneralSettingKey("language")
+  const isChinese = useMemo(() => {
+    return language === "zh-CN"
+  }, [language])
+
   const seconds = formatTimeToSeconds(durationInSeconds)
   const estimatedMins = seconds && Math.floor(seconds / 60)
 
   const handleClickPlay = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isMobile) e.stopPropagation()
+    e.stopPropagation()
+    e.preventDefault()
     if (!playStatus) {
       // switch this to play
       AudioPlayer.mount({
@@ -303,14 +332,14 @@ function AudioCover({
 
       <div
         className={cn(
-          "center absolute inset-0 w-full transition-all duration-200 ease-in-out group-hover:-translate-y-2 group-hover:opacity-100",
-          playStatus || isMobile ? "-translate-y-2 opacity-100" : "opacity-0",
+          "center absolute inset-0 w-full transition-all duration-200 ease-in-out group-hover:opacity-100",
+          playStatus || isMobile ? "opacity-100" : "opacity-0",
         )}
         onClick={handleClickPlay}
       >
         <button
           type="button"
-          className="center bg-material-opaque hover:bg-accent size-10 rounded-full opacity-95 hover:text-white hover:opacity-100"
+          className="center size-10 rounded-full bg-material-opaque opacity-95 hover:bg-accent hover:text-white hover:opacity-100"
         >
           <i
             className={cn("size-6", {
@@ -326,17 +355,17 @@ function AudioCover({
         <div className="absolute bottom-0 w-full overflow-hidden rounded-b-sm text-center">
           <div
             className={cn(
-              "bg-material-ultra-thick absolute left-0 top-0 size-full opacity-0 duration-200 group-hover:opacity-100",
+              "absolute left-0 top-0 size-full bg-material-ultra-thick opacity-0 duration-200 group-hover:opacity-100",
               isMobile && "opacity-100",
             )}
           />
           <div
             className={cn(
-              "group-hover:backdrop-blur-background text-body opacity-0 backdrop-blur-none duration-200 group-hover:opacity-100",
-              isMobile && "backdrop-blur-background opacity-100",
+              "text-body opacity-0 backdrop-blur-none duration-200 group-hover:opacity-100 group-hover:backdrop-blur-background",
+              isMobile && "opacity-100 backdrop-blur-background",
             )}
           >
-            {formatEstimatedMins(estimatedMins)}
+            {isChinese ? `${estimatedMins} 分钟` : formatEstimatedMins(estimatedMins)}
           </div>
         </div>
       )}

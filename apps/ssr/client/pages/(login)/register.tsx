@@ -1,4 +1,6 @@
+import { useServerConfigs } from "@client/atoms/server-configs"
 import { loginHandler, signUp } from "@client/lib/auth"
+import { ReferralForm } from "@client/modules/referral"
 import { useAuthProviders } from "@client/query/users"
 import { Logo } from "@follow/components/icons/logo.jsx"
 import { Button, MotionButtonBase } from "@follow/components/ui/button/index.jsx"
@@ -19,6 +21,7 @@ import { cn } from "@follow/utils/utils"
 import HCaptcha from "@hcaptcha/react-hcaptcha"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRef, useState } from "react"
+import * as React from "react"
 import { useForm } from "react-hook-form"
 import { Trans, useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -46,6 +49,7 @@ const formSchema = z
   })
 
 function RegisterForm() {
+  const serverConfigs = useServerConfigs()
   const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
@@ -101,7 +105,7 @@ function RegisterForm() {
 
   return (
     <div className="relative min-w-80">
-      <h1 className="mb-6 text-center text-2xl">
+      <h1 className="mb-8 text-center text-3xl">
         {t("login.signUpTo")} <b>{` ${APP_NAME}`}</b>
       </h1>
       {isEmail ? (
@@ -146,6 +150,7 @@ function RegisterForm() {
                 </FormItem>
               )}
             />
+            {serverConfigs?.REFERRAL_ENABLED && <ReferralForm align="left" />}
             <HCaptcha ref={captchaRef} sitekey={env.VITE_HCAPTCHA_SITE_KEY} size="invisible" />
             <Button
               isLoading={isSubmitting}
@@ -170,7 +175,7 @@ function RegisterForm() {
                   loginHandler(key, "app")
                 }
               }}
-              className="center hover:bg-material-medium relative w-full gap-2 rounded-xl border p-2.5 pl-5 font-semibold duration-200"
+              className="center relative w-full gap-2 rounded-xl border p-2.5 pl-5 font-semibold duration-200 hover:bg-material-medium"
             >
               <img
                 className={cn(
@@ -182,6 +187,7 @@ function RegisterForm() {
               <span>{t("login.continueWith", { provider: provider.name })}</span>
             </MotionButtonBase>
           ))}
+          {serverConfigs?.REFERRAL_ENABLED && <ReferralForm />}
         </div>
       )}
       <Divider className="my-7" />

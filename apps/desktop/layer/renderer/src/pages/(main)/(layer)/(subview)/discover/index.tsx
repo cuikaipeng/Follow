@@ -1,13 +1,14 @@
 import { Divider } from "@follow/components/ui/divider/Divider.js"
+import { useScrollElementUpdate } from "@follow/components/ui/scroll-area/hooks.js"
 import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@follow/components/ui/tabs/index.jsx"
 import { UserRole } from "@follow/constants"
+import { useUserRole } from "@follow/store/user/hooks"
 import { cn } from "@follow/utils/utils"
 import { createElement } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
-import { useUserRole } from "~/atoms/user"
 import { AppErrorBoundary } from "~/components/common/AppErrorBoundary"
 import { ErrorComponentType } from "~/components/errors/enum"
 import { useActivationModal } from "~/modules/activation"
@@ -63,9 +64,10 @@ export function Component() {
 
   const presentActivationModal = useActivationModal()
   const role = useUserRole()
+  const { onUpdateMaxScroll } = useScrollElementUpdate()
 
   const currentTabs = tabs.map((tab) => {
-    const disabled = tab.disableForTrial && role === UserRole.Trial
+    const disabled = tab.disableForTrial && (role === UserRole.Free || role === UserRole.Trial)
     return {
       ...tab,
       disabled,
@@ -76,7 +78,7 @@ export function Component() {
     <div className="flex size-full flex-col px-6 py-8">
       {/* Simple Header */}
       <div className="mx-auto mb-8 max-w-6xl text-center">
-        <h1 className="text-text mb-4 text-3xl font-bold">{t("words.discover")}</h1>
+        <h1 className="mb-4 text-3xl font-bold text-text">{t("words.discover")}</h1>
       </div>
 
       <div className="mx-auto w-full max-w-6xl">
@@ -86,6 +88,7 @@ export function Component() {
             setSearch(
               (search) => {
                 search.set("type", val)
+                search.delete("keyword")
                 return new URLSearchParams(search)
               },
               { replace: true },
@@ -105,6 +108,8 @@ export function Component() {
                     onClick={() => {
                       if (tab.disabled) {
                         presentActivationModal()
+                      } else {
+                        onUpdateMaxScroll?.()
                       }
                     }}
                   >
@@ -134,14 +139,14 @@ export function Component() {
           <Divider />
 
           <div>
-            <h2 className="text-text mb-6 text-center text-xl font-semibold">Trending</h2>
+            <h2 className="mb-6 text-center text-xl font-semibold text-text">Trending</h2>
             <Trending center />
           </div>
 
           <Divider />
 
           <div>
-            <h2 className="text-text mb-6 text-center text-xl font-semibold">Recommendations</h2>
+            <h2 className="mb-6 text-center text-xl font-semibold text-text">Recommendations</h2>
             <AppErrorBoundary errorType={ErrorComponentType.RSSHubDiscoverError}>
               <Recommendations />
             </AppErrorBoundary>

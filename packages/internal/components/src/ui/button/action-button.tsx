@@ -11,21 +11,20 @@ import type { Options } from "react-hotkeys-hook"
 import { useHotkeys } from "react-hotkeys-hook"
 
 import { KbdCombined } from "../kbd/Kbd"
-import { Tooltip, TooltipContent, TooltipPortal, TooltipRoot, TooltipTrigger } from "../tooltip"
+import { Tooltip, TooltipContent, TooltipPortal, TooltipTrigger } from "../tooltip"
 
 export interface ActionButtonProps {
   icon?: React.ReactNode | ((props: { isActive?: boolean; className: string }) => React.ReactNode)
   tooltip?: React.ReactNode
   tooltipDescription?: React.ReactNode
   tooltipSide?: "top" | "bottom"
-  tooltipDefaultOpen?: boolean
   active?: boolean
   disabled?: boolean
   clickableDisabled?: boolean
   shortcut?: string
   disableTriggerShortcut?: boolean
   enableHoverableContent?: boolean
-  size?: "sm" | "base" | "lg"
+  size?: "xs" | "sm" | "base" | "lg"
   id?: string
   /**
    * Use motion effects to prompt and guide users to pay attention or click this button
@@ -47,7 +46,8 @@ const actionButtonStyleVariant = {
   size: {
     lg: tw`text-xl size-10`,
     base: tw`text-xl size-8`,
-    sm: tw`text-sm size-6`,
+    sm: tw`text-lg size-7`,
+    xs: tw`text-base size-[1.3rem]`,
   },
 }
 
@@ -59,7 +59,6 @@ export const ActionButton = ({
   tooltipDescription,
   className,
   tooltipSide,
-  tooltipDefaultOpen,
   highlightMotion,
   children,
   active,
@@ -172,29 +171,24 @@ export const ActionButton = ({
       )}
       {tooltip ? (
         <Tooltip disableHoverableContent={!enableHoverableContent}>
-          <TooltipRoot defaultOpen={tooltipDefaultOpen} key={id}>
-            <TooltipTrigger aria-label={typeof tooltip === "string" ? tooltip : undefined} asChild>
-              {Trigger}
-            </TooltipTrigger>
-            <TooltipPortal>
-              <TooltipContent
-                className="max-w-[300px] flex-col gap-1"
-                side={tooltipSide ?? "bottom"}
-              >
-                <div className="flex items-center gap-1">
-                  {tooltip}
-                  {!!finalShortcut && (
-                    <div className="ml-1">
-                      <KbdCombined className="text-text">{finalShortcut}</KbdCombined>
-                    </div>
-                  )}
-                </div>
-                {tooltipDescription ? (
-                  <div className="text-text-secondary text-body">{tooltipDescription}</div>
-                ) : null}
-              </TooltipContent>
-            </TooltipPortal>
-          </TooltipRoot>
+          <TooltipTrigger aria-label={typeof tooltip === "string" ? tooltip : undefined} asChild>
+            {Trigger}
+          </TooltipTrigger>
+          <TooltipPortal>
+            <TooltipContent className="max-w-[300px] flex-col gap-1" side={tooltipSide ?? "bottom"}>
+              <div className="flex items-center gap-1">
+                {tooltip}
+                {!!finalShortcut && (
+                  <div className="ml-1">
+                    <KbdCombined className="text-text">{finalShortcut}</KbdCombined>
+                  </div>
+                )}
+              </div>
+              {tooltipDescription ? (
+                <div className="text-text-secondary text-body">{tooltipDescription}</div>
+              ) : null}
+            </TooltipContent>
+          </TooltipPortal>
         </Tooltip>
       ) : (
         Trigger

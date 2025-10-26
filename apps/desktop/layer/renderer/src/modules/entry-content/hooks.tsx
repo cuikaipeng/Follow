@@ -5,10 +5,10 @@ import { createElement, useCallback, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
+import { useShowAITranslation } from "~/atoms/ai-translation"
 import { useEntryIsInReadability, useEntryIsInReadabilitySuccess } from "~/atoms/readability"
-import { useActionLanguage, useGeneralSettingKey } from "~/atoms/settings/general"
+import { useActionLanguage } from "~/atoms/settings/general"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
-import { checkLanguage } from "~/lib/translate"
 
 import { ImageGalleryContent } from "./components/ImageGalleryContent"
 
@@ -46,13 +46,16 @@ export const useEntryContent = (entryId: string) => {
   const isInReadabilityMode = useEntryIsInReadability(entryId)
   const isReadabilitySuccess = useEntryIsInReadabilitySuccess(entryId)
 
+  const enableTranslation = useShowAITranslation()
   const actionLanguage = useActionLanguage()
-  const enableTranslation = useGeneralSettingKey("translation")
-  const contentTranslated = useEntryTranslation(entryId, actionLanguage)
+  const contentTranslated = useEntryTranslation({
+    entryId,
+    language: actionLanguage,
+    enabled: enableTranslation,
+  })
   usePrefetchEntryTranslation({
     entryIds: [entryId],
-    checkLanguage,
-    translation: enableTranslation,
+    enabled: enableTranslation,
     language: actionLanguage,
     withContent: true,
     target: isReadabilitySuccess ? "readabilityContent" : "content",

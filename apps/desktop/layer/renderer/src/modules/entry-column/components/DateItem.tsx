@@ -4,14 +4,15 @@ import { useIsListSubscription } from "@follow/store/subscription/hooks"
 import { stopPropagation } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
 import type { FC, PropsWithChildren } from "react"
-import { memo, useCallback, useMemo, useRef, useState } from "react"
+import { memo, useMemo, useRef, useState } from "react"
 import { Trans } from "react-i18next"
 import { useDebounceCallback } from "usehooks-ts"
 
 import { SafeFragment } from "~/components/common/Fragment"
 import { RelativeDay } from "~/components/ui/datetime"
 import { IconScaleTransition } from "~/components/ux/transition/icon"
-import { useRouteParams } from "~/hooks/biz/useRouteParams"
+import { getRouteParams, useRouteParams } from "~/hooks/biz/useRouteParams"
+import { useShowEntryDetailsColumn } from "~/hooks/biz/useShowEntryDetailsColumn"
 
 import { markAllByRoute } from "../hooks/useMarkAll"
 
@@ -39,9 +40,11 @@ const useParseDate = (date: string) =>
     }
   }, [date])
 
-const dateItemclassName = tw`relative flex items-center text-sm lg:text-base gap-1 bg-background px-4 font-bold text-text h-7`
+const dateItemclassName = tw`relative flex items-center text-sm lg:text-base gap-1 px-3 font-bold text-text h-9`
 export const DateItem = memo(({ date, view, isSticky }: DateItemProps) => {
-  if (view === FeedViewType.SocialMedia) {
+  const showEntryDetailsColumn = useShowEntryDetailsColumn()
+
+  if (view === FeedViewType.SocialMedia || !showEntryDetailsColumn) {
     return <SocialMediaDateItem date={date} className={dateItemclassName} isSticky={isSticky} />
   }
   return <UniversalDateItem date={date} className={dateItemclassName} isSticky={isSticky} />
@@ -92,7 +95,11 @@ const DateItemInner: FC<DateItemInnerProps> = ({
   )
   return (
     <div
-      className={cn(className, isSticky && "border-b")}
+      className={cn(
+        className,
+        "border-b border-transparent bg-background",
+        isSticky && "border-border",
+      )}
       onClick={stopPropagation}
       onMouseEnter={removeConfirm.cancel}
       onMouseLeave={removeConfirm}
@@ -112,7 +119,7 @@ const DateItemInner: FC<DateItemInnerProps> = ({
           onClick={() => {
             if (confirmMark) {
               clearTimeout(timerRef.current)
-              markAllByRoute({
+              markAllByRoute(getRouteParams(), {
                 startTime,
                 endTime,
               })
@@ -159,14 +166,14 @@ const SocialMediaDateItem = ({
 
   return (
     <DateItemInner
-      // @ts-expect-error
-      Wrapper={useCallback(
-        ({ children }) => (
-          <div className="m-auto flex w-[645px] max-w-full select-none gap-3 pl-5 text-base lg:text-lg">
-            {children}
-          </div>
-        ),
-        [],
+      Wrapper={({ children }) => (
+        <div
+          className={cn(
+            "m-auto flex w-full max-w-[645px] select-none gap-3 pl-2 text-base lg:text-lg",
+          )}
+        >
+          {children}
+        </div>
       )}
       className={className}
       date={dateObj}

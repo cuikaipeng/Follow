@@ -1,13 +1,14 @@
 import { useUnreadByIds } from "@follow/store/unread/hooks"
 import { cn } from "@follow/utils"
 import { memo, useState } from "react"
-import { Text, View } from "react-native"
+import { View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 import { GROUPED_LIST_MARGIN } from "@/src/components/ui/grouped/constants"
 import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { NativePressable } from "@/src/components/ui/pressable/NativePressable"
+import { Text } from "@/src/components/ui/typography/Text"
 import { RightCuteFiIcon } from "@/src/icons/right_cute_fi"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { selectFeed } from "@/src/modules/screen/atoms"
@@ -37,16 +38,22 @@ export const CategoryGrouped = memo(
     const rotateSharedValue = useSharedValue(0)
     const rotateStyle = useAnimatedStyle(() => {
       return {
-        transform: [{ rotate: `${rotateSharedValue.value}deg` }],
+        transform: [
+          {
+            rotate: `${rotateSharedValue.value}deg`,
+          },
+        ],
       }
     }, [rotateSharedValue])
-
     const secondaryLabelColor = useColor("label")
     const navigation = useNavigation()
-
     return (
       <>
-        <View style={{ marginHorizontal: GROUPED_LIST_MARGIN }}>
+        <View
+          style={{
+            marginHorizontal: GROUPED_LIST_MARGIN,
+          }}
+        >
           <SubscriptionFeedCategoryContextMenu
             feedIds={subscriptionIds}
             category={category}
@@ -59,7 +66,6 @@ export const CategoryGrouped = memo(
                   type: "category",
                   categoryName: category,
                 })
-
                 navigation.pushControllerView(FeedScreen, {
                   feedId: category,
                 })
@@ -81,8 +87,8 @@ export const CategoryGrouped = memo(
                   <RightCuteFiIcon color={secondaryLabelColor} height={14} width={14} />
                 </Animated.View>
               </NativePressable>
-              <Text className="text-text ml-4 font-medium">{category}</Text>
-              <UnreadCount unread={unreadCounts} className="text-secondary-label ml-auto text-xs" />
+              <Text className="ml-4 font-medium text-text">{category}</Text>
+              <UnreadCount unread={unreadCounts} className="ml-auto text-xs text-secondary-label" />
             </ItemPressable>
           </SubscriptionFeedCategoryContextMenu>
         </View>
@@ -98,5 +104,4 @@ export const CategoryGrouped = memo(
     )
   },
 )
-
 CategoryGrouped.displayName = "CategoryGrouped"

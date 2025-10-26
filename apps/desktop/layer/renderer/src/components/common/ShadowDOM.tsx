@@ -1,17 +1,30 @@
 import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.js"
 import { useIsDark } from "@follow/hooks"
+import { getAccentColorValue } from "@follow/shared/settings/constants"
+import { hexToHslString } from "@follow/utils"
 import { nanoid } from "nanoid"
 import type { FC, PropsWithChildren, ReactNode } from "react"
-import { createContext, createElement, use, useLayoutEffect, useMemo, useState } from "react"
+import {
+  createContext,
+  createElement,
+  use,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import root from "react-shadow"
 
 import { useUISettingKeys } from "~/atoms/settings/ui"
 import { useReduceMotion } from "~/hooks/biz/useReduceMotion"
+import type { TextSelectionEvent } from "~/lib/simple-text-selection"
+import { addTextSelectionListener } from "~/lib/simple-text-selection"
 
 const ShadowDOMContext = createContext(false)
 
 const weakMapElementKey = new WeakMap<HTMLStyleElement | HTMLLinkElement, string>()
-const cloneStylesElement = (_mutationRecord?: MutationRecord) => {
+const cloneStylesElement = () => {
   const $styles = document.head.querySelectorAll("style").values()
   const reactNodes = [] as ReactNode[]
 
@@ -55,22 +68,39 @@ const cloneStylesElement = (_mutationRecord?: MutationRecord) => {
 export const ShadowDOM: FC<
   PropsWithChildren<React.HTMLProps<HTMLElement>> & {
     injectHostStyles?: boolean
+    textSelectionEnabled?: boolean
+    onTextSelect?: (event: TextSelectionEvent) => void
+    onSelectionClear?: () => void
   }
 > & {
   useIsShadowDOM: () => boolean
 } = (props) => {
-  const { injectHostStyles = true, ...rest } = props
+  const {
+    injectHostStyles = true,
+    textSelectionEnabled = false,
+    onTextSelect,
+    onSelectionClear,
+    ...rest
+  } = props
 
   const [stylesElements, setStylesElements] = useState<ReactNode[]>(() =>
     injectHostStyles ? cloneStylesElement() : [],
   )
 
+  const shadowRootRef = useRef<ShadowRoot | null>(null)
+
+  useLayoutEffect(() => {
+    if (!textSelectionEnabled || !shadowRootRef.current || !onTextSelect) return
+
+    const cleanup = addTextSelectionListener(shadowRootRef.current, onTextSelect, onSelectionClear)
+
+    return cleanup
+  }, [textSelectionEnabled, onTextSelect, onSelectionClear])
+
   useLayoutEffect(() => {
     if (!injectHostStyles) return
-    const mutationObserver = new MutationObserver((e) => {
-      const event = e[0]
-
-      setStylesElements(cloneStylesElement(event))
+    const mutationObserver = new MutationObserver(() => {
+      setStylesElements(cloneStylesElement())
     })
     mutationObserver.observe(document.head, {
       childList: true,
@@ -85,19 +115,31 @@ export const ShadowDOM: FC<
   const dark = useIsDark()
 
   const reduceMotion = useReduceMotion()
-  const [uiFont, usePointerCursor] = useUISettingKeys(["uiFontFamily", "usePointerCursor"])
+  const [uiFont, usePointerCursor, accentColor] = useUISettingKeys([
+    "uiFontFamily",
+    "usePointerCursor",
+    "accentColor",
+  ])
 
   return (
     // @ts-expect-error
-    <root.div {...rest}>
+    <root.div
+      {...rest}
+      ref={useCallback((element) => {
+        if (element) {
+          shadowRootRef.current = element.shadowRoot
+        }
+      }, [])}
+    >
       <ShadowDOMContext value={true}>
         <div
           style={useMemo(
             () => ({
               fontFamily: `${uiFont},"SN Pro", system-ui, sans-serif`,
               "--pointer": usePointerCursor ? "pointer" : "default",
+              "--fo-a": hexToHslString(getAccentColorValue(accentColor)[dark ? "dark" : "light"]),
             }),
-            [uiFont, usePointerCursor],
+            [uiFont, usePointerCursor, accentColor, dark],
           )}
           id="shadow-html"
           data-motion-reduce={reduceMotion}

@@ -1,5 +1,5 @@
-import { useMobile } from "@follow/components/hooks/useMobile.js"
 import {
+  MasonryForceRerenderContext,
   MasonryIntersectionContext,
   MasonryItemsAspectRatioContext,
   MasonryItemsAspectRatioSetterContext,
@@ -31,10 +31,11 @@ import {
 import { useEventCallback } from "usehooks-ts"
 
 import { useActionLanguage, useGeneralSettingKey } from "~/atoms/settings/general"
+import { useUISettingKey } from "~/atoms/settings/ui"
 import { MediaContainerWidthProvider } from "~/components/ui/media/MediaContainerWidthProvider"
+import type { StoreImageType } from "~/store/image"
 import { imageActions } from "~/store/image"
 
-import { getMasonryColumnValue, setMasonryColumnValue, useMasonryColumnValue } from "../atoms"
 import { batchMarkRead } from "../hooks/useEntryMarkReadHandler"
 import { PictureWaterFallItem } from "./picture-item"
 
@@ -47,13 +48,13 @@ const gutter = 24
 
 export const PictureMasonry: FC<MasonryProps> = (props) => {
   const { data } = props
-  const isMobile = useMobile()
   const cacheMap = useState(() => new Map<string, object>())[0]
   const [isInitDim, setIsInitDim] = useState(false)
   const [isInitLayout, setIsInitLayout] = useState(false)
   const deferIsInitLayout = useDeferredValue(isInitLayout)
   const restoreDimensions = useEventCallback(async () => {
     const images = [] as string[]
+
     data.forEach((entryId) => {
       const entry = getEntry(entryId)
       if (!entry) return
@@ -68,24 +69,34 @@ export const PictureMasonry: FC<MasonryProps> = (props) => {
         setIsInitDim(true)
       })
     })
-  }, [])
+  }, [restoreDimensions])
 
-  const customizeColumn = useMasonryColumnValue()
-  const { containerRef, currentColumn, currentItemWidth, calcItemWidth } = useMasonryColumn(
-    gutter,
-    (column) => {
-      setIsInitLayout(true)
-      if (getMasonryColumnValue() === -1) {
-        setMasonryColumnValue(column)
+  useLayoutEffect(() => {
+    const images: StoreImageType[] = []
+    data.forEach((entryId) => {
+      const entry = getEntry(entryId)
+      if (!entry) return
+
+      if (!entry.media) return
+      for (const media of entry.media) {
+        if (!media.height || !media.width) continue
+
+        images.push({
+          src: media.url,
+          width: media.width,
+          height: media.height,
+          ratio: media.width / media.height,
+        })
       }
-    },
-  )
+    })
+    if (images.length > 0) {
+      imageActions.saveImages(images)
+    }
+  }, [JSON.stringify(data)])
 
-  const finalColumn = customizeColumn !== -1 && !isMobile ? customizeColumn : currentColumn
-  const finalItemWidth = useMemo(
-    () => (customizeColumn !== -1 ? calcItemWidth(finalColumn) : currentItemWidth),
-    [calcItemWidth, currentItemWidth, customizeColumn, finalColumn],
-  )
+  const { containerRef, currentColumn, currentItemWidth } = useMasonryColumn(gutter, () => {
+    setIsInitLayout(true)
+  })
 
   const items = useMemo(() => {
     const result = data.map((entryId) => {
@@ -99,13 +110,14 @@ export const PictureMasonry: FC<MasonryProps> = (props) => {
       return ret
     }) as { entryId: string; cache?: object }[]
 
-    if (props.hasNextPage) {
-      for (let i = 0; i < 10; i++) {
-        result.push({
-          entryId: `placeholder${i}`,
-        })
-      }
-    }
+    // Disable placeholders in waterfall to prevent layout redraws on last page
+    // if (props.hasNextPage) {
+    //   for (let i = 0; i < 10; i++) {
+    //     result.push({
+    //       entryId: `placeholder${i}`,
+    //     })
+    //   }
+    // }
 
     return result
   }, [cacheMap, data, props.hasNextPage])
@@ -211,37 +223,45 @@ export const PictureMasonry: FC<MasonryProps> = (props) => {
     }
   }, [])
 
+  const isImageOnly = useUISettingKey("pictureViewImageOnly")
+  const [masonryForceRerender, setMasonrtForceRerender] = useState(0)
+  useEffect(() => {
+    setMasonrtForceRerender((i) => i + 1)
+  }, [isImageOnly, setMasonrtForceRerender])
+
   return (
-    <div ref={containerRef} className="mx-4 pt-2">
+    <div ref={containerRef} className="mx-4 pt-4">
       {isInitDim && deferIsInitLayout && (
-        <MasonryItemWidthContext value={finalItemWidth}>
+        <MasonryItemWidthContext value={currentItemWidth}>
           {/* eslint-disable-next-line @eslint-react/no-context-provider */}
           <MasonryItemsAspectRatioContext.Provider value={masonryItemsRadio}>
             <MasonryItemsAspectRatioSetterContext value={setMasonryItemsRadio}>
               <MasonryIntersectionContext value={intersectionObserver}>
-                <MediaContainerWidthProvider width={finalItemWidth}>
-                  <FirstScreenReadyContext value={firstScreenReady}>
-                    <Masonry
-                      items={firstScreenReady ? items : items.slice(0, FirstScreenItemCount)}
-                      columnGutter={gutter}
-                      columnWidth={finalItemWidth}
-                      columnCount={finalColumn}
-                      overscanBy={2}
-                      render={MasonryRender}
-                      onRender={handleRender}
-                      itemKey={itemKey}
-                    />
-                    {props.Footer ? (
-                      typeof props.Footer === "function" ? (
-                        <div className="mb-4">
-                          <props.Footer />
-                        </div>
-                      ) : (
-                        <div className="mb-4">{props.Footer}</div>
-                      )
-                    ) : null}
-                  </FirstScreenReadyContext>
-                </MediaContainerWidthProvider>
+                <MasonryForceRerenderContext value={masonryForceRerender}>
+                  <MediaContainerWidthProvider width={currentItemWidth}>
+                    <FirstScreenReadyContext value={firstScreenReady}>
+                      <Masonry
+                        items={firstScreenReady ? items : items.slice(0, FirstScreenItemCount)}
+                        columnGutter={gutter}
+                        columnWidth={currentItemWidth}
+                        columnCount={currentColumn}
+                        overscanBy={2}
+                        render={MasonryRender}
+                        onRender={handleRender}
+                        itemKey={itemKey}
+                      />
+                      {props.Footer ? (
+                        typeof props.Footer === "function" ? (
+                          <div className="mb-4">
+                            <props.Footer />
+                          </div>
+                        ) : (
+                          <div className="mb-4">{props.Footer}</div>
+                        )
+                      ) : null}
+                    </FirstScreenReadyContext>
+                  </MediaContainerWidthProvider>
+                </MasonryForceRerenderContext>
               </MasonryIntersectionContext>
             </MasonryItemsAspectRatioSetterContext>
           </MasonryItemsAspectRatioContext.Provider>
@@ -258,8 +278,13 @@ const MasonryRender: React.ComponentType<
   }>
 > = ({ data, index }) => {
   const firstScreenReady = use(FirstScreenReadyContext)
+  const enableTranslation = useGeneralSettingKey("translation")
   const actionLanguage = useActionLanguage()
-  const translation = useEntryTranslation(data.entryId, actionLanguage)
+  const translation = useEntryTranslation({
+    entryId: data.entryId,
+    language: actionLanguage,
+    enabled: enableTranslation,
+  })
 
   if (data.entryId.startsWith("placeholder")) {
     return <LoadingSkeletonItem />

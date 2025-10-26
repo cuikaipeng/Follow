@@ -1,6 +1,7 @@
-import { views } from "@follow/constants"
+import { FeedViewType, getView } from "@follow/constants"
 import { useCollectionEntryList } from "@follow/store/collection/hooks"
 import {
+  useEntriesQuery,
   useEntryIdsByFeedId,
   useEntryIdsByFeedIds,
   useEntryIdsByInboxId,
@@ -12,16 +13,17 @@ import type { UseEntriesReturn } from "@follow/store/entry/types"
 import { fallbackReturn } from "@follow/store/entry/utils"
 import { useFolderFeedsByFeedId } from "@follow/store/subscription/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
+import { nextFrame } from "@follow/utils"
 import { isBizId } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { debounce } from "es-toolkit/compat"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { ROUTE_FEED_PENDING } from "~/constants/app"
 import { useRouteParams } from "~/hooks/biz/useRouteParams"
 import { useAuthQuery } from "~/hooks/common"
-import { entries, useEntries } from "~/queries/entries"
+import { entries } from "~/queries/entries"
 
 import { useIsPreviewFeed } from "./useIsPreviewFeed"
 
@@ -45,8 +47,11 @@ const useRemoteEntries = (): UseEntriesReturn => {
       inboxId,
       listId,
       view,
-      ...(unreadOnly === true && !isPreview && { read: false }),
-      ...(hidePrivateSubscriptionsInTimeline === true && { excludePrivate: true }),
+      ...(unreadOnly === true && !isPreview && { unreadOnly: true }),
+      ...(hidePrivateSubscriptionsInTimeline === true && {
+        hidePrivateSubscriptionsInTimeline: true,
+      }),
+      ...(view === FeedViewType.All && { limit: 40 }),
     }
 
     if (feedId && listId && isBizId(feedId)) {
@@ -64,7 +69,7 @@ const useRemoteEntries = (): UseEntriesReturn => {
     view,
     hidePrivateSubscriptionsInTimeline,
   ])
-  const query = useEntries(entriesOptions)
+  const query = useEntriesQuery(entriesOptions)
 
   const [fetchedTime, setFetchedTime] = useState<number>()
   useEffect(() => {
@@ -96,18 +101,12 @@ const useRemoteEntries = (): UseEntriesReturn => {
 
   const refetch = useCallback(async () => void query.refetch(), [query])
   const fetchNextPage = useCallback(async () => void query.fetchNextPage(), [query])
-  const entriesIds = useMemo(() => {
-    if (!query.data || query.isLoading || query.isError) {
-      return []
-    }
-    return query.data?.pages?.map((page) => page.data?.map((entry) => entry.entries.id)).flat()
-  }, [query.data, query.isLoading, query.isError])
 
   if (!query.data || query.isLoading) {
     return fallbackReturn
   }
   return {
-    entriesIds,
+    entriesIds: query.entriesIds,
     hasNext: query.hasNextPage,
     hasUpdate,
     refetch,
@@ -120,6 +119,8 @@ const useRemoteEntries = (): UseEntriesReturn => {
     isFetching: query.isFetching,
     hasNextPage: query.hasNextPage,
     error: query.isError ? query.error : null,
+    fetchedTime,
+    queryKey: query.queryKey,
   }
 }
 
@@ -155,15 +156,16 @@ const useLocalEntries = (): UseEntriesReturn => {
   const allEntries = useEntryStore(
     useCallback(
       (state) => {
-        const ids = showEntriesByView
-          ? (entryIdsByView ?? [])
-          : (getEntryIdsFromMultiplePlace(
-              entryIdsByCollections,
-              entryIdsByFeedId,
-              entryIdsByCategory,
-              entryIdsByListId,
-              entryIdsByInboxId,
-            ) ?? [])
+        const ids = isCollection
+          ? entryIdsByCollections
+          : showEntriesByView
+            ? (entryIdsByView ?? [])
+            : (getEntryIdsFromMultiplePlace(
+                entryIdsByFeedId,
+                entryIdsByCategory,
+                entryIdsByListId,
+                entryIdsByInboxId,
+              ) ?? [])
 
         return ids
           .map((id) => {
@@ -183,6 +185,7 @@ const useLocalEntries = (): UseEntriesReturn => {
         entryIdsByInboxId,
         entryIdsByListId,
         entryIdsByView,
+        isCollection,
         showEntriesByView,
         unreadOnly,
       ],
@@ -236,7 +239,7 @@ const useLocalEntries = (): UseEntriesReturn => {
 }
 
 export const useEntriesByView = ({ onReset }: { onReset?: () => void }) => {
-  const { feedId, view, listId } = useRouteParams()
+  const { view, listId } = useRouteParams()
 
   const remoteQuery = useRemoteEntries()
   const localQuery = useLocalEntries()
@@ -253,39 +256,20 @@ export const useEntriesByView = ({ onReset }: { onReset?: () => void }) => {
   const query = remoteQuery.isReady ? remoteQuery : localQuery
   const entryIds: string[] = query.entriesIds
 
-  // in unread only entries only can grow the data, but not shrink
-  // so we memo this previous data to avoid the flicker
-  const prevEntryIdsRef = useRef(entryIds)
-
-  const isFetchingFirstPage = query.isFetching && !query.isFetchingNextPage
+  const isFetchingFirstPage = remoteQuery.isFetching && !remoteQuery.isFetchingNextPage
 
   useEffect(() => {
-    if (!isFetchingFirstPage) {
-      prevEntryIdsRef.current = entryIds
-
-      onReset?.()
+    if (isFetchingFirstPage) {
+      nextFrame(() => {
+        onReset?.()
+      })
     }
-  }, [isFetchingFirstPage])
-
-  const entryIdsAsDeps = entryIds.toString()
-
-  useEffect(() => {
-    prevEntryIdsRef.current = []
-  }, [feedId])
-  useEffect(() => {
-    if (!prevEntryIdsRef.current) {
-      prevEntryIdsRef.current = entryIds
-
-      return
-    }
-    // merge the new entries with the old entries, and unique them
-    const nextIds = [...new Set([...prevEntryIdsRef.current, ...entryIds])]
-    prevEntryIdsRef.current = nextIds
-  }, [entryIdsAsDeps])
+  }, [isFetchingFirstPage, query.queryKey])
 
   const groupByDate = useGeneralSettingKey("groupByDate")
   const groupedCounts: number[] | undefined = useMemo(() => {
-    if (views[view]!.gridMode) {
+    const viewDefinition = getView(view)
+    if (viewDefinition?.gridMode || view === FeedViewType.All) {
       return
     }
     if (!groupByDate) {
@@ -323,6 +307,9 @@ export const useEntriesByView = ({ onReset }: { onReset?: () => void }) => {
     }, [query]),
     entriesIds: entryIds,
     groupedCounts,
+    isFetching: remoteQuery.isFetching,
+    isFetchingNextPage: remoteQuery.isFetchingNextPage,
+    isLoading: remoteQuery.isLoading,
   }
 }
 

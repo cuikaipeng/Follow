@@ -1,23 +1,23 @@
 import { Button } from "@follow/components/ui/button/index.js"
 import { UserRole } from "@follow/constants"
+import { useUserRole } from "@follow/store/user/hooks"
 import { repository } from "@pkg"
 import { useTranslation } from "react-i18next"
 import { useEventCallback } from "usehooks-ts"
 
-import { useUserRole } from "~/atoms/user"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { CustomSafeError } from "~/errors/CustomSafeError"
 
 import { useActivationModal } from "../activation"
+import { InboxTable } from "./Inbox"
 import { InboxForm } from "./InboxForm"
-import { InboxTable } from "./InboxTable"
 
 const useCanCreateMoreInboxAndNotify = () => {
   const role = useUserRole()
   const presentActivationModal = useActivationModal()
 
   return useEventCallback(() => {
-    if (role === UserRole.Trial) {
+    if (role === UserRole.Free || role === UserRole.Trial) {
       const can = false
       if (!can) {
         presentActivationModal()
@@ -44,14 +44,14 @@ export function DiscoverInboxList() {
   const preCheck = useCanCreateMoreInboxAndNotify()
 
   return (
-    <div className="bg-material-ultra-thin mx-auto w-full max-w-[540px] rounded-lg border p-5 shadow-sm">
+    <div className="mx-auto w-full max-w-[540px] rounded-lg border bg-material-ultra-thin p-5 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
         <span>{t("discover.inbox.description")}</span>
         <a
           href={`${repository.url}/wiki/Inbox#webhooks`}
           target="_blank"
           rel="noreferrer"
-          className="text-accent border-accent inline-flex w-auto items-center gap-1 rounded-full border px-2 py-px text-sm"
+          className="inline-flex w-auto items-center gap-1 rounded-full border border-accent px-2 py-px text-sm text-accent"
         >
           <i className="i-mgc-book-6-cute-re" />
           <span>{t("discover.inbox.webhooks_docs")}</span>

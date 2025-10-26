@@ -7,9 +7,11 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import { Provider } from "jotai"
 import { ModalStackContainer } from "rc-modal-sheet/m"
 import type { FC, PropsWithChildren } from "react"
+import * as React from "react"
 
 import { queryClient } from "../lib/query-client"
 import { jotaiStore } from "../lib/store"
+import { ServerConfigsProvider } from "./server-configs-provider"
 import { UserProvider } from "./user-provider"
 
 const ThemeProvider = () => {
@@ -21,6 +23,7 @@ export const RootProviders: FC<PropsWithChildren> = ({ children }) => (
   <MotionProvider>
     <Provider store={jotaiStore}>
       <QueryClientProvider client={queryClient}>
+        <ServerConfigsProvider />
         <ThemeProvider />
         <EventProvider />
         <StableRouterProvider />

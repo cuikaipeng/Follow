@@ -1,9 +1,10 @@
 import { cn } from "@follow/utils"
+import type { CreateInvitationRequest } from "@follow-app/client-sdk"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { setStringAsync } from "expo-clipboard"
 import { Trans, useTranslation } from "react-i18next"
-import { Pressable, Text, View } from "react-native"
+import { Pressable, View } from "react-native"
 
 import { useServerConfigs } from "@/src/atoms/server-configs"
 import { UINavigationHeaderActionButton } from "@/src/components/layouts/header/NavigationHeader"
@@ -21,9 +22,10 @@ import {
   GroupedInsetListSectionHeader,
 } from "@/src/components/ui/grouped/GroupedList"
 import { MonoText } from "@/src/components/ui/typography/MonoText"
+import { Text } from "@/src/components/ui/typography/Text"
 import { LoveCuteFiIcon } from "@/src/icons/love_cute_fi"
 import { PowerIcon } from "@/src/icons/power"
-import { apiClient } from "@/src/lib/api-fetch"
+import { followClient } from "@/src/lib/api-client"
 import type { DialogComponent } from "@/src/lib/dialog"
 import { Dialog } from "@/src/lib/dialog"
 import { toastFetchError } from "@/src/lib/error-parser"
@@ -38,29 +40,26 @@ const invitationQueryKey = ["invitations"]
 const useInvitationsQuery = () => {
   return useQuery({
     queryKey: invitationQueryKey,
-    queryFn: () => apiClient.invitations.$get().then((res) => res.data),
+    queryFn: () => followClient.api.invitations.list().then((res) => res.data),
   })
 }
 const useInvitationsLimitationQuery = () => {
   const { data } = useQuery({
     queryKey: ["invitations", "limitation"],
-    queryFn: () => apiClient.invitations.limitation.$get(),
+    queryFn: () => followClient.api.invitations.getLimitation().then((res) => res.data),
   })
-  return data?.data
+  return data
 }
-
 const numberFormatter = new Intl.NumberFormat("en-US")
 export const InvitationsScreen: NavigationControllerView = () => {
   const { t } = useTranslation("settings")
   const serverConfigs = useServerConfigs()
-
   const { data: invitations, isLoading } = useInvitationsQuery()
   const limitation = useInvitationsLimitationQuery()
   const handleCopyCode = (code: string) => {
     setStringAsync(code)
     toast.success("Copied to clipboard")
   }
-
   const secondaryLabelColor = useColor("secondaryLabel")
   return (
     <SafeNavigationScrollView
@@ -83,17 +82,19 @@ export const InvitationsScreen: NavigationControllerView = () => {
               ns="settings"
               i18nKey="invitation.earlyAccess"
               parent={({ children }: { children: React.ReactNode }) => (
-                <Text className="text-label mt-3 text-left text-base leading-tight">
+                <Text className="mt-3 text-left text-base leading-tight text-label">
                   {children}
                 </Text>
               )}
-              components={{ strong: <Text className="font-bold" /> }}
+              components={{
+                strong: <Text className="font-bold" />,
+              }}
             />
             <Trans
               ns="settings"
               i18nKey="invitation.generateCost"
               parent={({ children }: { children: React.ReactNode }) => (
-                <Text className="text-label mt-3 text-left text-base leading-tight">
+                <Text className="mt-3 text-left text-base leading-tight text-label">
                   {children}
                 </Text>
               )}
@@ -102,7 +103,18 @@ export const InvitationsScreen: NavigationControllerView = () => {
               }}
               components={{
                 PowerIcon: (
-                  <View style={{ transform: [{ translateY: 6 }, { translateX: -2 }] }}>
+                  <View
+                    style={{
+                      transform: [
+                        {
+                          translateY: 6,
+                        },
+                        {
+                          translateX: -2,
+                        },
+                      ],
+                    }}
+                  >
                     <PowerIcon color={accentColor} height={16} width={16} />
                   </View>
                 ),
@@ -112,7 +124,7 @@ export const InvitationsScreen: NavigationControllerView = () => {
               ns="settings"
               i18nKey="invitation.limitationMessage"
               parent={({ children }: { children: React.ReactNode }) => (
-                <Text className="text-label mt-3 text-base leading-tight">{children}</Text>
+                <Text className="mt-3 text-base leading-tight text-label">{children}</Text>
               )}
               values={{
                 limitation: numberFormatter.format(limitation ?? 0),
@@ -128,7 +140,7 @@ export const InvitationsScreen: NavigationControllerView = () => {
         {invitations?.map((invitation) => (
           <ContextMenu.Root key={invitation.code}>
             <ContextMenu.Trigger>
-              <GroupedInsetListBaseCell className="bg-secondary-system-grouped-background flex-1">
+              <GroupedInsetListBaseCell className="flex-1 bg-secondary-system-grouped-background">
                 <View className="mr-2 shrink flex-row items-center gap-4">
                   <UserAvatar
                     size={26}
@@ -143,7 +155,7 @@ export const InvitationsScreen: NavigationControllerView = () => {
                     >
                       {invitation.users?.name || (!invitation.users ? t("invitation.notUsed") : "")}
                     </Text>
-                    <Text className="text-secondary-label text-sm">
+                    <Text className="text-sm text-secondary-label">
                       {t("invitation.created_at")}{" "}
                       {dayjs(invitation.createdAt).format("YYYY/MM/DD")}
                     </Text>
@@ -170,7 +182,6 @@ export const InvitationsScreen: NavigationControllerView = () => {
     </SafeNavigationScrollView>
   )
 }
-
 const GenerateButton = () => {
   const { t } = useTranslation("settings")
   const limitation = useInvitationsLimitationQuery()
@@ -194,15 +205,13 @@ const GenerateButton = () => {
     </UINavigationHeaderActionButton>
   )
 }
-
 const ConfirmGenerateDialog: DialogComponent = () => {
   const serverConfigs = useServerConfigs()
   const { dismiss } = Dialog.useDialogContext()!
-
   const newInvitation = useMutation({
     mutationKey: ["newInvitation"],
-    mutationFn: (values: Parameters<typeof apiClient.invitations.new.$post>[0]["json"]) =>
-      apiClient.invitations.new.$post({ json: values }),
+    mutationFn: (values: CreateInvitationRequest) =>
+      followClient.api.invitations.create({ TOTPCode: values.TOTPCode }),
     onError(err) {
       toastFetchError(err)
       console.error(err)
@@ -212,14 +221,12 @@ const ConfirmGenerateDialog: DialogComponent = () => {
     },
     onSuccess(data) {
       toast.success("Generate successfully, code is copied to clipboard")
-
       type Invitation = {
         code: string
         createdAt: string | null
       }
       const old = queryClient.getQueryData<Invitation[]>(invitationQueryKey)
       setStringAsync(data.data)
-
       queryClient.setQueryData<Invitation[]>(invitationQueryKey, () => {
         return [
           {
@@ -231,16 +238,22 @@ const ConfirmGenerateDialog: DialogComponent = () => {
       })
     },
   })
-
   const confirm = useTOTPModalWrapper(newInvitation.mutateAsync, {
     dismiss,
   })
-
   return (
     <View>
       <Text>
         You can spend {serverConfigs?.INVITATION_PRICE}{" "}
-        <View style={{ transform: [{ translateY: 2 }] }}>
+        <View
+          style={{
+            transform: [
+              {
+                translateY: 2,
+              },
+            ],
+          }}
+        >
           <PowerIcon color={accentColor} height={16} width={16} />
         </View>{" "}
         Power to generate an invitation code for your friends.
@@ -254,7 +267,6 @@ const ConfirmGenerateDialog: DialogComponent = () => {
     </View>
   )
 }
-
 ConfirmGenerateDialog.id = "ConfirmGenerateDialog"
 ConfirmGenerateDialog.confirmText = "Generate"
 ConfirmGenerateDialog.title = "Generate Invitation Code"

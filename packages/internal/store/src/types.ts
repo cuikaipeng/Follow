@@ -1,7 +1,4 @@
-import type { AppType } from "@follow/shared/hono"
-import type { hc } from "hono/client"
-
-export type APIClient = ReturnType<typeof hc<AppType>>
+import type { ModuleAPIs } from "@follow-app/client-sdk"
 
 export type GeneralMutationOptions = {
   onSuccess?: () => void
@@ -11,3 +8,5 @@ export type GeneralMutationOptions = {
 export type GeneralQueryOptions = {
   enabled?: boolean
 }
+
+export type FollowAPI = ModuleAPIs

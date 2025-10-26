@@ -1,11 +1,10 @@
 import { useWhoami } from "@follow/store/user/hooks"
 import { userSyncService } from "@follow/store/user/store"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import * as FileSystem from "expo-file-system"
 import type { FC } from "react"
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { Alert, Text, View } from "react-native"
+import { Alert, View } from "react-native"
 
 import {
   NavigationBlurEffectHeaderView,
@@ -20,17 +19,17 @@ import {
   GroupedPlainButtonCell,
 } from "@/src/components/ui/grouped/GroupedList"
 import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
-import { getDbPath } from "@/src/database"
+import { Text } from "@/src/components/ui/typography/Text"
 import { AppleCuteFiIcon } from "@/src/icons/apple_cute_fi"
 import { GithubCuteFiIcon } from "@/src/icons/github_cute_fi"
 import { GoogleCuteFiIcon } from "@/src/icons/google_cute_fi"
 import type { AuthProvider } from "@/src/lib/auth"
 import {
+  deleteUser,
   forgetPassword,
   getAccountInfo,
   getProviders,
   linkSocial,
-  signOut,
   unlinkAccount,
 } from "@/src/lib/auth"
 import { Dialog } from "@/src/lib/dialog"
@@ -40,6 +39,7 @@ import { useNavigation } from "@/src/lib/navigation/hooks"
 import { toast } from "@/src/lib/toast"
 
 import { ConfirmPasswordDialog } from "../../dialogs/ConfirmPasswordDialog"
+import { ConfirmTOTPCodeDialog } from "../../dialogs/ConfirmTOTPCodeDialog"
 import { TwoFASetting } from "./2FASetting"
 import { ResetPassword } from "./ResetPassword"
 
@@ -49,7 +49,7 @@ type Account = {
   provider: string
   profile:
     | {
-        id: string
+        id: string | number
         name?: string
         email?: string | null
         image?: string
@@ -58,10 +58,8 @@ type Account = {
     | null
     | undefined
 }
-
 const accountInfoKey = ["account-info"]
 const userProviderKey = ["providers"]
-
 const useAccount = () => {
   return useQuery({
     queryKey: accountInfoKey,
@@ -76,37 +74,10 @@ export const AccountScreen = () => {
       Header={<NavigationBlurEffectHeaderView title={t("titles.account")} />}
     >
       <AuthenticationSection />
-
       <SecuritySection />
-
-      {/* Danger Zone */}
-
-      <GroupedInsetListSectionHeader label={t("profile.danger_zone")} />
-      <GroupedInsetListCard>
-        <GroupedPlainButtonCell
-          label={t("profile.delete_account.label")}
-          textClassName="text-red text-left"
-          onPress={async () => {
-            Alert.alert("Delete account", "Are you sure you want to delete your account?", [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                  await signOut()
-                  const dbPath = getDbPath()
-                  await FileSystem.deleteAsync(dbPath)
-                  await expo.reloadAppAsync("User sign out")
-                },
-              },
-            ])
-          }}
-        />
-      </GroupedInsetListCard>
     </SafeNavigationScrollView>
   )
 }
-
 const provider2IconMap = {
   google: (
     <GroupedInsetListNavigationLinkIcon backgroundColor="#4081EC">
@@ -124,7 +95,6 @@ const provider2IconMap = {
     </GroupedInsetListNavigationLinkIcon>
   ),
 }
-
 const provider2LabelMap = {
   google: "Google",
   github: "GitHub",
@@ -138,18 +108,22 @@ const AccountLinker: FC<{
   const unlinkAccountMutation = useMutation({
     mutationFn: async () => {
       if (!account) throw new Error("Account not found")
-      const res = await unlinkAccount({ providerId: provider, accountId: account.accountId })
+      const res = await unlinkAccount({
+        providerId: provider,
+        accountId: account.accountId,
+      })
       if (res.error) throw new Error(res.error.message)
     },
     onSuccess: () => {
       toast.success("Unlinked account success")
-      queryClient.invalidateQueries({ queryKey: accountInfoKey })
+      queryClient.invalidateQueries({
+        queryKey: accountInfoKey,
+      })
     },
     onError: (error) => {
       toast.error(error.message)
     },
   })
-
   if (!provider2LabelMap[provider]) return null
   return (
     <GroupedInsetListNavigationLink
@@ -159,7 +133,7 @@ const AccountLinker: FC<{
         <Text
           ellipsizeMode="tail"
           numberOfLines={1}
-          className="text-secondary-label mr-1 max-w-[150px]"
+          className="mr-1 max-w-[150px] text-secondary-label"
         >
           {account?.profile?.email || account?.profile?.name || ""}
         </Text>
@@ -184,9 +158,11 @@ const AccountLinker: FC<{
           })
           return
         }
-
         Alert.alert("Unlink account", "Are you sure you want to unlink your account?", [
-          { text: "Cancel", style: "cancel" },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
           {
             text: "Unlink",
             style: "destructive",
@@ -198,16 +174,13 @@ const AccountLinker: FC<{
   )
 }
 ;(AccountLinker as any).itemStyle = GroupedInsetListCardItemStyle.NavigationLink
-
 const AuthenticationSection = () => {
   const { t } = useTranslation("settings")
   const { data: accounts } = useAccount()
-
   const { data: providers, isLoading } = useQuery({
     queryKey: userProviderKey,
     queryFn: async () => (await getProviders()).data as Record<string, AuthProvider>,
   })
-
   const providerToAccountMap = useMemo(() => {
     return Object.keys(providers || {}).reduce(
       (acc, provider) => {
@@ -217,7 +190,6 @@ const AuthenticationSection = () => {
       {} as Record<string, Account>,
     )
   }, [accounts?.data, providers])
-
   return (
     <>
       <GroupedInsetListSectionHeader label={t("profile.link_social.authentication")} />
@@ -239,15 +211,12 @@ const AuthenticationSection = () => {
     </>
   )
 }
-
 const SecuritySection = () => {
   const { t } = useTranslation("settings")
   const { data: account } = useAccount()
   const hasPassword = account?.data?.find((account) => account.provider === "credential")
   const whoAmI = useWhoami()
-
   const twoFactorEnabled = whoAmI?.twoFactorEnabled
-
   const navigation = useNavigation()
   return (
     <>
@@ -263,7 +232,9 @@ const SecuritySection = () => {
               return
             }
             if (!hasPassword) {
-              forgetPassword({ email })
+              forgetPassword({
+                email,
+              })
               toast.success("We have sent you an email with instructions to reset your password.")
             } else {
               navigation.pushControllerView(ResetPassword)
@@ -280,14 +251,11 @@ const SecuritySection = () => {
               override: {
                 async onConfirm(ctx) {
                   ctx.dismiss()
-
                   const { done } = loading.start()
-
                   if (twoFactorEnabled) {
                     const res = await userSyncService
                       .updateTwoFactor(false, ctx.password)
                       .finally(() => done())
-
                     if (res.error?.message) {
                       toast.error("Invalid password or something went wrong")
                       return
@@ -296,11 +264,9 @@ const SecuritySection = () => {
                     return
                   }
                   const { password } = ctx
-
                   const res = await userSyncService
                     .updateTwoFactor(true, password)
                     .finally(() => done())
-
                   if (res.error?.message) {
                     toast.error("Invalid password or something went wrong")
                     return
@@ -315,6 +281,39 @@ const SecuritySection = () => {
                 },
               },
             })
+          }}
+        />
+        <GroupedPlainButtonCell
+          label={t("profile.delete_account.label")}
+          textClassName="text-red text-left"
+          onPress={async () => {
+            Alert.alert(
+              "Delete account",
+              "Are you sure you want to delete your account? \nThis action is irreversible and may take up to two days to take effect.",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    // await signOut()
+                    Dialog.show(ConfirmTOTPCodeDialog, {
+                      override: {
+                        async onConfirm(ctx) {
+                          ctx.dismiss()
+                          await deleteUser({
+                            TOTPCode: ctx.totpCode,
+                          })
+                        },
+                      },
+                    })
+                  },
+                },
+              ],
+            )
           }}
         />
       </GroupedInsetListCard>

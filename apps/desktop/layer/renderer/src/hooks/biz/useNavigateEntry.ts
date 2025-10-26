@@ -1,11 +1,12 @@
 import { getReadonlyRoute, getStableRouterNavigate } from "@follow/components/atoms/route.js"
 import { useMobile } from "@follow/components/hooks/useMobile.js"
 import { useSheetContext } from "@follow/components/ui/sheet/context.js"
-import type { FeedViewType } from "@follow/constants"
+import { FeedViewType } from "@follow/constants"
+import { getEntry } from "@follow/store/entry/getter"
 import { getSubscriptionByFeedId } from "@follow/store/subscription/getter"
 import { tracker } from "@follow/tracker"
-import { nextFrame } from "@follow/utils"
 import { useCallback } from "react"
+import { toast } from "sonner"
 
 import { disableShowAISummaryOnce } from "~/atoms/ai-summary"
 import { disableShowAITranslationOnce } from "~/atoms/ai-translation"
@@ -18,7 +19,10 @@ import {
   ROUTE_FEED_IN_LIST,
   ROUTE_FEED_PENDING,
   ROUTE_TIMELINE_OF_VIEW,
+  ROUTE_VIEW_ALL,
 } from "~/constants"
+
+import { useRouteParamsSelector } from "./useRouteParams"
 
 export type NavigateEntryOptions = Partial<{
   timelineId: string
@@ -47,25 +51,21 @@ export const useNavigateEntry = () => {
   )
 }
 
-/*
- * /timeline/:timelineId/:feedId/:entryId
- * timelineId: view-1
- * feedId: xxx, folder-xxx, list-xxx, inbox-xxx
- * entryId: xxx
- */
-export const navigateEntry = (options: NavigateEntryOptions) => {
-  const { entryId, feedId, view, folderName, inboxId, listId, timelineId, backPath } = options || {}
+type ParsedNavigateEntryOptions = {
+  feedId: string
+  timelineId: string
+  entryId: string
+}
+
+const parseNavigateEntryOptions = (options: NavigateEntryOptions): ParsedNavigateEntryOptions => {
+  const { entryId, feedId, view, folderName, inboxId, listId, timelineId } = options || {}
   const route = getReadonlyRoute()
   const { params } = route
   let finalFeedId = feedId || params.feedId || ROUTE_FEED_PENDING
   let finalTimelineId = timelineId || params.timelineId || ROUTE_FEED_PENDING
   const finalEntryId = entryId || ROUTE_ENTRY_PENDING
   const subscription = getSubscriptionByFeedId(finalFeedId)
-  const finalView = subscription?.view || view
-
-  if (backPath) {
-    setPreviewBackPath(backPath)
-  }
+  const finalView = typeof view === "number" ? view : subscription?.view
 
   if ("feedId" in options && feedId === null) {
     finalFeedId = ROUTE_FEED_PENDING
@@ -86,32 +86,86 @@ export const navigateEntry = (options: NavigateEntryOptions) => {
   finalFeedId = encodeURIComponent(finalFeedId)
 
   if (finalView !== undefined && !timelineId) {
-    finalTimelineId = `${ROUTE_TIMELINE_OF_VIEW}${finalView}`
+    finalTimelineId =
+      finalView === FeedViewType.All ? ROUTE_VIEW_ALL : `${ROUTE_TIMELINE_OF_VIEW}${finalView}`
   }
+
+  return {
+    feedId: finalFeedId,
+    timelineId: finalTimelineId,
+    entryId: finalEntryId,
+  }
+}
+
+export function getNavigateEntryPath(options: NavigateEntryOptions | ParsedNavigateEntryOptions) {
+  if ("feedId" in options) {
+    return `/timeline/${options.timelineId}/${options.feedId}/${options.entryId}`
+  }
+
+  const { feedId, timelineId, entryId } = parseNavigateEntryOptions(options)
+
+  return `/timeline/${timelineId}/${feedId}/${entryId}`
+}
+
+/*
+ * /timeline/:timelineId/:feedId/:entryId
+ * timelineId: view-1
+ * feedId: xxx, folder-xxx, list-xxx, inbox-xxx
+ * entryId: xxx
+ */
+export const navigateEntry = (options: NavigateEntryOptions) => {
+  const parsedOptions = parseNavigateEntryOptions(options)
+  const path = getNavigateEntryPath(parsedOptions)
+  const { backPath } = options || {}
+  const route = getReadonlyRoute()
+  const currentPath = route.location.pathname + route.location.search
+  if (path === currentPath) return
+
+  if (backPath) {
+    setPreviewBackPath(backPath)
+  }
+
+  tracker.navigateEntry({
+    feedId: parsedOptions.feedId,
+    entryId: parsedOptions.entryId,
+    timelineId: parsedOptions.timelineId,
+  })
 
   disableShowAISummaryOnce()
   disableShowAITranslationOnce()
-
-  nextFrame(() => {
+  const sourceContent = getEntry(parsedOptions.entryId)?.settings?.sourceContent
+  if (!sourceContent) {
     resetShowSourceContent()
-  })
+  }
 
-  tracker.navigateEntry({ feedId: finalFeedId, entryId: finalEntryId, timelineId: finalTimelineId })
+  const navigate = getStableRouterNavigate()
 
-  const path = `/timeline/${finalTimelineId}/${finalFeedId}/${finalEntryId}`
+  if (!navigate) {
+    const message =
+      "Navigation is not available, maybe a mistake in the code, please report an issue. thx."
+    toast.error(message)
+    throw new Error(message, { cause: "Navigation is not available" })
+  }
 
-  const currentPath = route.location.pathname + route.location.search
-  if (path === currentPath) return
-  return getStableRouterNavigate()?.(path)
+  return navigate?.(path)
 }
 
 export const useBackHome = (timelineId?: string) => {
   const navigate = useNavigateEntry()
+  const feedId = useRouteParamsSelector((state) => state.feedId)
+  const entryId = useRouteParamsSelector((state) => state.entryId)
+  const backToFeed =
+    entryId && feedId && entryId !== ROUTE_ENTRY_PENDING && feedId !== ROUTE_FEED_PENDING
+  const feedIdToNavigate = backToFeed ? feedId : null
 
   return useCallback(
     (overvideTimelineId?: string) => {
-      navigate({ feedId: null, entryId: null, timelineId: overvideTimelineId ?? timelineId })
+      navigate({
+        feedId: feedIdToNavigate,
+        entryId: null,
+        timelineId: overvideTimelineId ?? timelineId,
+      })
     },
-    [timelineId, navigate],
+    [navigate, feedIdToNavigate, timelineId],
   )
 }

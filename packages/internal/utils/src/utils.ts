@@ -1,8 +1,11 @@
+import { WEB_BUILD } from "@follow/shared/constants"
 import type { ClassValue } from "clsx"
 import { clsx } from "clsx"
 import dayjs from "dayjs"
 import { extendTailwindMerge } from "tailwind-merge"
 import { parse } from "tldts"
+
+import { replaceImgUrlIfNeed } from "./img-proxy"
 
 type Nullable<T> = T | null | undefined
 
@@ -118,7 +121,10 @@ export const isASCII = (str: string) => /^[\u0000-\u007F]*$/.test(str)
 const EPOCH = 1712546615000n // follow repo created
 const MAX_TIMESTAMP_BITS = 41n // Maximum number of bits typically used for timestamp
 
-export const isBizId = (id: string | undefined): boolean => {
+export function isBizId(id: string): boolean
+export function isBizId(id: string | undefined): id is string
+
+export function isBizId(id: string | undefined): id is string {
   if (!id || !/^\d{13,19}$/.test(id)) return false
 
   const snowflake = BigInt(id)
@@ -239,6 +245,27 @@ export const getUrlIcon = (url: string, fallback?: boolean | undefined) => {
   }
 
   return ret
+}
+
+export const getAvatarUrl = (user?: {
+  email?: string | null
+  name?: string | null
+  handle?: string | null
+  image?: string | null
+}) => {
+  if (user) {
+    if (user?.image) {
+      return replaceImgUrlIfNeed({
+        url: user.image,
+        inBrowser: WEB_BUILD,
+      })
+    } else {
+      const fallbackUrl = `https://avatar.vercel.sh/${user.handle || user.name}.svg?text=${(user.handle || user.name)?.slice(0, 2).toUpperCase()}`
+      return `https://unavatar.webp.se/gravatar/${user.email}?fallback=${encodeURIComponent(fallbackUrl)}`
+    }
+  } else {
+    return `https://avatar.vercel.sh/folo`
+  }
 }
 
 export { parse as parseUrl } from "tldts"
@@ -395,6 +422,27 @@ export const formatTimeToSeconds = (time?: string | number) => {
   }
 }
 
+/**
+ * @example
+ * ```ts
+ * timeStringToSeconds("1:30") // 90
+ * timeStringToSeconds("1:30:00") // 5400
+ * ```
+ */
+export function timeStringToSeconds(time: string): number | null {
+  const timeParts = time.split(":").map(Number)
+
+  if (timeParts.length === 2) {
+    const [minutes, seconds] = timeParts
+    return minutes! * 60 + seconds!
+  } else if (timeParts.length === 3) {
+    const [hours, minutes, seconds] = timeParts
+    return hours! * 3600 + minutes! * 60 + seconds!
+  } else {
+    return null
+  }
+}
+
 export const formatEstimatedMins = (estimatedMins: number) => {
   const minutesInHour = 60
   const minutesInDay = minutesInHour * 24
@@ -475,4 +523,24 @@ export function formatNumber(num: number): string {
   }
 
   return `${isNegative ? "-" : ""}${absNum}`
+}
+
+export type MobilePlatform = "iOS" | "Android" | null
+
+export const getMobilePlatform = once((): MobilePlatform => {
+  const os = getOS()
+
+  return ["iOS", "Android"].includes(os) ? (os as MobilePlatform) : null
+})
+
+export const isMobileDevice = once((): boolean => {
+  return getMobilePlatform() !== null
+})
+
+export function getDateISOString(dateOrDateString: Date | string | null): string | null {
+  if (!dateOrDateString) return null
+  if (typeof dateOrDateString === "string") {
+    return dateOrDateString
+  }
+  return dateOrDateString.toISOString()
 }

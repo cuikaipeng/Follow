@@ -1,19 +1,16 @@
 import { isBizId } from "@follow/utils/utils"
+import type { FollowClient } from "@follow-app/client-sdk"
 import * as React from "react"
 
-import type { ApiClient } from "~/lib/api-client"
-import { renderToImage } from "~/lib/og/render-to-image"
-
+import { renderToImage } from "../../lib/og/render-to-image"
 import { getImageBase64, OGAvatar, OGCanvas } from "./__base"
 
-export const renderUserOG = async (apiClient: ApiClient, id: string) => {
+export const renderUserOG = async (apiClient: FollowClient, id: string) => {
   const handle = isBizId(id || "") ? id : `${id}`.startsWith("@") ? `${id}`.slice(1) : id
 
-  const user = await apiClient.profiles.$get({
-    query: {
-      handle,
-      id: isBizId(handle || "") ? handle : undefined,
-    },
+  const user = await apiClient.api.profiles.getProfile({
+    id,
+    handle,
   })
 
   if (!user) {
@@ -27,52 +24,47 @@ export const renderUserOG = async (apiClient: ApiClient, id: string) => {
       <div
         style={{
           display: "flex",
-          flexGrow: 1,
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          flexShrink: 0,
-          width: "45%",
-
-          overflow: "hidden",
+          width: "100%",
+          height: "100%",
+          gap: 25,
         }}
       >
         <OGAvatar base64={imageBase64} title={user.data.name!} />
-      </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexGrow: 1,
-          flexShrink: 1,
-          width: "52%",
-          flexDirection: "column",
-          overflow: "hidden",
-          textAlign: "left",
-          justifyContent: "center",
-        }}
-      >
-        <h3
+        <div
           style={{
-            color: "#000000",
-            fontSize: "3.5rem",
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
           }}
         >
-          {user.data.name}
-        </h3>
-        {user.data.handle && (
-          <p
+          <h3
             style={{
-              fontSize: "1.8rem",
-              height: "5.8rem",
-              overflow: "hidden",
-              lineClamp: 2,
-              color: "#000022",
+              color: "#ffffff",
+              fontSize: "4.5rem",
+              fontWeight: 700,
+              margin: 0,
+              letterSpacing: "-0.02em",
             }}
           >
-            @{user.data.handle}
-          </p>
-        )}
+            {user.data.name}
+          </h3>
+          {user.data.handle && (
+            <p
+              style={{
+                fontSize: "2.5rem",
+                color: "#8b949e",
+                margin: 0,
+                marginTop: 12,
+              }}
+            >
+              @{user.data.handle}
+            </p>
+          )}
+        </div>
       </div>
     </OGCanvas>,
     {

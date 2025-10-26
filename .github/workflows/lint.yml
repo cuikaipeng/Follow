@@ -5,10 +5,10 @@ on:
 
 # Do not use secrets or variables to allow for public access
 env:
-  VITE_WEB_URL: https://app.follow.is
+  VITE_WEB_URL: https://app.folo.is
   VITE_API_URL: https://api.follow.is
 
-name: CI Format, Typecheck and Lint
+name: ✨ CI Format, Typecheck and Lint
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-lint
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev' }}
@@ -22,7 +22,7 @@ jobs:
         node-version: [lts/*]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: true
       - name: Cache turbo build setup
@@ -39,12 +39,15 @@ jobs:
       - uses: pnpm/action-setup@v4
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install
+      - name: Build web and SSR server
+        run: |
+          npm exec turbo run Folo#build:web @follow/ssr#build
       - name: Format, Lint and Typecheck
         run: |
           export NODE_OPTIONS="--max_old_space_size=16384"

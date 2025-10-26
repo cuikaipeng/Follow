@@ -1,10 +1,11 @@
 import { isTaggedFunctionCallOf } from "ast-kit"
-import type { Transformer } from "unplugin-ast/dist/types-DGZH3jc3.js"
+import type { Transformer } from "unplugin-ast"
 import { RemoveWrapperFunction } from "unplugin-ast/transformers"
 import AST from "unplugin-ast/vite"
 
 // Custom transformer for tw function that compresses template strings
 const TwTransformer: Transformer<any> = {
+  // @ts-ignore
   onNode: (node) => isTaggedFunctionCallOf(node, ["tw"]),
   transform(node) {
     if (node.type === "TaggedTemplateExpression") {

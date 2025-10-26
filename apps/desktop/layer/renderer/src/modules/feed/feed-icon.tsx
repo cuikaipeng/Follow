@@ -1,8 +1,6 @@
 // import { Avatar, AvatarFallback, AvatarImage } from "@follow/components/ui/avatar/index.jsx"
 import { PlatformIcon } from "@follow/components/ui/platform-icon/index.jsx"
-import type { FeedOrListRespModel } from "@follow/models/types"
 import type { FeedModel } from "@follow/store/feed/types"
-import type { ListModel } from "@follow/store/list/types"
 import { getBackgroundGradient } from "@follow/utils/color"
 import { getImageProxyUrl } from "@follow/utils/img-proxy"
 import { cn, getUrlIcon } from "@follow/utils/utils"
@@ -13,18 +11,30 @@ import { useMemo } from "react"
 
 const { Avatar, AvatarFallback, AvatarImage } = AvatarPrimitive
 
-function getIconProps(
-  props: Pick<
-    Parameters<typeof FeedIcon>[0],
-    "feed" | "entry" | "useMedia" | "siteUrl" | "fallbackUrl" | "fallback" | "size"
-  >,
-) {
-  const { feed, entry, useMedia, siteUrl: propSiteUrl, fallbackUrl, fallback, size = 20 } = props
-  const image =
-    (useMedia ? entry?.firstPhotoUrl || entry?.authorAvatar : entry?.authorAvatar) || feed?.image
-  const siteUrl = (feed as FeedModel)?.siteUrl || fallbackUrl
+// Size-responsive border radius utility function
+const getBorderRadius = (size: number) => {
+  if (size <= 24) return "rounded-sm" // 2px for small avatars
+  if (size <= 32) return "rounded-md" // 6px for medium avatars
+  if (size <= 48) return "rounded-lg" // 8px for large avatars
+  return "rounded-xl" // 12px for extra large avatars
+}
 
-  if (propSiteUrl && !feed) {
+type GetIconPropsProps = {
+  target?: IconTarget | null
+  entry?: FeedIconEntry | null
+  useMedia?: boolean
+  siteUrl?: string
+  fallbackUrl?: string
+  fallback?: boolean
+  size?: number
+}
+function getIconProps(props: GetIconPropsProps) {
+  const { target, entry, useMedia, siteUrl: propSiteUrl, fallbackUrl, fallback, size = 20 } = props
+  const image =
+    (useMedia ? entry?.firstPhotoUrl || entry?.authorAvatar : entry?.authorAvatar) || target?.image
+  const siteUrl = (target as FeedModel)?.siteUrl || fallbackUrl
+
+  if (propSiteUrl && !target) {
     const [src] = getFeedIconSrc({
       siteUrl: propSiteUrl,
     })
@@ -64,13 +74,13 @@ function getIconProps(
       fallbackSrc,
     }
   }
-  if (feed?.type === "inbox") {
+  if (target?.type === "inbox") {
     return {
       type: "inbox" as const,
     }
   }
 
-  if (feed?.title) {
+  if (target?.title) {
     return {
       type: "text" as const,
     }
@@ -139,10 +149,19 @@ const FallbackableImage = function FallbackableImage({
   )
 }
 
-type FeedIconFeed =
-  | Pick<FeedModel, "ownerUserId" | "id" | "title" | "url" | "image" | "siteUrl" | "type">
-  | ListModel
-  | FeedOrListRespModel
+// type FeedIconFeed = Pick<FeedModel, "title" | "image" | "siteUrl" | "type"> | ListModel
+type IconTarget = {
+  title?: Nullable<string>
+  image?: Nullable<string>
+  siteUrl?: Nullable<string>
+  type: "feed" | "list" | "inbox"
+  entry?: FeedIconEntry | null
+  useMedia?: boolean
+  feed?: FeedModel | null
+  fallbackUrl?: string
+  fallback?: boolean
+  size?: number
+}
 
 export type FeedIconEntry = { authorAvatar?: string | null; firstPhotoUrl?: string | null }
 const fadeInVariant = {
@@ -152,7 +171,7 @@ const fadeInVariant = {
 
 const isIconLoadedSet = new Set<string>()
 export function FeedIcon({
-  feed,
+  target,
   entry,
   fallbackUrl,
   className,
@@ -164,7 +183,7 @@ export function FeedIcon({
   disableFadeIn,
   noMargin,
 }: {
-  feed?: FeedIconFeed | null
+  target?: IconTarget | null
   entry?: FeedIconEntry | null
   fallbackUrl?: string
   className?: string
@@ -180,12 +199,12 @@ export function FeedIcon({
   disableFadeIn?: boolean
   noMargin?: boolean
 }) {
-  const marginClassName = noMargin ? "" : "mr-2"
-  const iconProps = getIconProps({ feed, entry, useMedia, siteUrl, fallbackUrl, fallback, size })
+  const marginClassName = cn(noMargin ? "" : "mr-2", className)
+  const iconProps = getIconProps({ target, entry, useMedia, siteUrl, fallbackUrl, fallback, size })
 
   const colors = useMemo(
-    () => getBackgroundGradient(feed?.title || (feed as FeedModel)?.url || siteUrl || ""),
-    [feed?.title, (feed as FeedModel)?.url, siteUrl],
+    () => getBackgroundGradient(target?.title || (target as FeedModel)?.url || siteUrl || ""),
+    [target?.title, (target as FeedModel)?.url, siteUrl],
   )
 
   const sizeStyle: React.CSSProperties = useMemo(
@@ -211,7 +230,6 @@ export function FeedIcon({
         "flex shrink-0 items-center justify-center rounded-sm",
         "text-white",
         marginClassName,
-        className,
       )}
     >
       <span
@@ -219,7 +237,7 @@ export function FeedIcon({
           fontSize: size / 2,
         }}
       >
-        {!!feed?.title && feed.title[0]}
+        {!!target?.title && target.title[0]}
       </span>
     </span>
   )
@@ -238,13 +256,13 @@ export function FeedIcon({
         <PlatformIcon url={iconProps.platformUrl!} style={sizeStyle} className={className}>
           {fallbackSrc ? (
             <FallbackableImage
-              className={cn(marginClassName, className)}
+              className={marginClassName}
               style={sizeStyle}
               fallbackUrl={fallbackSrc}
             />
           ) : (
             <m.img
-              className={cn(marginClassName, className)}
+              className={marginClassName}
               style={sizeStyle}
               {...(disableFadeIn || isIconLoaded ? {} : fadeInVariant)}
             />
@@ -280,7 +298,7 @@ export function FeedIcon({
   if (finalSrc) {
     return (
       <Avatar className={cn("shrink-0 [&_*]:select-none", marginClassName)} style={sizeStyle}>
-        <AvatarImage className="rounded-sm object-cover" asChild src={finalSrc}>
+        <AvatarImage className={cn("object-cover", getBorderRadius(size))} asChild src={finalSrc}>
           {imageElement}
         </AvatarImage>
         <AvatarFallback delayMs={200} asChild>

@@ -1,4 +1,5 @@
 import { useHasNotificationActions } from "@follow/store/action/hooks"
+import { ROUTE_FEED_IN_INBOX } from "@follow/store/constants/app"
 import { useWhoami } from "@follow/store/user/hooks"
 import { getApp } from "@react-native-firebase/app"
 import type { FirebaseMessagingTypes } from "@react-native-firebase/messaging"
@@ -7,7 +8,7 @@ import { useMutation } from "@tanstack/react-query"
 import { useEffect } from "react"
 import { Platform } from "react-native"
 
-import { apiClient } from "@/src/lib/api-fetch"
+import { followClient } from "@/src/lib/api-client"
 import { kv } from "@/src/lib/kv"
 import { useNavigation } from "@/src/lib/navigation/hooks"
 import { requestNotificationPermission } from "@/src/lib/permission"
@@ -18,12 +19,7 @@ const FIREBASE_MESSAGING_TOKEN_STORAGE_KEY = "firebase_messaging_token"
 async function saveMessagingToken() {
   const app = getApp()
   const token = await getMessaging(app).getToken()
-  await apiClient.messaging.$post({
-    json: {
-      token,
-      channel: Platform.OS,
-    },
-  })
+  await followClient.api.messaging.createToken({ token, channel: Platform.OS })
   kv.set(FIREBASE_MESSAGING_TOKEN_STORAGE_KEY, token)
 }
 
@@ -48,6 +44,7 @@ export function useMessaging() {
     function navigateToEntry(message: FirebaseMessagingTypes.RemoteMessage) {
       if (
         !message.data ||
+        message.data.type !== "new-entry" ||
         typeof message.data.view !== "string" ||
         typeof message.data.entryId !== "string"
       ) {
@@ -57,6 +54,7 @@ export function useMessaging() {
       navigation.pushControllerView(EntryDetailScreen, {
         entryId: message.data.entryId,
         view: Number.parseInt(message.data.view),
+        isInbox: String(message.data.feedId).startsWith(ROUTE_FEED_IN_INBOX),
       })
     }
 

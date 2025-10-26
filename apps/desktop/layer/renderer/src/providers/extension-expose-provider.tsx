@@ -1,6 +1,7 @@
 import { Routes } from "@follow/constants"
 import { registerGlobalContext } from "@follow/shared/bridge"
 import { env } from "@follow/shared/env.desktop"
+import { invalidateUserSession } from "@follow/store/user/hooks"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation } from "react-router"
@@ -8,7 +9,7 @@ import { toast } from "sonner"
 
 import { setWindowState } from "~/atoms/app"
 import { getGeneralSettings } from "~/atoms/settings/general"
-import { getUISettings, useToggleZenMode } from "~/atoms/settings/ui"
+import { getUISettings } from "~/atoms/settings/ui"
 import { setUpdaterStatus, useUpdaterStatus } from "~/atoms/updater"
 import { useDialog, useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { useDiscoverRSSHubRouteModal } from "~/hooks/biz/useDiscoverRSSHubRoute"
@@ -17,13 +18,14 @@ import { navigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { oneTimeToken } from "~/lib/auth"
 import { queryClient } from "~/lib/query-client"
 import { usePresentUserProfileModal } from "~/modules/profile/hooks"
-import { useSettingModal } from "~/modules/settings/modal/use-setting-modal"
+import type { SettingModalOptions } from "~/modules/settings/modal/useSettingModal"
+import { useSettingModal } from "~/modules/settings/modal/useSettingModal"
 import { handleSessionChanges } from "~/queries/auth"
 import { clearDataIfLoginOtherAccount } from "~/store/utils/clear"
 
 declare module "@follow/components/providers/stable-router-provider.js" {
   interface CustomRoute {
-    showSettings: (path?: string) => void
+    showSettings: (options?: SettingModalOptions) => void
   }
 }
 
@@ -117,13 +119,6 @@ export const ExtensionExposeProvider = () => {
     })
   }, [follow, present, presentDiscoverRSSHubRoute, presentUserProfile, t])
 
-  const toggleZenMode = useToggleZenMode()
-  useEffect(() => {
-    registerGlobalContext({
-      zenMode: toggleZenMode,
-    })
-  }, [toggleZenMode])
-
   const dialog = useDialog()
   useEffect(() => {
     registerGlobalContext({
@@ -132,6 +127,13 @@ export const ExtensionExposeProvider = () => {
   }, [dialog])
 
   useBindElectronBridge()
+
+  useEffect(() => {
+    registerGlobalContext({
+      refreshSession: invalidateUserSession,
+    })
+  }, [dialog])
+
   return null
 }
 

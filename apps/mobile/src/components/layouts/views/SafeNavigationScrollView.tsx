@@ -1,4 +1,5 @@
 import { useTypeScriptHappyCallback } from "@follow/hooks"
+import { cn } from "@follow/utils"
 import { useSetAtom, useStore } from "jotai"
 import type { PropsWithChildren } from "react"
 import { use, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
@@ -64,7 +65,11 @@ export const SafeNavigationScrollView = ({
   const frame = useSafeAreaFrame()
   const sheetModal = useScreenIsInSheetModal()
   const [headerHeight, setHeaderHeight] = useState(() =>
-    getDefaultHeaderHeight(frame, sheetModal, insets.top),
+    getDefaultHeaderHeight({
+      landscape: frame.width > frame.height,
+      modalPresentation: sheetModal,
+      topInset: insets.top,
+    }),
   )
   const screenCtxValue = use(ScreenItemContext)
 
@@ -134,7 +139,7 @@ export const SafeNavigationScrollView = ({
           {...props}
         >
           <View style={{ height: headerHeight - (withTopInset ? insets.top : 0) }} />
-          <View style={contentViewStyle} className={contentViewClassName}>
+          <View style={contentViewStyle} className={cn("flex-1", contentViewClassName)}>
             {children}
           </View>
           {ScrollViewBottom}

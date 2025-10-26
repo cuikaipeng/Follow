@@ -14,13 +14,14 @@ import { RootPortal } from "@follow/components/ui/portal/index.js"
 import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
 import { Switch } from "@follow/components/ui/switch/index.jsx"
 import { FeedViewType } from "@follow/constants"
-import type { EntryModelSimple, FeedAnalyticsModel, FeedModel } from "@follow/models/types"
 import { useFeedByIdOrUrl } from "@follow/store/feed/hooks"
+import type { FeedModel } from "@follow/store/feed/types"
 import { useCategories, useSubscriptionByFeedId } from "@follow/store/subscription/hooks"
 import { subscriptionSyncService } from "@follow/store/subscription/store"
-import { unreadActions } from "@follow/store/unread/store"
+import { whoami } from "@follow/store/user/getters"
 import { tracker } from "@follow/tracker"
 import { cn } from "@follow/utils/utils"
+import type { FeedAnalyticsModel, ParsedEntry } from "@follow-app/client-sdk"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef } from "react"
@@ -29,14 +30,11 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { getGeneralSettings } from "~/atoms/settings/general"
 import { Autocomplete } from "~/components/ui/auto-completion"
 import { useCurrentModal, useIsInModal } from "~/components/ui/modal/stacked/hooks"
 import { getRouteParams } from "~/hooks/biz/useRouteParams"
 import { useI18n } from "~/hooks/common"
-import { apiClient } from "~/lib/api-fetch"
 import { toastFetchError } from "~/lib/error-parser"
-import { entries as entriesQuery } from "~/queries/entries"
 import { feed as feedQuery, useFeedQuery } from "~/queries/feed"
 
 import { ViewSelectorRadioGroup } from "../shared/ViewSelectorRadioGroup"
@@ -46,6 +44,7 @@ const formSchema = z.object({
   view: z.string(),
   category: z.string().nullable().optional(),
   isPrivate: z.boolean().optional(),
+  hideFromTimeline: z.boolean().optional(),
   title: z.string().optional(),
 })
 export type FeedFormDataValuesType = z.infer<typeof formSchema>
@@ -112,6 +111,7 @@ export const FeedForm: Component<{
                         url,
 
                         onSuccess,
+                        isLoading: feedQuery.isLoading,
                         subscriptionData: feedQuery.data?.subscription,
                         entries: feedQuery.data?.entries,
                         feed,
@@ -134,7 +134,7 @@ export const FeedForm: Component<{
           case !!feedQuery.error: {
             return (
               <div className="center grow flex-col gap-3">
-                <i className="i-mgc-close-cute-re text-red size-7" />
+                <i className="i-mgc-close-cute-re size-7 text-red" />
                 <p>{t("feed_form.error_fetching_feed")}</p>
               </div>
             )
@@ -151,6 +151,7 @@ export const FeedForm: Component<{
       }, [
         defaultValues,
         feed,
+        feedQuery.data?.analytics,
         feedQuery.data?.entries,
         feedQuery.data?.subscription,
         feedQuery.error,
@@ -177,6 +178,7 @@ const FeedInnerForm = ({
   analytics,
 
   placeholderRef,
+  isLoading,
 }: {
   defaultValues?: z.infer<typeof formSchema>
   id?: string
@@ -187,12 +189,14 @@ const FeedInnerForm = ({
     category?: string | null
     isPrivate?: boolean
     title?: string | null
+    hideFromTimeline?: boolean | null
   }
   feed: FeedModel
-  entries?: EntryModelSimple[]
+  entries?: ParsedEntry[]
   analytics?: FeedAnalyticsModel
 
   placeholderRef: React.RefObject<HTMLDivElement | null>
+  isLoading: boolean
 }) => {
   const subscription = useSubscriptionByFeedId(id || "") || subscriptionData
   const isSubscribed = !!subscription
@@ -214,8 +218,11 @@ const FeedInnerForm = ({
     if (subscription) {
       form.setValue("view", `${subscription?.view}`)
       subscription?.category && form.setValue("category", subscription.category)
-      form.setValue("isPrivate", subscription?.isPrivate || false)
-      form.setValue("title", subscription?.title || "")
+      typeof subscription.isPrivate === "boolean" &&
+        form.setValue("isPrivate", subscription.isPrivate)
+      typeof subscription.hideFromTimeline === "boolean" &&
+        form.setValue("hideFromTimeline", subscription.hideFromTimeline)
+      subscription?.title && form.setValue("title", subscription.title)
     }
   }, [subscription])
 
@@ -231,39 +238,27 @@ const FeedInnerForm = ({
 
   const followMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
+      const userId = whoami()?.id || ""
       const body = {
         url: feed.url,
         view: Number.parseInt(values.view),
         category: values.category,
-        isPrivate: values.isPrivate,
+        isPrivate: values.isPrivate || false,
+        hideFromTimeline: values.hideFromTimeline,
         title: values.title,
         feedId: feed.id,
-      }
-      const $method = isSubscribed ? apiClient.subscriptions.$patch : apiClient.subscriptions.$post
+        userId,
+        type: "feed",
+        listId: undefined,
+      } as const
 
-      return $method({
-        json: body,
-      }) as unknown as Promise<
-        | ReturnType<typeof apiClient.subscriptions.$post>
-        | ReturnType<typeof apiClient.subscriptions.$patch>
-      >
+      if (isSubscribed) {
+        return subscriptionSyncService.edit(body)
+      } else {
+        return subscriptionSyncService.subscribe(body)
+      }
     },
-    onSuccess: (data, variables) => {
-      if (getGeneralSettings().hidePrivateSubscriptionsInTimeline) {
-        entriesQuery
-          .entries({
-            feedId: "all",
-            view: Number(variables.view),
-            excludePrivate: true,
-          })
-          .invalidate({ exact: true })
-      }
-
-      if ("unread" in data) {
-        unreadActions.upsertMany(data.unread)
-      }
-      subscriptionSyncService.fetch()
-
+    onSuccess: () => {
       const feedId = feed.id
       if (feedId) {
         feedQuery.byId({ id: feedId }).invalidate()
@@ -271,10 +266,6 @@ const FeedInnerForm = ({
       toast(isSubscribed ? t("feed_form.updated") : t("feed_form.followed"), {
         duration: 1000,
       })
-
-      if (!isSubscribed) {
-        tracker.subscribe({ feedId: feed.id, view: Number.parseInt(variables.view) })
-      }
 
       onSuccess?.()
     },
@@ -308,7 +299,7 @@ const FeedInnerForm = ({
 
   return (
     <div className="flex flex-1 flex-col gap-y-4">
-      <FeedSummary feed={feed} analytics={analytics} showAnalytics />
+      <FeedSummary isLoading={isLoading} feed={feed} analytics={analytics} showAnalytics />
       <Form {...form}>
         <form
           id="feed-form"
@@ -326,7 +317,7 @@ const FeedInnerForm = ({
                 </div>
                 <FormControl>
                   <div className="flex gap-2">
-                    <Input {...field} />
+                    <Input placeholder={feed.title || undefined} {...field} />
                     <Button
                       buttonClassName="shrink-0"
                       type="button"
@@ -392,6 +383,29 @@ const FeedInnerForm = ({
           />
           <FormField
             control={form.control}
+            name="hideFromTimeline"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>{t("feed_form.hide_from_timeline")}</FormLabel>
+                    <FormDescription>
+                      {t("feed_form.hide_from_timeline_description")}
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      className="shrink-0"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </div>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
             name="view"
             render={() => (
               <FormItem className="mb-4">
@@ -414,7 +428,7 @@ const FeedInnerForm = ({
           {isSubscribed && (
             <Button
               type="button"
-              variant="text"
+              variant="ghost"
               onClick={() => {
                 dismiss()
               }}

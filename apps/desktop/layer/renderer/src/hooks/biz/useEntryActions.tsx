@@ -1,13 +1,13 @@
 import { isMobile } from "@follow/components/hooks/useMobile.js"
-import { FeedViewType, UserRole, views } from "@follow/constants"
+import { FeedViewType, getView, UserRole } from "@follow/constants"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { useIsEntryStarred } from "@follow/store/collection/hooks"
-import { getEntry } from "@follow/store/entry/getter"
 import { useEntry } from "@follow/store/entry/hooks"
 import { entrySyncServices } from "@follow/store/entry/store"
 import type { EntryModel } from "@follow/store/entry/types"
 import { useFeedById } from "@follow/store/feed/hooks"
 import { useIsInbox } from "@follow/store/inbox/hooks"
+import { useUserRole } from "@follow/store/user/hooks"
 import { doesTextContainHTML } from "@follow/utils/utils"
 import { useMemo } from "react"
 
@@ -20,14 +20,16 @@ import {
   setReadabilityStatus,
   useEntryIsInReadability,
 } from "~/atoms/readability"
+import { useIntegrationSettingValue } from "~/atoms/settings/integration"
 import { useShowSourceContent } from "~/atoms/source-content"
-import { useUserRole, whoami } from "~/atoms/user"
 import { ipcServices } from "~/lib/client"
 import { COMMAND_ID } from "~/modules/command/commands/id"
 import { getCommand, useRunCommandFn } from "~/modules/command/hooks/use-command"
 import { useCommandShortcuts } from "~/modules/command/hooks/use-command-binding"
 import type { FollowCommandId } from "~/modules/command/types"
 import { useToolbarOrderMap } from "~/modules/customize-toolbar/hooks"
+
+import { useRouteParams } from "./useRouteParams"
 
 export const enableEntryReadability = async ({ id, url }: { id: string; url: string }) => {
   const status = getReadabilityStatus()[id]
@@ -45,14 +47,10 @@ export const toggleEntryReadability = async ({ id, url }: { id: string; url: str
       [id]: ReadabilityStatus.WAITING,
     })
     try {
-      const data = getEntry(id)?.readabilityContent
-
-      if (!data) {
-        await entrySyncServices.fetchEntryReadabilityContent(id, async () => {
-          const res = await ipcServices?.reader.readability({ url })
-          return res?.content
-        })
-      }
+      await entrySyncServices.fetchEntryReadabilityContent(id, async () => {
+        const res = await ipcServices?.reader.readability({ url })
+        return res?.content
+      })
 
       setReadabilityStatus({
         [id]: ReadabilityStatus.SUCCESS,
@@ -118,7 +116,67 @@ export class EntryActionMenuItem extends MenuItemText {
     })
   }
 }
-export type EntryActionItem = EntryActionMenuItem | MenuItemSeparator
+
+export class EntryActionDropdownItem extends MenuItemText {
+  protected privateConfig: EntryActionMenuItemConfig
+  public children: EntryActionMenuItem[]
+
+  constructor(config: EntryActionMenuItemConfig & { children?: EntryActionMenuItem[] }) {
+    const cmd = getCommand(config.id) || null
+    super({
+      ...config,
+      label: cmd?.label.title || "",
+      click: () => config.onClick?.(),
+      hide: !cmd || config.hide,
+    })
+
+    this.privateConfig = config
+    this.children = config.children || []
+  }
+
+  public get id() {
+    return this.privateConfig.id
+  }
+
+  public get active() {
+    return this.privateConfig.active
+  }
+
+  public get notice() {
+    return this.privateConfig.notice
+  }
+
+  public get entryId() {
+    return this.privateConfig.entryId
+  }
+
+  public get hasChildren() {
+    return this.children.length > 0
+  }
+
+  public get enabledChildren() {
+    return this.children.filter((child) => !child.hide)
+  }
+
+  public addChild(child: EntryActionMenuItem) {
+    this.children.push(child)
+  }
+
+  public removeChild(childId: string) {
+    this.children = this.children.filter((child) => child.id !== childId)
+  }
+
+  public override extend(
+    config: Partial<EntryActionMenuItemConfig & { children?: EntryActionMenuItem[] }>,
+  ) {
+    return new EntryActionDropdownItem({
+      ...this.privateConfig,
+      ...config,
+      children: config.children || this.children,
+    })
+  }
+}
+export type EntryActionItem = EntryActionMenuItem | EntryActionDropdownItem | MenuItemSeparator
 
 const entrySelector = (state: EntryModel) => {
   const content = state.content || ""
@@ -128,6 +186,7 @@ const entrySelector = (state: EntryModel) => {
   const { summary, translation, readability } = state.settings || {}
 
   const media = state.media || []
+  const attachments = state.attachments || []
   const images = media.filter((a) => a.type === "photo")
   const imagesLength = images.length
 
@@ -143,19 +202,25 @@ const entrySelector = (state: EntryModel) => {
     hasContent,
     doesContentContainsHTMLTags,
     imagesLength,
+    hasBitTorrent: attachments.some((a) => a.mime_type === "application/x-bittorrent"),
   }
 }
+export const HIDE_ACTIONS_IN_ENTRY_CONTEXT_MENU: FollowCommandId[] = [
+  COMMAND_ID.entry.viewSourceContent,
+  COMMAND_ID.entry.toggleAISummary,
+  COMMAND_ID.entry.toggleAITranslation,
 
-export const useEntryActions = ({
-  entryId,
-  view,
-  compact,
-}: {
-  entryId: string
-  view: FeedViewType
-  compact?: boolean
-}) => {
+  COMMAND_ID.settings.customizeToolbar,
+  COMMAND_ID.entry.readability,
+  COMMAND_ID.entry.exportAsPDF,
+]
+
+export const HIDE_ACTIONS_IN_ENTRY_TOOLBAR_ACTIONS: FollowCommandId[] = [
+  ...HIDE_ACTIONS_IN_ENTRY_CONTEXT_MENU,
+]
+export const useEntryActions = ({ entryId, view }: { entryId: string; view: FeedViewType }) => {
   const entry = useEntry(entryId, entrySelector)
+  const { isCollection, entryId: routeEntryId } = useRouteParams()
   const isInCollection = useIsEntryStarred(entryId)
   const isEntryInReadability = useEntryIsInReadability(entryId)
 
@@ -179,8 +244,11 @@ export const useEntryActions = ({
   const hasEntry = !!entry
 
   const userRole = useUserRole()
+  const integrationSettings = useIntegrationSettingValue()
 
   const shortcuts = useCommandShortcuts()
+
+  const isCurrentVisitEntry = routeEntryId === entryId
 
   const actionConfigs: EntryActionItem[] = useMemo(() => {
     if (!hasEntry) return []
@@ -227,13 +295,9 @@ export const useEntryActions = ({
         entryId,
       }),
       new EntryActionMenuItem({
-        id: COMMAND_ID.entry.tip,
-        onClick: runCmdFn(COMMAND_ID.entry.tip, [
-          { entryId, feedId: feed?.id, userId: feed?.ownerUserId },
-        ]),
-        hide: isInbox || feed?.ownerUserId === whoami()?.id,
-        // shortcut: shortcuts.entry.tip.key,
-        shortcut: shortcuts[COMMAND_ID.entry.tip],
+        id: COMMAND_ID.integration.saveToQBittorrent,
+        onClick: runCmdFn(COMMAND_ID.integration.saveToQBittorrent, [{ entryId }]),
+        hide: !IN_ELECTRON || !entry.hasBitTorrent,
         entryId,
       }),
       new EntryActionMenuItem({
@@ -258,6 +322,7 @@ export const useEntryActions = ({
       }),
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.exportAsPDF,
+        hide: !isCurrentVisitEntry,
         onClick: runCmdFn(COMMAND_ID.entry.exportAsPDF, [{ entryId }]),
         entryId,
       }),
@@ -271,6 +336,7 @@ export const useEntryActions = ({
         id: COMMAND_ID.entry.openInBrowser,
         hide: !entry.url,
         onClick: runCmdFn(COMMAND_ID.entry.openInBrowser, [{ entryId }]),
+        shortcut: shortcuts[COMMAND_ID.entry.openInBrowser],
         entryId,
       }),
       new EntryActionMenuItem({
@@ -291,7 +357,7 @@ export const useEntryActions = ({
             view,
           ),
         active: isShowAISummaryOnce,
-        disabled: userRole === UserRole.Trial,
+        disabled: userRole === UserRole.Free || userRole === UserRole.Trial,
         entryId,
       }),
       new EntryActionMenuItem({
@@ -303,7 +369,7 @@ export const useEntryActions = ({
             view,
           ),
         active: isShowAITranslationOnce,
-        disabled: userRole === UserRole.Trial,
+        disabled: userRole === UserRole.Free || userRole === UserRole.Trial,
         entryId,
       }),
       new EntryActionMenuItem({
@@ -316,13 +382,13 @@ export const useEntryActions = ({
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.readAbove,
         onClick: runCmdFn(COMMAND_ID.entry.readAbove, [{ publishedAt: entry.publishedAt }]),
-        hide: !!isInCollection,
+        hide: !!isCollection,
         entryId,
       }),
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.read,
         onClick: runCmdFn(COMMAND_ID.entry.read, [{ entryId }]),
-        hide: !!isInCollection,
+        hide: !!isCollection,
         active: !!entry.read,
         shortcut: shortcuts[COMMAND_ID.entry.read],
         entryId,
@@ -330,7 +396,7 @@ export const useEntryActions = ({
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.readBelow,
         onClick: runCmdFn(COMMAND_ID.entry.readBelow, [{ publishedAt: entry.publishedAt }]),
-        hide: !!isInCollection,
+        hide: !!isCollection,
         entryId,
       }),
       MENU_ITEM_SEPARATOR,
@@ -344,23 +410,46 @@ export const useEntryActions = ({
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.tts,
         onClick: runCmdFn(COMMAND_ID.entry.tts, [{ entryId }]),
-        hide: !IN_ELECTRON || compact || !entry.hasContent,
+        hide: !IN_ELECTRON || !entry.hasContent,
         shortcut: shortcuts[COMMAND_ID.entry.tts],
         entryId,
       }),
       new EntryActionMenuItem({
         id: COMMAND_ID.entry.readability,
         onClick: runCmdFn(COMMAND_ID.entry.readability, [{ entryId, entryUrl: entry.url! }]),
-        hide: !!entry.readability || compact || (view && views[view]!.wideMode) || !entry.url,
+        hide: !!entry.readability || (view && getView(view)?.wideMode) || !entry.url,
         active: isEntryInReadability,
         notice: !entry.doesContentContainsHTMLTags && !isEntryInReadability,
         entryId,
       }),
-      new EntryActionMenuItem({
-        id: COMMAND_ID.settings.customizeToolbar,
-        onClick: runCmdFn(COMMAND_ID.settings.customizeToolbar, []),
-        entryId,
-      }),
+
+      // Custom Integration with sub-menu
+      ...(() => {
+        const customIntegrations = integrationSettings.customIntegration || []
+        const enabledIntegrations = customIntegrations.filter((integration) => integration.enabled)
+
+        if (!integrationSettings.enableCustomIntegration || enabledIntegrations.length === 0) {
+          return []
+        }
+
+        return [
+          new EntryActionDropdownItem({
+            id: COMMAND_ID.integration.custom,
+            onClick: runCmdFn(COMMAND_ID.integration.custom, [{ entryId }]),
+            entryId,
+            children: enabledIntegrations.map((integration) => {
+              const virtualId = `integration:custom:${integration.id}` as FollowCommandId
+              return new EntryActionMenuItem({
+                id: virtualId,
+                onClick: () => {
+                  runCmdFn(virtualId, [{ entryId }])()
+                },
+                entryId,
+              })
+            }),
+          }),
+        ]
+      })(),
     ].filter((config) => {
       if (config === MENU_ITEM_SEPARATOR) {
         return config
@@ -374,6 +463,14 @@ export const useEntryActions = ({
     hasEntry,
     runCmdFn,
     entryId,
+    entry?.hasBitTorrent,
+    entry?.url,
+    entry?.imagesLength,
+    entry?.publishedAt,
+    entry?.read,
+    entry?.hasContent,
+    entry?.readability,
+    entry?.doesContentContainsHTMLTags,
     feed?.id,
     feed?.ownerUserId,
     feed?.siteUrl,
@@ -381,21 +478,17 @@ export const useEntryActions = ({
     shortcuts,
     view,
     isInCollection,
-    entry?.url,
-    entry?.publishedAt,
-    entry?.hasContent,
-    entry?.read,
-    entry?.readability,
-    entry?.imagesLength,
+    isCurrentVisitEntry,
     isShowSourceContent,
     isShowAISummaryAuto,
     isShowAISummaryOnce,
     userRole,
     isShowAITranslationAuto,
     isShowAITranslationOnce,
-    compact,
+    isCollection,
     isEntryInReadability,
-    entry?.doesContentContainsHTMLTags,
+    integrationSettings.customIntegration,
+    integrationSettings.enableCustomIntegration,
   ])
 
   return actionConfigs
@@ -404,13 +497,11 @@ export const useEntryActions = ({
 export const useSortedEntryActions = ({
   entryId,
   view,
-  compact,
 }: {
   entryId: string
   view: FeedViewType
-  compact?: boolean
 }) => {
-  const entryActions = useEntryActions({ entryId, view, compact })
+  const entryActions = useEntryActions({ entryId, view })
   const orderMap = useToolbarOrderMap()
   const mainAction = useMemo(
     () =>

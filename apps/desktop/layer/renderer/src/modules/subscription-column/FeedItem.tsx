@@ -71,6 +71,10 @@ const FeedItemImpl = ({ view, feedId, className, isPreview }: FeedItemProps) => 
   const { t } = useTranslation()
   const subscription = useSubscriptionByFeedId(feedId)
   const navigate = useNavigateEntry()
+
+  // Use current route view for navigation to stay in current view (e.g., All view)
+  const currentRouteView = useRouteParamsSelector((s) => s.view)
+  const navigationView = currentRouteView ?? view
   const feed = useFeedById(feedId, (feed) => {
     return {
       type: feed.type,
@@ -101,14 +105,14 @@ const FeedItemImpl = ({ view, feedId, className, isPreview }: FeedItemProps) => 
       }
 
       e.stopPropagation()
-      if (view === undefined) return
+      if (navigationView === undefined) return
       navigate({
         feedId,
         entryId: null,
-        view,
+        view: navigationView,
       })
     },
-    [feedId, navigate, setSelectedFeedIds, view],
+    [feedId, navigate, setSelectedFeedIds, navigationView],
   )
 
   const feedUnread = useUnreadById(feedId)
@@ -189,11 +193,11 @@ const FeedItemImpl = ({ view, feedId, className, isPreview }: FeedItemProps) => 
       {...contextMenuProps}
     >
       <div className={cn("flex min-w-0 items-center", isFeed && feed.errorAt && "text-red")}>
-        <FeedIcon fallback feed={feed} size={16} />
+        <FeedIcon fallback target={feed} size={16} />
         <FeedTitle feed={feed} />
         {isFeed && (
           <ErrorTooltip errorAt={feed.errorAt} errorMessage={feed.errorMessage}>
-            <i className="i-mgc-wifi-off-cute-re ml-1 shrink-0 text-base" />
+            <i className="i-mingcute-close-circle-fill ml-1 shrink-0 text-base" />
           </ErrorTooltip>
         )}
         {subscription?.isPrivate && (
@@ -207,7 +211,7 @@ const FeedItemImpl = ({ view, feedId, className, isPreview }: FeedItemProps) => 
           </Tooltip>
         )}
       </div>
-      {isPreview && (
+      {isPreview ? (
         <Button
           size="sm"
           variant="ghost"
@@ -220,10 +224,11 @@ const FeedItemImpl = ({ view, feedId, className, isPreview }: FeedItemProps) => 
             })
           }}
         >
-          <i className="i-mgc-add-cute-re text-accent text-base" />
+          <i className="i-mgc-add-cute-re text-base text-accent" />
         </Button>
+      ) : (
+        <UnreadNumber unread={feedUnread} className="ml-2" />
       )}
-      <UnreadNumber unread={feedUnread} className="ml-2" />
     </DraggableItemWrapper>
   )
 }
@@ -270,6 +275,11 @@ const ListItemImpl: Component<ListItemProps> = ({
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const subscription = useSubscriptionByFeedId(listId)!
   const navigate = useNavigateEntry()
+
+  // Use current route view for navigation to stay in current view (e.g., All view)
+  const currentRouteView = useRouteParamsSelector((s) => s.view)
+  const navigationView = currentRouteView ?? view
+
   const handleNavigate = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       e.stopPropagation()
@@ -277,10 +287,10 @@ const ListItemImpl: Component<ListItemProps> = ({
       navigate({
         listId,
         entryId: null,
-        view,
+        view: navigationView,
       })
     },
-    [listId, navigate, view],
+    [listId, navigate, navigationView],
   )
   const showContextMenu = useShowContextMenu()
   const { t } = useTranslation()
@@ -309,7 +319,7 @@ const ListItemImpl: Component<ListItemProps> = ({
       {...contextMenuProps}
     >
       <div className="flex min-w-0 flex-1 items-center">
-        <FeedIcon fallback feed={list} size={iconSize} className="mask mask-squircle" />
+        <FeedIcon fallback target={list} size={iconSize} className="mask-squircle mask" />
         <EllipsisHorizontalTextWithTooltip className="truncate">
           {getPreferredTitle(list)}
         </EllipsisHorizontalTextWithTooltip>
@@ -325,7 +335,7 @@ const ListItemImpl: Component<ListItemProps> = ({
           </Tooltip>
         )}
       </div>
-      {isPreview && (
+      {isPreview ? (
         <Button
           size="sm"
           variant="ghost"
@@ -337,10 +347,11 @@ const ListItemImpl: Component<ListItemProps> = ({
             })
           }}
         >
-          <i className="i-mgc-add-cute-re text-accent text-base" />
+          <i className="i-mgc-add-cute-re text-base text-accent" />
         </Button>
+      ) : (
+        <UnreadNumber unread={listUnread} className="ml-2" />
       )}
-      <UnreadNumber unread={listUnread} className="ml-2" />
     </div>
   )
 }
@@ -379,6 +390,11 @@ const InboxItemImpl: Component<InboxItemProps> = ({ view, inboxId, className, ic
 
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const navigate = useNavigateEntry()
+
+  // Use current route view for navigation to stay in current view (e.g., All view)
+  const currentRouteView = useRouteParamsSelector((s) => s.view)
+  const navigationView = currentRouteView ?? view
+
   const handleNavigate = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       e.stopPropagation()
@@ -386,10 +402,10 @@ const InboxItemImpl: Component<InboxItemProps> = ({ view, inboxId, className, ic
       navigate({
         inboxId,
         entryId: null,
-        view,
+        view: navigationView,
       })
     },
-    [inboxId, navigate, view],
+    [inboxId, navigate, navigationView],
   )
   const showContextMenu = useShowContextMenu()
 
@@ -407,7 +423,7 @@ const InboxItemImpl: Component<InboxItemProps> = ({ view, inboxId, className, ic
       data-sub={`inbox-${inboxId}`}
       data-inbox-id={inboxId}
       className={cn(
-        "cursor-menu flex w-full items-center justify-between rounded-md pr-2.5 text-base font-medium leading-loose lg:text-sm",
+        "flex w-full cursor-menu items-center justify-between rounded-md pr-2.5 text-base font-medium leading-loose lg:text-sm",
         feedColumnStyles.item,
         "py-0.5 pl-2.5",
         className,
@@ -416,7 +432,7 @@ const InboxItemImpl: Component<InboxItemProps> = ({ view, inboxId, className, ic
       {...contextMenuProps}
     >
       <div className={"flex min-w-0 items-center"}>
-        <FeedIcon fallback feed={inbox} size={iconSize} />
+        <FeedIcon fallback target={inbox} size={iconSize} />
         <EllipsisHorizontalTextWithTooltip className="truncate">
           {getPreferredTitle(inbox)}
         </EllipsisHorizontalTextWithTooltip>

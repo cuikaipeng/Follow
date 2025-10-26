@@ -11,28 +11,26 @@ import type { PropsWithChildren } from "react"
 import { memo, use, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
+import { useUISettingKey } from "~/atoms/settings/ui"
 import { SwipeMedia } from "~/components/ui/media/SwipeMedia"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { EntryContent } from "~/modules/entry-content"
 import { useImageDimensions } from "~/store/image"
 
-import { usePreviewMedia } from "../../../components/ui/media/hooks"
 import { EntryItemWrapper } from "../layouts/EntryItemWrapper"
 import { GridItem, GridItemFooter } from "../templates/grid-item-template"
 import type { UniversalItemProps } from "../types"
 
-export function PictureItem({ entryId, entryPreview, translation }: UniversalItemProps) {
+export function PictureItem({ entryId, translation }: UniversalItemProps) {
   const entry = useEntry(entryId, (state) => ({ media: state.media, id: state.id }))
-  const entryMedia = entry?.media || entryPreview?.entries?.media || []
+  const entryMedia = entry?.media || []
 
   const isActive = useRouteParamsSelector(({ entryId }) => entryId === entry?.id)
 
   const { t } = useTranslation()
-  const entryContent = useMemo(() => <EntryContent entryId={entryId} noMedia compact />, [entryId])
-  const previewMedia = usePreviewMedia(entryContent)
+
   if (!entry) return null
   return (
-    <GridItem entryId={entryId} entryPreview={entryPreview} translation={translation}>
+    <GridItem entryId={entryId} translation={translation}>
       <div className="relative flex gap-2 overflow-x-auto">
         {entryMedia ? (
           <SwipeMedia
@@ -43,12 +41,10 @@ export function PictureItem({ entryId, entryPreview, translation }: UniversalIte
               isActive && "rounded-b-none",
             )}
             imgClassName="object-cover"
-            onPreview={(media, i) => {
-              previewMedia(media, i)
-            }}
+            fitContainer
           />
         ) : (
-          <div className="center bg-material-medium text-text-secondary aspect-square w-full flex-col gap-1 rounded-md text-xs">
+          <div className="center aspect-square w-full flex-col gap-1 rounded-md bg-material-medium text-xs text-text-secondary">
             <i className="i-mgc-sad-cute-re size-6" />
             {t("entry_content.no_content")}
           </div>
@@ -65,7 +61,6 @@ const proxySize = {
 
 export const PictureWaterFallItem = memo(function PictureWaterFallItem({
   entryId,
-  entryPreview,
   translation,
   index,
   className,
@@ -76,9 +71,8 @@ export const PictureWaterFallItem = memo(function PictureWaterFallItem({
   }))
 
   const isActive = useRouteParamsSelector(({ entryId }) => entryId === entry?.id)
-  const entryContent = useMemo(() => <EntryContent entryId={entryId} noMedia compact />, [entryId])
-  const previewMedia = usePreviewMedia(entryContent)
   const itemWidth = useMasonryItemWidth()
+  const isImageOnly = useUISettingKey("pictureViewImageOnly")
 
   const [ref, setRef] = useState<HTMLDivElement | null>(null)
   const intersectionObserver = use(MasonryIntersectionContext)
@@ -93,7 +87,7 @@ export const PictureWaterFallItem = memo(function PictureWaterFallItem({
     }
   }, [ref, intersectionObserver])
 
-  const media = entry?.media || entryPreview?.entries?.media || []
+  const media = entry?.media || []
 
   if (media?.length === 0) return null
   if (!entry) return null
@@ -103,7 +97,7 @@ export const PictureWaterFallItem = memo(function PictureWaterFallItem({
       <EntryItemWrapper
         view={FeedViewType.Pictures}
         entryId={entryId}
-        itemClassName="group rounded-md overflow-hidden hover:bg-transparent"
+        itemClassName="group rounded-md hover:bg-transparent"
         style={{
           width: itemWidth,
         }}
@@ -118,19 +112,15 @@ export const PictureWaterFallItem = memo(function PictureWaterFallItem({
               )}
               proxySize={proxySize}
               imgClassName="object-cover"
-              onPreview={previewMedia}
             />
-
-            <div className="z-[3] shrink-0 overflow-hidden rounded-b-md pb-1">
-              <GridItemFooter
-                entryId={entryId}
-                entryPreview={entryPreview}
-                translation={translation}
-              />
-            </div>
+            {!isImageOnly && (
+              <div className="z-[3] shrink-0 overflow-hidden rounded-b-md pb-1">
+                <GridItemFooter entryId={entryId} translation={translation} />
+              </div>
+            )}
           </MasonryItemFixedDimensionWrapper>
         ) : (
-          <div className="center bg-material-medium text-text-secondary aspect-video flex-col gap-1 rounded-md text-xs">
+          <div className="center aspect-video flex-col gap-1 rounded-md bg-material-medium text-xs text-text-secondary">
             <i className="i-mgc-sad-cute-re size-6" />
             No media available
           </div>
@@ -148,26 +138,31 @@ const MasonryItemFixedDimensionWrapper = (
   const { url, children } = props
   const dim = useImageDimensions(url)
   const itemWidth = useMasonryItemWidth()
+  const isImageOnly = useUISettingKey("pictureViewImageOnly")
 
-  const itemHeight = dim ? itemWidth / dim.ratio : itemWidth
-  const stableRadio = useState(() => itemWidth / itemHeight || 1)[0]
+  const stableRadio = useMemo(() => {
+    return dim ? dim.ratio : 1
+  }, [dim])
   const setItemStableRatio = useSetStableMasonryItemRatio()
 
   const stableRadioCtx = useMasonryItemRatio(url)
 
   useEffect(() => {
-    setItemStableRatio(url, stableRadio)
-  }, [setItemStableRatio, stableRadio, url])
+    if (dim) {
+      setItemStableRatio(url, stableRadio)
+    }
+  }, [setItemStableRatio, stableRadio, url, dim])
 
+  const finalRatio = stableRadioCtx || stableRadio
   const style = useMemo(
     () => ({
       width: itemWidth,
-      height: itemWidth / stableRadioCtx! + 60,
+      height: itemWidth / finalRatio + +(!isImageOnly ? 60 : 0),
     }),
-    [itemWidth, stableRadioCtx],
+    [itemWidth, finalRatio, isImageOnly],
   )
 
-  if (!style.height) return null
+  if (!style.height || style.height === Infinity) return null
 
   return (
     <div className="relative flex h-full flex-col overflow-x-auto overflow-y-hidden" style={style}>
@@ -179,3 +174,5 @@ const MasonryItemFixedDimensionWrapper = (
 MasonryItemFixedDimensionWrapper.whyDidYouRender = {
   logOnDifferentValues: true,
 }
+
+export { PictureItemSkeleton } from "./picture-item-skeleton"

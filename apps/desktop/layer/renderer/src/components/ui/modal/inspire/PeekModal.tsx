@@ -5,22 +5,22 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { m } from "~/components/common/Motion"
+import { GlassButton } from "~/components/ui/button/GlassButton"
 
-import { PeekModalBaseButton } from "../components/base"
 import { FixedModalCloseButton } from "../components/close"
 import { useCurrentModal, useModalStack } from "../stacked/hooks"
 import { InPeekModal } from "./InPeekModal"
 
-export const PeekModal = (
-  props: PropsWithChildren<{
-    to?: string
-    rightActions?: {
-      onClick: () => void
-      label: string
-      icon: ReactNode
-    }[]
-  }>,
-) => {
+interface PeekModalProps {
+  to?: string
+  rightActions?: {
+    onClick: () => void
+    label: string
+    icon: ReactNode
+  }[]
+}
+
+export const PeekModal = (props: PropsWithChildren<PeekModalProps>) => {
   const { dismissAll } = useModalStack()
 
   const { to, children } = props
@@ -31,13 +31,13 @@ export const PeekModal = (
   return (
     <RootPortalContext value={rootRef as HTMLElement}>
       <div
-        className="scrollbar-none relative mx-auto mt-[10vh] max-w-full overflow-hidden px-2 lg:max-w-[65rem] lg:p-0"
+        className="relative mx-auto mt-[10vh] max-w-full overflow-hidden px-2 scrollbar-none lg:max-w-[65rem] lg:p-0"
         ref={setRootRef}
       >
         <m.div
           exit={{ opacity: 0, y: 50 }}
           transition={{ duration: 0.2 }}
-          className="motion-preset-slide-up motion-duration-200 motion-ease-spring-smooth scrollbar-none overflow-hidden"
+          className="motion-preset-slide-up overflow-hidden motion-duration-200 motion-ease-spring-smooth scrollbar-none"
         >
           <InPeekModal value={true}>{children}</InPeekModal>
         </m.div>
@@ -46,26 +46,32 @@ export const PeekModal = (
           exit={{
             opacity: 0,
           }}
-          className="safe-inset-top-4 fixed right-4 flex items-center gap-4"
+          className="fixed right-4 flex items-center gap-4 safe-inset-top-4"
         >
           {props.rightActions?.map((action) => (
-            <PeekModalBaseButton
+            <GlassButton
               key={action.label}
               onClick={action.onClick}
-              label={action.label}
-              icon={action.icon}
-            />
+              description={action.label}
+              size="md"
+              variant="flat"
+            >
+              {action.icon}
+            </GlassButton>
           ))}
           {!!to && (
-            <PeekModalBaseButton
+            <GlassButton
               onClick={() => {
                 dismissAll()
 
                 getStableRouterNavigate()?.(to)
               }}
-              label={t("words.expand")}
-              icon={<i className="i-mgc-fullscreen-2-cute-re text-lg" />}
-            />
+              description={t("words.expand")}
+              size="md"
+              variant="flat"
+            >
+              <i className="i-mgc-fullscreen-2-cute-re text-lg" />
+            </GlassButton>
           )}
           <FixedModalCloseButton onClick={dismiss} />
         </m.div>

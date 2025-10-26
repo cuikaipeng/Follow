@@ -64,13 +64,12 @@ interface RenderGlobalContext {
   getWebUrl: () => string
   getApiUrl: () => string
 
-  // View
-  zenMode: () => void
-
   // Utils
   invalidateQuery: (queryKey: string | string[]) => void
   navigateEntry: (options: { feedId: string; entryId: string; view: number }) => void
   updateDownloaded: () => void
+
+  refreshSession: () => void
 }
 
 export const registerGlobalContext = (context: Partial<RenderGlobalContext>) => {

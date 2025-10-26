@@ -1,4 +1,4 @@
-name: Build Desktop
+name: 🖥️ Build Desktop
 
 on:
   push:
@@ -32,6 +32,7 @@ env:
   VITE_OPENPANEL_CLIENT_ID: ${{ vars.VITE_OPENPANEL_CLIENT_ID }}
   VITE_OPENPANEL_API_URL: ${{ vars.VITE_OPENPANEL_API_URL }}
   VITE_FIREBASE_CONFIG: ${{ vars.VITE_FIREBASE_CONFIG }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   NODE_OPTIONS: --max-old-space-size=8192
 
 jobs:
@@ -55,13 +56,13 @@ jobs:
 
     steps:
       - name: Check out Git repository Fully
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         if: env.PROD == 'true'
         with:
           fetch-depth: 0
           lfs: true
       - name: Check out Git repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         if: env.PROD == 'false'
         with:
           fetch-depth: 1
@@ -71,7 +72,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: "pnpm"
@@ -137,14 +138,11 @@ jobs:
       - name: Build - Vite
         working-directory: apps/desktop
         run: pnpm build:electron-vite ${{ env.PROD == 'false' && '--mode staging' || '' }}
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
       - name: Build - Windows and Linux
-        if: runner.os != 'macOS'
+        if: runner.os == 'Linux' || (runner.os == 'Windows' && github.event.inputs.store != 'true')
         working-directory: apps/desktop
         run: pnpm build:electron-forge ${{ env.PROD == 'false' && '--mode=staging' || '' }}
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
       - name: Build - macOS
         if: runner.os == 'macOS' && github.event.inputs.store != 'true'
@@ -174,18 +172,19 @@ jobs:
         working-directory: apps/desktop
         run: pnpm build:electron-forge:mas
 
+      - name: Build - Microsoft Store
+        if: runner.os == 'Windows' && github.event.inputs.store == 'true'
+        working-directory: apps/desktop
+        run: pnpm build:electron-forge:ms
+
       - name: Build - Renderer
         if: runner.os == 'Linux'
         working-directory: apps/desktop
         run: pnpm build:render
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
       - name: Upload file (macos-arm64-dmg)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'macOS'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: macos-arm64-dmg
           path: |
@@ -194,10 +193,8 @@ jobs:
           retention-days: 90
 
       - name: Upload file (macos-x64-dmg)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'macOS'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: macos-x64-dmg
           path: |
@@ -206,10 +203,8 @@ jobs:
           retention-days: 90
 
       - name: Upload file (macos-mas-pkg)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'macOS'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: macos-mas-pkg
           path: |
@@ -217,11 +212,9 @@ jobs:
           retention-days: 90
 
       - name: Upload file (windows-x64-exe unsigned)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         id: upload-unsigned-windows-x64-exe
         if: runner.os == 'windows'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: windows-x64-exe
           path: |
@@ -229,7 +222,7 @@ jobs:
             apps/desktop/out/make/**/latest.yml
           retention-days: 90
 
-      - uses: signpath/github-action-submit-signing-request@v1.2
+      - uses: signpath/github-action-submit-signing-request@v2.0
         continue-on-error: true
         if: runner.os == 'windows' && env.RELEASE == 'true'
         with:
@@ -246,10 +239,8 @@ jobs:
         run: npx tsx apps/desktop/scripts/update-windows-yml.ts
 
       - name: Upload file (windows-x64-exe signed)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'windows' && env.RELEASE == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: windows-x64-exe
           path: |
@@ -259,10 +250,8 @@ jobs:
           overwrite: true
 
       - name: Upload file (windows-x64-appx)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'windows'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: windows-x64-appx
           path: |
@@ -270,10 +259,8 @@ jobs:
           retention-days: 90
 
       - name: Upload file (linux-x64-appimage)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os == 'linux'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: linux-x64-appimage
           path: |
@@ -284,7 +271,7 @@ jobs:
       - name: Generate artifact attestation
         if: env.RELEASE == 'true'
         continue-on-error: true
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             apps/desktop/out/make/**/Folo-*.dmg
@@ -298,8 +285,6 @@ jobs:
       - run: npx changelogithub
         if: env.RELEASE == 'true'
         continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Version
         if: env.RELEASE == 'true'
@@ -312,10 +297,10 @@ jobs:
         if: env.RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ steps.version.outputs.APP_VERSION }}
+          name: Desktop v${{ steps.version.outputs.APP_VERSION }}
           draft: false
           prerelease: true
-          tag_name: v${{ steps.version.outputs.APP_VERSION }}
+          tag_name: desktop/v${{ steps.version.outputs.APP_VERSION }}
           files: |
             apps/desktop/out/make/**/Folo-*.dmg
             apps/desktop/out/make/**/Folo-*.zip

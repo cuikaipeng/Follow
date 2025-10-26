@@ -1,12 +1,13 @@
 import { cn, formatNumber } from "@follow/utils"
 import { useQuery } from "@tanstack/react-query"
-import { Text, View } from "react-native"
+import { View } from "react-native"
 import { useColor } from "react-native-uikit-colors"
 
 import { useUISettingKey } from "@/src/atoms/settings/ui"
 import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { ItemPressableStyle } from "@/src/components/ui/pressable/enum"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
+import { Text } from "@/src/components/ui/typography/Text"
 import { FilterCuteReIcon } from "@/src/icons/filter_cute_re"
 import { TrendingUpCuteReIcon } from "@/src/icons/trending_up_cute_re"
 import { User3CuteReIcon } from "@/src/icons/user_3_cute_re"
@@ -32,15 +33,17 @@ export const Trending = ({
         lang: discoverLanguage === "all" ? undefined : discoverLanguage,
         limit: 20,
       }).then((res) => res.data),
+    meta: {
+      persist: true,
+    },
   })
   const navigation = useNavigation()
-
   return (
     <View className={className}>
       <View className={cn("flex-row items-center justify-between pb-1 pt-4", itemClassName)}>
         <View className="flex-row items-center gap-2">
           <TrendingUpCuteReIcon width={24} height={24} color={label} />
-          <Text className="text-label pb-2 text-2xl font-bold leading-[1.1]">Trending</Text>
+          <Text className="pb-2 text-2xl font-bold leading-[1.1] text-label">Trending</Text>
         </View>
         <ItemPressable
           className="rounded-lg p-1"
@@ -61,8 +64,10 @@ export const Trending = ({
         ) : (
           data?.map((item, index) => (
             <FeedSummary
+              preview
+              view={item.view}
               key={item.feed?.id}
-              item={item}
+              feed={item.feed!}
               className={cn("flex flex-1 flex-row items-center bg-none py-3", itemClassName)}
               simple
               preChildren={
@@ -79,7 +84,7 @@ export const Trending = ({
                       : "bg-gray-5/60 dark:bg-white/60",
                   )}
                 >
-                  <Text className={cn("text-text text-xs font-medium", index < 3 && "text-white")}>
+                  <Text className={cn("text-xs font-medium text-text", index < 3 && "text-white")}>
                     {index + 1}
                   </Text>
                 </View>
@@ -87,7 +92,7 @@ export const Trending = ({
             >
               <View className="flex flex-row items-center gap-1 opacity-60">
                 <User3CuteReIcon width={13} height={13} color={label} />
-                <Text className="text-text text-sm">
+                <Text className="text-sm text-text">
                   {formatNumber(item.analytics.subscriptionCount || 0)}
                 </Text>
               </View>

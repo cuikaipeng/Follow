@@ -14,7 +14,6 @@ export const COMMAND_ID = {
     copyTitle: "entry:copy-title",
     tts: "entry:tts",
     exportAsPDF: "entry:export-as-pdf",
-    tip: "entry:tip",
     delete: "entry:delete",
     share: "entry:share",
   },
@@ -27,6 +26,9 @@ export const COMMAND_ID = {
     saveToReadeck: "integration:save-to-readeck",
     saveToCubox: "integration:save-to-cubox",
     saveToZotero: "integration:save-to-zotero",
+    saveToQBittorrent: "integration:save-to-qbittorrent",
+
+    custom: "integration:custom",
   },
   list: {
     edit: "list:edit",
@@ -46,14 +48,14 @@ export const COMMAND_ID = {
     showShortcuts: "global:show-shortcuts",
     toggleCornerPlay: "global:toggle-corner-play",
     quickAdd: "global:quick-add",
+    toggleAIChat: "global:toggle-ai-chat",
+    quickSearch: "global:quick-search",
   },
   layout: {
     toggleSubscriptionColumn: "layout:toggle-subscription-column",
     focusToTimeline: "layout:focus-to-timeline",
     focusToSubscription: "layout:focus-to-subscription",
     focusToEntryRender: "layout:focus-to-entry-render",
-    toggleWideMode: "layout:toggle-wide-mode",
-    toggleZenMode: "layout:toggle-zen-mode",
   },
   timeline: {
     switchToNext: "timeline:switch-to-next",

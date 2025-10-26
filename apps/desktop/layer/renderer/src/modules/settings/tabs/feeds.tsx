@@ -20,24 +20,19 @@ import {
   TooltipTrigger,
 } from "@follow/components/ui/tooltip/index.js"
 import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
-import { views } from "@follow/constants"
-import type { ExtractBizResponse } from "@follow/models"
+import { getView, getViewList } from "@follow/constants"
 import { getFeedById } from "@follow/store/feed/getter"
-import { useFeedById } from "@follow/store/feed/hooks"
+import { useFeedById, usePrefetchFeedAnalytics } from "@follow/store/feed/hooks"
 import { getSubscriptionByFeedId } from "@follow/store/subscription/getter"
 import {
   useAllFeedSubscriptionIds,
   useSubscriptionByFeedId,
 } from "@follow/store/subscription/hooks"
-import { jotaiStore } from "@follow/utils/jotai"
 import { clsx, formatNumber, sortByAlphabet } from "@follow/utils/utils"
-import { useSingleton } from "foxact/use-singleton"
-import type { PrimitiveAtom } from "jotai"
-import { atom, useAtomValue } from "jotai"
-import { selectAtom } from "jotai/utils"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { AnimatePresence, m } from "motion/react"
 import type { FC } from "react"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { useIsInMASReview } from "~/atoms/server-configs"
@@ -51,15 +46,13 @@ import {
 import { useDialog } from "~/components/ui/modal/stacked/hooks"
 import { useBatchUpdateSubscription } from "~/hooks/biz/useSubscriptionActions"
 import { useAuthQuery } from "~/hooks/common"
-import { apiClient } from "~/lib/api-fetch"
 import { UrlBuilder } from "~/lib/url-builder"
 import { FeedIcon } from "~/modules/feed/feed-icon"
 import { useConfirmUnsubscribeSubscriptionModal } from "~/modules/modal/hooks/useConfirmUnsubscribeSubscriptionModal"
 import { Balance } from "~/modules/wallet/balance"
 import { Queries } from "~/queries"
 
-type Analytics = ExtractBizResponse<typeof apiClient.feeds.analytics.$post>["data"]["analytics"]
-type SortField = "name" | "view" | "date"
+type SortField = "name" | "view" | "date" | "subscriptionCount" | "updatesPerWeek"
 type SortDirection = "asc" | "desc"
 
 export const SettingFeeds = () => {
@@ -72,7 +65,7 @@ export const SettingFeeds = () => {
   )
 }
 
-const GRID_COLS_CLASSNAME = tw`grid-cols-[30px_auto_150px_150px_100px]`
+const GRID_COLS_CLASSNAME = tw`grid-cols-[30px_auto_100px_150px_60px_60px]`
 
 const SubscriptionFeedsSection = () => {
   const { t } = useTranslation("settings")
@@ -121,90 +114,8 @@ const SubscriptionFeedsSection = () => {
   const presentDeleteSubscription = useConfirmUnsubscribeSubscriptionModal()
   const handleBatchUnsubscribe = useCallback(() => {
     const feedIds = Array.from(selectedFeeds)
-    presentDeleteSubscription(feedIds)
-  }, [presentDeleteSubscription, selectedFeeds])
-
-  const [visibleableFeedIds, setVisibleableFeedIds] = useState<Set<string>>(() => new Set())
-  const scrollContainerElement = useScrollViewElement()
-  useEffect(() => {
-    if (!scrollContainerElement) return
-    const observer = new IntersectionObserver((entries) => {
-      setVisibleableFeedIds((prevSet) => {
-        const nextSet = new Set(prevSet)
-        entries.forEach((entry) => {
-          const targetId = (entry.target as HTMLButtonElement).dataset.id
-          if (targetId) {
-            if (entry.isIntersecting) {
-              nextSet.add(targetId)
-            } else {
-              nextSet.delete(targetId)
-            }
-          }
-        })
-        return nextSet
-      })
-    })
-    scrollContainerElement.querySelectorAll("[data-id]").forEach((el) => {
-      observer.observe(el)
-    })
-    return () => {
-      observer.disconnect()
-    }
-  }, [scrollContainerElement])
-
-  const isFetchedSetRef = useSingleton(() => new Set())
-  const [analytics] = useState(() => atom<Analytics>({}))
-
-  const pendingFetchIdsRef = useRef<Set<string>>(new Set())
-  const timeoutRef = useRef<NodeJS.Timeout>(void 0)
-
-  useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-
-    visibleableFeedIds.forEach((id) => {
-      if (!isFetchedSetRef.current.has(id)) {
-        pendingFetchIdsRef.current.add(id)
-      }
-    })
-
-    timeoutRef.current = setTimeout(() => {
-      const fetchedIds = Array.from(pendingFetchIdsRef.current)
-      if (fetchedIds.length > 0) {
-        fetchedIds.forEach((id) => {
-          isFetchedSetRef.current.add(id)
-        })
-
-        // Clear pending batch
-        pendingFetchIdsRef.current.clear()
-
-        apiClient.feeds.analytics
-          .$post({
-            json: {
-              id: fetchedIds,
-            },
-          })
-          .then((res) => {
-            jotaiStore.set(analytics, {
-              ...jotaiStore.get(analytics),
-              ...res.data.analytics,
-            })
-          })
-          .catch((_error) => {
-            fetchedIds.forEach((id) => {
-              isFetchedSetRef.current.delete(id)
-            })
-          })
-      }
-    }, 200)
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [analytics, isFetchedSetRef, visibleableFeedIds])
+    presentDeleteSubscription(feedIds, () => setSelectedFeeds(new Set()))
+  }, [presentDeleteSubscription, selectedFeeds, setSelectedFeeds])
 
   return (
     <section className="relative mt-4">
@@ -215,7 +126,7 @@ const SubscriptionFeedsSection = () => {
           {/* Header - Sticky */}
           <div
             className={clsx(
-              "bg-background text-text-secondary sticky top-0 z-20 grid h-8 gap-4 border-b px-1 pb-2 text-sm font-medium",
+              "sticky top-0 z-20 grid h-8 gap-4 border-b bg-background px-1 pb-2 text-sm font-medium text-text-secondary",
               GRID_COLS_CLASSNAME,
             )}
           >
@@ -224,7 +135,7 @@ const SubscriptionFeedsSection = () => {
             </div>
             <button
               type="button"
-              className="hover:text-text text-left transition-colors"
+              className="text-left transition-colors hover:text-text"
               onClick={() => handleSort("name")}
             >
               {t("feeds.tableHeaders.name")}
@@ -234,36 +145,56 @@ const SubscriptionFeedsSection = () => {
             </button>
             <button
               type="button"
-              className="hover:text-text ml-4 text-left transition-colors"
+              className="ml-4 text-left transition-colors hover:text-text"
               onClick={() => handleSort("view")}
             >
-              View
+              {t("feeds.tableHeaders.view")}
               {sortField === "view" && (
                 <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>
               )}
             </button>
             <button
-              className="hover:text-text text-center transition-colors"
+              className="text-center transition-colors hover:text-text"
               onClick={() => handleSort("date")}
               type="button"
             >
-              Subscribed Date
+              {t("feeds.tableHeaders.date")}
               {sortField === "date" && (
                 <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>
               )}
             </button>
-            <div className="text-center">Analytics</div>
+            <button
+              className="text-nowrap text-center transition-colors hover:text-text"
+              onClick={() => handleSort("subscriptionCount")}
+              type="button"
+            >
+              {t("feeds.tableHeaders.followers")}
+              {sortField === "subscriptionCount" && (
+                <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>
+              )}
+            </button>
+            <button
+              className="text-nowrap text-center transition-colors hover:text-text"
+              onClick={() => handleSort("updatesPerWeek")}
+              type="button"
+            >
+              {t("feeds.tableHeaders.updatesPerWeek")}
+              {sortField === "updatesPerWeek" && (
+                <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>
+              )}
+            </button>
           </div>
 
           {/* Feed List */}
-          <SortedFeedsList
-            feeds={allFeeds}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            selectedFeeds={selectedFeeds}
-            analyticsAtom={analytics}
-            onSelect={handleSelectFeed}
-          />
+          <div className="relative">
+            <SortedFeedsList
+              feeds={allFeeds}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              selectedFeeds={selectedFeeds}
+              onSelect={handleSelectFeed}
+            />
+          </div>
 
           {/* Sticky Action Bar at bottom when scrolled */}
           <AnimatePresence>
@@ -276,14 +207,14 @@ const SubscriptionFeedsSection = () => {
                   transition={Spring.presets.smooth}
                   className="sticky bottom-16 mt-4 flex justify-center"
                 >
-                  <div className="text-text-secondary bg-material-opaque rounded-md px-4 py-2 text-sm">
-                    {selectedFeeds.size} item(s) selected
+                  <div className="rounded-md bg-material-opaque px-4 py-2 text-sm text-text-secondary">
+                    {t("feeds.tableSelected.item", { count: selectedFeeds.size })}
                     <button
-                      className="text-accent cursor-button ml-3 text-xs"
+                      className="ml-3 cursor-button text-xs text-accent"
                       type="button"
                       onClick={() => setSelectedFeeds(new Set())}
                     >
-                      Clear
+                      {t("feeds.tableSelected.clear")}
                     </button>
                   </div>
                 </m.div>
@@ -294,11 +225,11 @@ const SubscriptionFeedsSection = () => {
                   transition={Spring.presets.smooth}
                   className="sticky bottom-4 flex justify-center"
                 >
-                  <div className="bg-material-opaque flex items-center gap-2 rounded px-4 py-2">
+                  <div className="flex items-center gap-2 rounded bg-material-opaque px-4 py-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <MotionButtonBase className="text-accent text-xs" type="button">
-                          Move to View
+                        <MotionButtonBase className="text-xs text-accent" type="button">
+                          {t("feeds.tableSelected.moveToView.action")}
                         </MotionButtonBase>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent side="top">
@@ -307,11 +238,11 @@ const SubscriptionFeedsSection = () => {
                     </DropdownMenu>
 
                     <MotionButtonBase
-                      className="text-red text-xs"
+                      className="text-xs text-red"
                       type="button"
                       onClick={handleBatchUnsubscribe}
                     >
-                      Unsubscribe
+                      {t("feeds.tableSelected.unsubscribe")}
                     </MotionButtonBase>
                   </div>
                 </m.div>
@@ -326,12 +257,13 @@ const SubscriptionFeedsSection = () => {
 
 const SortedFeedsList: FC<{
   feeds: string[]
-  analyticsAtom: PrimitiveAtom<Analytics>
   sortField: SortField
   sortDirection: SortDirection
   selectedFeeds: Set<string>
   onSelect: (feedId: string, checked: boolean) => void
-}> = ({ feeds, sortField, sortDirection, selectedFeeds, onSelect, analyticsAtom }) => {
+}> = ({ feeds, sortField, sortDirection, selectedFeeds, onSelect }) => {
+  const scrollContainerElement = useScrollViewElement()
+
   const sortedFeedIds = useMemo(() => {
     switch (sortField) {
       case "date": {
@@ -372,33 +304,105 @@ const SortedFeedsList: FC<{
             : sortByAlphabet(bCompareTitle, aCompareTitle)
         })
       }
+      case "updatesPerWeek": {
+        return feeds.sort((a, b) => {
+          const aSubscription = getSubscriptionByFeedId(a)
+          const bSubscription = getSubscriptionByFeedId(b)
+          if (!aSubscription || !bSubscription) return 0
+          const aFeed = getFeedById(a)
+          const bFeed = getFeedById(b)
+          if (!aFeed || !bFeed) return 0
+          return sortDirection === "asc"
+            ? (aFeed.updatesPerWeek || 0) - (bFeed.updatesPerWeek || 0)
+            : (bFeed.updatesPerWeek || 0) - (aFeed.updatesPerWeek || 0)
+        })
+      }
+      case "subscriptionCount": {
+        return feeds.sort((a, b) => {
+          const aSubscription = getSubscriptionByFeedId(a)
+          const bSubscription = getSubscriptionByFeedId(b)
+          if (!aSubscription || !bSubscription) return 0
+          const aFeed = getFeedById(a)
+          const bFeed = getFeedById(b)
+          if (!aFeed || !bFeed) return 0
+          return sortDirection === "asc"
+            ? (aFeed.subscriptionCount || 0) - (bFeed.subscriptionCount || 0)
+            : (bFeed.subscriptionCount || 0) - (aFeed.subscriptionCount || 0)
+        })
+      }
     }
   }, [feeds, sortDirection, sortField])
 
-  return sortedFeedIds.map((feedId) => (
-    <FeedListItem
-      id={feedId}
-      key={feedId}
-      selected={selectedFeeds.has(feedId)}
-      onSelect={onSelect}
-      analyticsAtom={analyticsAtom}
-    />
-  ))
+  const rowVirtualizer = useVirtualizer({
+    count: sortedFeedIds.length,
+    getScrollElement: () => scrollContainerElement,
+    estimateSize: () => 44, // Estimated height of each feed item (h-10 = 40px + 4px gap)
+    overscan: 5,
+  })
+
+  // Track visible feeds for analytics prefetching
+  const virtualItems = rowVirtualizer.getVirtualItems()
+  const visibleFeedIds = useMemo(() => {
+    const feedIds: string[] = []
+    virtualItems.forEach((item) => {
+      const feedId = sortedFeedIds[item.index]
+      if (feedId) {
+        feedIds.push(feedId)
+      }
+    })
+    return feedIds
+  }, [virtualItems, sortedFeedIds])
+
+  usePrefetchFeedAnalytics(visibleFeedIds)
+
+  return (
+    <div
+      className="space-y-1"
+      style={{
+        height: `${rowVirtualizer.getTotalSize()}px`,
+        width: "100%",
+        position: "relative",
+      }}
+    >
+      {virtualItems.map((virtualRow) => {
+        const feedId = sortedFeedIds[virtualRow.index]
+        if (!feedId) return null
+
+        return (
+          <div
+            key={virtualRow.key}
+            data-index={virtualRow.index}
+            ref={rowVirtualizer.measureElement}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+          >
+            <FeedListItem id={feedId} selected={selectedFeeds.has(feedId)} onSelect={onSelect} />
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 const ViewSelector: FC<{ selectedFeeds: Set<string> }> = ({ selectedFeeds }) => {
+  const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const { mutate: batchUpdateSubscription } = useBatchUpdateSubscription()
   const { ask } = useDialog()
-  return views.map((view) => {
+  return getViewList().map((view) => {
     return (
       <DropdownMenuItem
         key={view.view}
         icon={view.icon}
         onClick={() => {
           ask({
-            title: "Confirm",
-            message: `Are you sure you want to move these feeds to ${tCommon(view.name)}?`,
+            title: t("feeds.tableSelected.moveToView.confirmTitle"),
+            message: t("feeds.tableSelected.moveToView.confirm", { view: tCommon(view.name) }),
             onConfirm: () => {
               batchUpdateSubscription({
                 feedIdList: Array.from(selectedFeeds),
@@ -419,16 +423,11 @@ const FeedListItem = memo(
     id,
     selected,
     onSelect,
-    analyticsAtom,
   }: {
     id: string
     selected: boolean
     onSelect: (feedId: string, checked: boolean) => void
-    analyticsAtom: PrimitiveAtom<Analytics>
   }) => {
-    const analytics = useAtomValue(
-      useMemo(() => selectAtom(analyticsAtom, (a) => a[id]), [analyticsAtom, id]),
-    )
     const subscription = useSubscriptionByFeedId(id)
     const feed = useFeedById(id)
     const isCustomizeName = subscription?.title && feed?.title !== subscription?.title
@@ -442,7 +441,7 @@ const FeedListItem = memo(
         role="button"
         tabIndex={-1}
         className={clsx(
-          "hover:bg-material-medium grid h-10 w-full items-center gap-4 rounded px-1",
+          "grid h-10 w-full items-center gap-4 rounded px-1 hover:bg-material-medium",
           "content-visibility-auto contain-intrinsic-size-[auto_2.5rem]",
           GRID_COLS_CLASSNAME,
         )}
@@ -452,12 +451,12 @@ const FeedListItem = memo(
           <Checkbox checked={selected} onCheckedChange={(checked) => onSelect(id, !!checked)} />
         </div>
         <div className="flex min-w-0 items-center gap-1">
-          <FeedIcon feed={feed} size={16} />
+          <FeedIcon target={feed} size={16} />
           <div className="flex min-w-0 flex-col">
             {feed?.errorAt ? (
               <Tooltip>
                 <TooltipTrigger>
-                  <EllipsisHorizontalTextWithTooltip className="text-red font-medium leading-4">
+                  <EllipsisHorizontalTextWithTooltip className="font-medium leading-4 text-red">
                     {subscription.title || feed?.title}
                   </EllipsisHorizontalTextWithTooltip>
                 </TooltipTrigger>
@@ -468,21 +467,21 @@ const FeedListItem = memo(
                 </TooltipPortal>
               </Tooltip>
             ) : (
-              <EllipsisHorizontalTextWithTooltip className="text-text font-medium leading-4">
+              <EllipsisHorizontalTextWithTooltip className="font-medium leading-4 text-text">
                 {subscription.title || feed?.title}
               </EllipsisHorizontalTextWithTooltip>
             )}
             {isCustomizeName && (
-              <EllipsisHorizontalTextWithTooltip className="text-text-secondary text-left text-sm">
+              <EllipsisHorizontalTextWithTooltip className="text-left text-sm text-text-secondary">
                 {feed?.title}
               </EllipsisHorizontalTextWithTooltip>
             )}
           </div>
         </div>
 
-        <div className="text-text flex items-center gap-1 text-sm opacity-80">
-          {views[subscription.view]!.icon}
-          <span>{tCommon(views[subscription.view]!.name)}</span>
+        <div className="flex items-center gap-1 text-sm text-text opacity-80">
+          {getView(subscription.view)!.icon}
+          <span>{tCommon(getView(subscription.view)!.name)}</span>
         </div>
         {!!subscription.createdAt && (
           <div className="whitespace-nowrap pr-1 text-center text-sm">
@@ -490,43 +489,45 @@ const FeedListItem = memo(
           </div>
         )}
         <div className="text-center text-xs">
-          {analytics ? (
-            <div className="flex flex-col gap-1">
-              <div className="grid grid-cols-2 gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="text-text-secondary flex items-center gap-1">
-                      <i className="i-mgc-user-3-cute-re" />
-                      <span className="tabular-nums">
-                        {formatNumber(analytics.subscriptionCount || 0)}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipPortal>
-                    <TooltipContent>Subscription Count</TooltipContent>
-                  </TooltipPortal>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="text-text-secondary flex items-center gap-1">
-                      <i className="i-mgc-safety-certificate-cute-re" />
-                      <span className="tabular-nums">
-                        {Math.round(analytics.updatesPerWeek || 0) || "0"}
-                        {"/w"}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipPortal>
-                    <TooltipContent>Updates Per Week</TooltipContent>
-                  </TooltipPortal>
-                </Tooltip>
-              </div>
-              {analytics.latestEntryPublishedAt && (
+          {feed?.subscriptionCount ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center gap-1 text-text-secondary">
+                  <i className="i-mgc-user-3-cute-re" />
+                  <span className="tabular-nums">{formatNumber(feed.subscriptionCount)}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent>Subscription Count</TooltipContent>
+              </TooltipPortal>
+            </Tooltip>
+          ) : (
+            <div className="text-text-secondary">--</div>
+          )}
+        </div>
+        <div className="text-center text-xs">
+          {feed?.updatesPerWeek ? (
+            <div className="flex justify-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-center gap-1 text-text-secondary">
+                    <i className="i-mgc-safety-certificate-cute-re" />
+                    <span className="tabular-nums">
+                      {Math.round(feed.updatesPerWeek)}
+                      {"/w"}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent>Updates Per Week</TooltipContent>
+                </TooltipPortal>
+              </Tooltip>
+              {feed.latestEntryPublishedAt && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="text-text-secondary">
                       <i className="i-mgc-calendar-time-add-cute-re" />
-                      <RelativeDay date={new Date(analytics.latestEntryPublishedAt)} />
+                      <RelativeDay date={new Date(feed.latestEntryPublishedAt)} />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>Latest Entry Published</TooltipContent>
@@ -561,7 +562,7 @@ const FeedClaimedSection = () => {
         {claimedList.isLoading ? (
           <LoadingCircle size="large" className="center h-36" />
         ) : !claimedList.data?.length ? (
-          <div className="text-text-secondary mt-36 w-full text-center text-sm">
+          <div className="mt-36 w-full text-center text-sm text-text-secondary">
             <p>{t("feeds.noFeeds")}</p>
           </div>
         ) : null}
@@ -590,7 +591,7 @@ const FeedClaimedSection = () => {
                         href={UrlBuilder.shareFeed(row.feed.id)}
                         className="flex items-center"
                       >
-                        <FeedIcon fallback feed={row.feed} size={16} />
+                        <FeedIcon fallback target={row.feed} size={16} />
                         <EllipsisHorizontalTextWithTooltip className="inline-block max-w-[200px] truncate">
                           {row.feed.title}
                         </EllipsisHorizontalTextWithTooltip>

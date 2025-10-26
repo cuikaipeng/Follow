@@ -3,7 +3,7 @@ import type { ListModel } from "@follow/store/list/types"
 import { createContext, createElement, use, useCallback, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import type { ListRenderItem } from "react-native"
-import { Image, StyleSheet, Text, View } from "react-native"
+import { Image, StyleSheet, View } from "react-native"
 import Animated, { LinearTransition } from "react-native-reanimated"
 import { useColor, useColors } from "react-native-uikit-colors"
 
@@ -20,6 +20,7 @@ import {
 import { FallbackIcon } from "@/src/components/ui/icon/fallback-icon"
 import { PlatformActivityIndicator } from "@/src/components/ui/loading/PlatformActivityIndicator"
 import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
+import { Text } from "@/src/components/ui/typography/Text"
 import { views } from "@/src/constants/views"
 import { AddCuteReIcon } from "@/src/icons/add_cute_re"
 import { PowerIcon } from "@/src/icons/power"
@@ -38,7 +39,6 @@ export const ListsScreen = () => {
   const { t } = useTranslation("settings")
   const { isLoading, data } = usePrefetchLists()
   const lists = useOwnedLists()
-
   return (
     <SafeNavigationScrollView
       nestedScrollEnabled
@@ -103,7 +103,6 @@ export const ListsScreen = () => {
     </SafeNavigationScrollView>
   )
 }
-
 const AddListButton = () => {
   const labelColor = useColor("label")
   const navigation = useNavigation()
@@ -117,19 +116,22 @@ const AddListButton = () => {
     </UINavigationHeaderActionButton>
   )
 }
-
 const ItemSeparatorComponent = () => {
   return (
     <View
-      className="bg-opaque-separator/50 ml-24 h-px flex-1"
+      className="ml-24 h-px flex-1 bg-opaque-separator/50"
       collapsable={false}
-      style={{ transform: [{ scaleY: 0.5 }] }}
+      style={{
+        transform: [
+          {
+            scaleY: 0.5,
+          },
+        ],
+      }}
     />
   )
 }
-
 const keyExtractor = (item: ListModel) => item.id
-
 const ListItemCell: ListRenderItem<ListModel> = (props) => {
   return <ListItemCellImpl {...props} />
 }
@@ -137,10 +139,8 @@ const ListItemCellImpl: ListRenderItem<ListModel> = ({ item: list }) => {
   const { t } = useTranslation("common")
   const { title, description } = list
   const listData = use(ListContext)[list.id]
-
   const navigation = useNavigation()
   const colors = useColors()
-
   return (
     <SwipeableItem
       swipeRightToCallAction
@@ -148,14 +148,18 @@ const ListItemCellImpl: ListRenderItem<ListModel> = ({ item: list }) => {
         {
           label: t("words.manage"),
           onPress: () => {
-            navigation.pushControllerView(ManageListScreen, { id: list.id })
+            navigation.pushControllerView(ManageListScreen, {
+              id: list.id,
+            })
           },
           backgroundColor: accentColor,
         },
         {
           label: t("words.edit"),
           onPress: () => {
-            navigation.presentControllerView(ListScreen, { listId: list.id })
+            navigation.presentControllerView(ListScreen, {
+              listId: list.id,
+            })
           },
           backgroundColor: colors.blue,
         },
@@ -163,60 +167,74 @@ const ListItemCellImpl: ListRenderItem<ListModel> = ({ item: list }) => {
     >
       <ItemPressable
         className="flex-row p-4"
-        onPress={() => navigation.pushControllerView(ManageListScreen, { id: list.id })}
+        onPress={() =>
+          navigation.pushControllerView(ManageListScreen, {
+            id: list.id,
+          })
+        }
       >
         <View className="size-16 overflow-hidden rounded-lg">
           {list.image ? (
-            <Image source={{ uri: list.image }} resizeMode="cover" className="size-full" />
+            <Image
+              source={{
+                uri: list.image,
+              }}
+              resizeMode="cover"
+              className="size-full"
+            />
           ) : (
             <FallbackIcon title={list.title || ""} size="100%" textStyle={styles.title} />
           )}
         </View>
         <View className="ml-4 flex-1">
           <Text
-            className="text-label text-lg font-semibold leading-tight"
+            className="text-lg font-semibold leading-tight text-label"
             numberOfLines={1}
             ellipsizeMode="middle"
           >
             {title}
           </Text>
           {!!description && (
-            <Text className="text-secondary-label text-base" numberOfLines={4}>
+            <Text className="text-base text-secondary-label" numberOfLines={4}>
               {description}
             </Text>
           )}
           <View className="flex-row items-center gap-1">
-            {!!views[list.view]?.icon &&
-              createElement(views[list.view]!.icon, {
-                color: views[list.view]!.activeColor,
+            {!!views.find((v) => v.view === list.view)?.icon &&
+              createElement(views.find((v) => v.view === list.view)!.icon, {
+                color: views.find((v) => v.view === list.view)!.activeColor,
                 height: 16,
                 width: 16,
               })}
-            {!!views[list.view]?.name && (
-              <Text className="text-secondary-label text-base">{t(views[list.view]!.name)}</Text>
+            {!!views.find((v) => v.view === list.view)?.name && (
+              <Text className="text-base text-secondary-label">
+                {t(views.find((v) => v.view === list.view)!.name)}
+              </Text>
             )}
           </View>
         </View>
 
         <View
-          className="bg-opaque-separator mx-4 h-full"
-          style={{ width: StyleSheet.hairlineWidth }}
+          className="mx-4 h-full bg-opaque-separator"
+          style={{
+            width: StyleSheet.hairlineWidth,
+          }}
         />
         <View className="w-16 gap-1">
           <View className="flex-row items-center gap-1">
             <PowerIcon height={16} width={16} color={accentColor} />
-            <Text className="text-secondary-label text-sm">{list.fee}</Text>
+            <Text className="text-sm text-secondary-label">{list.fee}</Text>
           </View>
 
           <View className="flex-row items-center gap-1">
             <UserAdd2CuteFiIcon height={16} width={16} color={accentColor} />
-            <Text className="text-secondary-label text-sm">{listData?.subscriptionCount || 0}</Text>
+            <Text className="text-sm text-secondary-label">{listData?.subscriptionCount || 0}</Text>
           </View>
 
           {!!listData?.purchaseAmount && (
             <View className="flex-row items-center gap-1">
               <Wallet2CuteFiIcon height={16} width={16} color={accentColor} />
-              <Balance className="text-secondary-label text-sm">
+              <Balance className="text-sm text-secondary-label">
                 {BigInt(listData.purchaseAmount)}
               </Balance>
             </View>
@@ -226,7 +244,6 @@ const ListItemCellImpl: ListRenderItem<ListModel> = ({ item: list }) => {
     </SwipeableItem>
   )
 }
-
 const styles = StyleSheet.create({
   title: {
     fontSize: 20,

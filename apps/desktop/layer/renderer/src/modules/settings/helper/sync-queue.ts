@@ -1,23 +1,26 @@
-import type { GeneralSettings, UISettings } from "@follow/shared/settings/interface"
+import type { AISettings, GeneralSettings, UISettings } from "@follow/shared/settings/interface"
 import { EventBus } from "@follow/utils/event-bus"
 import { getStorageNS } from "@follow/utils/ns"
 import { isEmptyObject, sleep } from "@follow/utils/utils"
+import type { SettingsTab } from "@follow-app/client-sdk"
 import { omit } from "es-toolkit/compat"
 import type { PrimitiveAtom } from "jotai"
 
+import { __aiSettingAtom, aiServerSyncWhiteListKeys, getAISettings } from "~/atoms/settings/ai"
 import {
   __generalSettingAtom,
   generalServerSyncWhiteListKeys,
   getGeneralSettings,
 } from "~/atoms/settings/general"
 import { __uiSettingAtom, getUISettings, uiServerSyncWhiteListKeys } from "~/atoms/settings/ui"
-import { apiClient } from "~/lib/api-fetch"
+import { followClient } from "~/lib/api-client"
 import { jotaiStore } from "~/lib/jotai"
 import { settings } from "~/queries/settings"
 
 type SettingMapping = {
   appearance: UISettings
   general: GeneralSettings
+  ai: AISettings
 }
 
 const omitKeys = []
@@ -25,6 +28,7 @@ const omitKeys = []
 const localSettingGetterMap = {
   appearance: () => omit(getUISettings(), uiServerSyncWhiteListKeys, omitKeys),
   general: () => omit(getGeneralSettings(), generalServerSyncWhiteListKeys, omitKeys),
+  ai: () => omit(getAISettings(), aiServerSyncWhiteListKeys, omitKeys),
 }
 
 const createInternalSetter =
@@ -37,15 +41,19 @@ const createInternalSetter =
 const localSettingSetterMap = {
   appearance: createInternalSetter(__uiSettingAtom),
   general: createInternalSetter(__generalSettingAtom),
+  ai: createInternalSetter(__aiSettingAtom),
 }
+
 const settingWhiteListMap = {
   appearance: uiServerSyncWhiteListKeys,
   general: generalServerSyncWhiteListKeys,
+  ai: aiServerSyncWhiteListKeys,
 }
 
 const bizSettingKeyToTabMapping = {
   ui: "appearance",
   general: "general",
+  ai: "ai",
 }
 
 export type SettingSyncTab = keyof SettingMapping
@@ -164,12 +172,11 @@ class SettingSyncQueue {
       if (isEmptyObject(json)) {
         continue
       }
-      const promise = apiClient.settings[":tab"]
-        .$patch({
-          param: {
-            tab,
-          },
-          json,
+
+      const promise = followClient.api.settings
+        .update({
+          tab: tab as SettingsTab,
+          ...json,
         })
         .then(() => {
           // remove from queue
@@ -192,11 +199,10 @@ class SettingSyncQueue {
       const promises = [] as Promise<any>[]
       for (const tab in localSettingGetterMap) {
         const payload = localSettingGetterMap[tab]()
-        const promise = apiClient.settings[":tab"].$patch({
-          param: {
-            tab,
-          },
-          json: payload,
+
+        const promise = followClient.api.settings.update({
+          tab: tab as SettingsTab,
+          ...payload,
         })
 
         promises.push(promise)
@@ -208,11 +214,9 @@ class SettingSyncQueue {
       const payload = localSettingGetterMap[tab]()
 
       this.chain = this.chain.finally(() =>
-        apiClient.settings[":tab"].$patch({
-          param: {
-            tab,
-          },
-          json: payload,
+        followClient.api.settings.update({
+          tab: tab as SettingsTab,
+          ...payload,
         }),
       )
 

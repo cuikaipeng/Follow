@@ -1,5 +1,6 @@
 import { useGlobalFocusableScopeSelector } from "@follow/components/common/Focusable/hooks.js"
-import { ActionButton, Button } from "@follow/components/ui/button/index.js"
+import { ActionButton } from "@follow/components/ui/button/index.js"
+import { styledButtonVariant } from "@follow/components/ui/button/variants.js"
 import { Kbd, KbdCombined } from "@follow/components/ui/kbd/Kbd.js"
 import { useCountdown } from "@follow/hooks"
 import { EventBus } from "@follow/utils/event-bus"
@@ -11,6 +12,7 @@ import { Trans, useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { HotkeyScope } from "~/constants"
+import { getRouteParams } from "~/hooks/biz/useRouteParams"
 import { useI18n } from "~/hooks/common"
 import { COMMAND_ID } from "~/modules/command/commands/id"
 import { useCommandBinding, useCommandShortcuts } from "~/modules/command/hooks/use-command-binding"
@@ -54,18 +56,19 @@ export const MarkAllReadButton = ({
         if (cancel) return
         cancel = true
       }
-      const id = toast("", {
+      const routerParams = getRouteParams()
+      const id = toast.warning("", {
         description: <ConfirmMarkAllReadInfo undo={undo} />,
         duration: 3000,
         onAutoClose() {
           if (cancel) return
-          markAllByRoute()
+          markAllByRoute(routerParams)
         },
         action: {
           label: (
             <span className="flex items-center gap-1">
               {t("mark_all_read_button.undo")}
-              <Kbd className="border-border inline-flex items-center border bg-transparent text-white">
+              <Kbd className="inline-flex items-center border border-border bg-transparent text-white">
                 $mod+z
               </Kbd>
             </span>
@@ -97,7 +100,7 @@ export const MarkAllReadButton = ({
       className={className}
       ref={ref}
       onClick={() => {
-        markAllByRoute()
+        markAllByRoute(getRouteParams())
       }}
     >
       <i className="i-mgc-check-circle-cute-re" />
@@ -114,11 +117,11 @@ const ConfirmMarkAllReadInfo = ({ undo }: { undo: () => any }) => {
   })
 
   return (
-    <div>
-      <p>{t("mark_all_read_button.confirm_mark_all_info")}</p>
-      <small className="opacity-50">
+    <div className="flex flex-col text-text">
+      <span>{t("mark_all_read_button.confirm_mark_all_info")}</span>
+      <span className="text-text-secondary">
         {t("mark_all_read_button.auto_confirm_info", { countdown })}
-      </small>
+      </span>
     </div>
   )
 }
@@ -136,28 +139,18 @@ export const FlatMarkAllReadButton: FC<
   const { className, filter, which, buttonClassName, iconClassName } = props
   const [status, setStatus] = useState<"initial" | "confirm" | "done">("initial")
 
-  const animate = {
-    initial: { rotate: -30, opacity: 0.9 },
-    exit: { rotate: -30, opacity: 0.9 },
-    animate: { rotate: 0, opacity: 1 },
-  }
   return (
-    <Button
-      variant="ghost"
+    <button
+      type="button"
       disabled={status === "done"}
-      buttonClassName={buttonClassName}
-      textClassName={cn(
-        "center relative flex h-auto gap-1",
-
-        className,
-      )}
+      className={cn(styledButtonVariant({ variant: "ghost" }), className, buttonClassName)}
       onClick={() => {
-        markAllByRoute(filter)
+        markAllByRoute(getRouteParams(), filter)
           .then(() => setStatus("done"))
           .catch(() => setStatus("initial"))
       }}
     >
-      <i key={2} {...animate} className={cn("i-mgc-check-circle-cute-re", iconClassName)} />
+      <i key={2} className={cn("i-mgc-check-circle-cute-re", iconClassName)} />
       <span className="duration-200">
         {status === "done" ? (
           t("mark_all_read_button.done")
@@ -172,6 +165,6 @@ export const FlatMarkAllReadButton: FC<
           />
         )}
       </span>
-    </Button>
+    </button>
   )
 }

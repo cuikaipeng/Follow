@@ -1,6 +1,5 @@
-import { resolve } from "node:path"
-
 import type { ConfigContext, ExpoConfig } from "expo/config"
+import { resolve } from "pathe"
 
 import PKG from "./package.json"
 
@@ -14,6 +13,7 @@ const iconPathMap = {
 const iconPath = iconPathMap[process.env.PROFILE || "production"] || iconPathMap.production
 
 const adaptiveIconPath = resolve(__dirname, "./assets/adaptive-icon.png")
+const splashIconPath = resolve(__dirname, "./assets/splash-icon.png")
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -27,9 +27,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
     },
     owner: "follow",
-    updates: {
-      url: "https://u.expo.dev/a6335b14-fb84-45aa-ba80-6f6ab8926920",
-    },
+    // disable expo updates for now, https://github.com/expo/expo/issues/29630
+    // updates: {
+    //   url: "https://folo-custom-expo-updates.vercel.app/api/manifest",
+    //   codeSigningCertificate: "./code-signing/certificate.pem",
+    //   codeSigningMetadata: {
+    //     keyid: "main",
+    //     alg: "rsa-v1_5-sha256",
+    //   },
+    // },
     runtimeVersion: isDev ? "0.0.0-dev" : PKG.version,
 
     name: "Folo",
@@ -63,6 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       edgeToEdgeEnabled: true,
       adaptiveIcon: {
         foregroundImage: adaptiveIconPath,
+        monochromeImage: adaptiveIconPath,
         backgroundColor: "#FF5C00",
       },
       googleServicesFile: "./build/google-services.json",
@@ -86,12 +93,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-splash-screen",
         {
-          backgroundColor: "#ffffff",
-          dark: {
-            backgroundColor: "#000000",
-          },
           android: {
-            image: iconPath,
+            image: splashIconPath,
             imageWidth: 200,
           },
         },
@@ -134,7 +137,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       require("./plugins/with-android-manifest-plugin.js"),
       "expo-secure-store",
       "@react-native-firebase/app",
-      "@react-native-firebase/crashlytics",
+      [
+        "@sentry/react-native/expo",
+        {
+          url: "https://sentry.io/",
+          project: "react-native",
+          organization: "follow-rg",
+        },
+      ],
       [
         "expo-image-picker",
         {

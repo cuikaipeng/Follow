@@ -1,4 +1,4 @@
-import type { Optional } from "../points"
+import type { Optional } from "../types"
 import { Api } from "./api"
 
 export type TrackHandlerPayload =
@@ -107,7 +107,6 @@ export class OpenPanel {
       return
     }
 
-    // eslint-disable-next-line unicorn/no-array-callback-reference
     if (this.options.filter && !this.options.filter(payload)) {
       return
     }

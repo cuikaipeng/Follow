@@ -1,29 +1,27 @@
 import { Spring } from "@follow/components/constants/spring.js"
 import { MotionButtonBase } from "@follow/components/ui/button/index.js"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipPortal,
-  TooltipTrigger,
-} from "@follow/components/ui/tooltip/index.js"
-import type { MediaModel } from "@follow/shared/hono"
+import { IN_ELECTRON } from "@follow/shared/constants"
 import { stopPropagation } from "@follow/utils/dom"
 import { cn } from "@follow/utils/utils"
+import type { EntryMedia } from "@follow-app/client-sdk"
 import useEmblaCarousel from "embla-carousel-react"
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures"
 import { useAnimationControls } from "motion/react"
 import type { FC } from "react"
 import * as React from "react"
-import { Fragment, useCallback, useEffect, useRef, useState } from "react"
+import { Fragment, use, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { ReactZoomPanPinchRef, ReactZoomPanPinchState } from "react-zoom-pan-pinch"
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch"
 
 import { m } from "~/components/common/Motion"
+import { GlassButton } from "~/components/ui/button/GlassButton"
 import { COPY_MAP } from "~/constants"
+import { ipcServices } from "~/lib/client"
 import { replaceImgUrlIfNeed } from "~/lib/img-proxy"
 
 import { useCurrentModal } from "../modal/stacked/hooks"
+import type { VideoPlayerRef } from "./VideoPlayer"
 import { VideoPlayer } from "./VideoPlayer"
 
 // Calculate the dynamic scale value and offset
@@ -53,6 +51,11 @@ const modalVariants = {
   }),
 }
 
+const PreviewWrapperDragContext = React.createContext<{
+  isDragging: boolean
+  lastDragEndAt: number
+}>({ isDragging: false, lastDragEndAt: 0 })
+
 const Wrapper: FC<{
   src: string
   children:
@@ -72,6 +75,7 @@ const Wrapper: FC<{
   // Drag close state
   const [isImageZoomed, setIsImageZoomed] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [lastDragEndAt, setLastDragEndAt] = useState(0)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
 
   // Combined zoom change callback
@@ -130,6 +134,7 @@ const Wrapper: FC<{
       } else {
         // Reset to normal state
         setIsDragging(false)
+        setLastDragEndAt(performance.now())
         setDragOffset({ x: 0, y: 0 })
         controls.start("visible", {
           ...Spring.presets.snappy,
@@ -150,47 +155,56 @@ const Wrapper: FC<{
     })
   }, [controls])
 
+  const dragCtxValue = useMemo(() => ({ isDragging, lastDragEndAt }), [isDragging, lastDragEndAt])
   return (
-    <div ref={containerRef} className="fixed inset-0">
-      <m.div
-        variants={modalVariants}
-        initial="initial"
-        animate={controls}
-        exit="exit"
-        custom={dragOffset}
-        className="bg-material-medium-dark flex size-full pt-[var(--fo-window-padding-top)] backdrop-blur"
-        drag={enableDragClose}
-        dragConstraints={{ top: 0, bottom: 300, left: -200, right: 200 }}
-        dragElastic={{ top: 0, bottom: 0.3, left: 0.2, right: 0.2 }}
-        onDragStart={handleDragStart}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-        style={{
-          cursor: enableDragClose ? (isDragging ? "grabbing" : "grab") : "default",
-        }}
-      >
-        <div
-          className={cn(
-            "group/left relative flex h-full w-0 grow overflow-hidden",
-            hasSideContent ? "min-w-96 items-center justify-center" : "",
-          )}
+    <PreviewWrapperDragContext value={dragCtxValue}>
+      <div ref={containerRef} className="fixed inset-0">
+        <HeaderActions src={src} />
+        <m.div
+          variants={modalVariants}
+          initial="initial"
+          animate={controls}
+          exit="exit"
+          custom={dragOffset}
+          className="flex size-full bg-material-medium-dark pt-[var(--fo-window-padding-top)] backdrop-blur"
+          drag={enableDragClose}
+          dragConstraints={{ top: 0, bottom: 300, left: -200, right: 200 }}
+          dragElastic={{ top: 0, bottom: 0.3, left: 0.2, right: 0.2 }}
+          onDragStart={handleDragStart}
+          onDrag={handleDrag}
+          onDragEnd={handleDragEnd}
+          style={{
+            cursor: enableDragClose ? (isDragging ? "grabbing" : "grab") : "default",
+          }}
         >
-          <HeaderActions src={src} />
-          {isArray ? renderedChildren[0] : renderedChildren}
-        </div>
-        {hasSideContent ? (
           <div
-            className="bg-background box-border flex h-full w-[400px] min-w-0 shrink-0 flex-col px-2 pt-1"
-            onClick={stopPropagation}
+            className={cn(
+              "group/left relative flex h-full w-0 grow overflow-hidden",
+              hasSideContent ? "min-w-96 items-center justify-center" : "",
+            )}
           >
-            {isArray ? renderedChildren[1] : null}
+            {isArray ? renderedChildren[0] : renderedChildren}
           </div>
-        ) : undefined}
-      </m.div>
-    </div>
+          {hasSideContent ? (
+            <div
+              className="box-border flex h-full w-[400px] min-w-0 shrink-0 flex-col bg-background px-2 pt-1"
+              onClick={stopPropagation}
+            >
+              {isArray ? renderedChildren[1] : null}
+            </div>
+          ) : undefined}
+        </m.div>
+      </div>
+    </PreviewWrapperDragContext>
   )
 }
 
+const headerActionsVariants = {
+  initial: { opacity: 0, translateY: "-20px" },
+  animate: { opacity: 1, translateY: "0px" },
+  exit: { opacity: 0, translateY: "-20px" },
+}
+const GLASS_BUTTON_CLASS = tw`group-hover/left:opacity-100 opacity-0`
 const HeaderActions: FC<{
   src: string
 }> = ({ src }) => {
@@ -198,94 +212,51 @@ const HeaderActions: FC<{
 
   const { dismiss } = useCurrentModal()
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[100] flex h-16 items-center justify-end gap-2 px-3">
-      <HeaderButton description={t(COPY_MAP.OpenInBrowser())} onClick={() => window.open(src)}>
-        <i className="i-mgc-external-link-cute-re" />
-      </HeaderButton>
-      <HeaderButton
-        description={t("common:words.download")}
-        onClick={() => {
-          const a = document.createElement("a")
-          a.href = src
-          a.download = src.split("/").pop()!
-          a.target = "_blank"
-          a.rel = "noreferrer"
-          a.click()
-        }}
+    <m.div
+      className="pointer-events-none absolute inset-x-0 top-0 z-[100] flex h-16 items-center justify-end gap-2 px-3"
+      variants={headerActionsVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={Spring.presets.smooth}
+    >
+      <GlassButton
+        theme="dark"
+        className={GLASS_BUTTON_CLASS}
+        description={t(COPY_MAP.OpenInBrowser())}
+        onClick={() => window.open(src)}
       >
-        <i className="i-mgc-download-2-cute-re" />
-      </HeaderButton>
+        <i className="i-mgc-external-link-cute-re" />
+      </GlassButton>
+      {IN_ELECTRON && (
+        <GlassButton
+          theme="dark"
+          className={GLASS_BUTTON_CLASS}
+          description={t("common:words.download")}
+          onClick={() => {
+            ipcServices?.app.download(src)
+          }}
+        >
+          <i className="i-mgc-download-2-cute-re" />
+        </GlassButton>
+      )}
 
-      <HeaderButton
+      <GlassButton
+        theme="dark"
         description={t("common:words.close")}
-        className="ml-3 !border-red-500/20 !bg-red-600/30 !opacity-100 hover:!bg-red-600/50"
+        className={cn(
+          GLASS_BUTTON_CLASS,
+          "ml-3 !border-red-500/20 !bg-red-600/30 !opacity-100 hover:!bg-red-600/50",
+        )}
         onClick={dismiss}
       >
         <i className="i-mgc-close-cute-re" />
-      </HeaderButton>
-    </div>
+      </GlassButton>
+    </m.div>
   )
 }
 
-const HeaderButton: FC<{
-  description?: string
-  onClick: () => void
-  className?: string
-  children: React.ReactNode
-}> = ({ description, onClick, className, children }) => {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <m.button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onClick()
-          }}
-          className={cn(
-            // Base styles with modern glass morphism - perfect 1:1 circle
-            "pointer-events-auto relative flex size-10 items-center justify-center rounded-full",
-            "bg-black/20 text-white backdrop-blur-md",
-            // Border and shadow for depth
-            "border border-white/10 shadow-lg shadow-black/25",
-            // Opacity and transition
-            "opacity-0 transition-all duration-300 ease-out group-hover/left:opacity-100",
-            // Text size
-            "text-lg",
-            className,
-          )}
-          initial={{ scale: 1 }}
-          whileHover={{
-            scale: 1.1,
-            backgroundColor: "rgba(255, 255, 255, 0.15)",
-            borderColor: "rgba(255, 255, 255, 0.2)",
-          }}
-          whileTap={{ scale: 0.95 }}
-          transition={{
-            type: "spring",
-            stiffness: 400,
-            damping: 30,
-          }}
-        >
-          {/* Glass effect overlay */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-t from-white/5 to-white/20 opacity-0 transition-opacity duration-300 hover:opacity-100" />
-
-          {/* Icon container */}
-          <div className="center relative z-10 flex">{children}</div>
-
-          {/* Subtle inner shadow for depth */}
-          <div className="absolute inset-0 rounded-full shadow-inner shadow-black/10" />
-        </m.button>
-      </TooltipTrigger>
-      {description && (
-        <TooltipPortal>
-          <TooltipContent>{description}</TooltipContent>
-        </TooltipPortal>
-      )}
-    </Tooltip>
-  )
-}
-export interface PreviewMediaProps extends MediaModel {
+export interface PreviewMediaProps extends EntryMedia {
   fallbackUrl?: string
 }
 export const PreviewMediaContent: FC<{
@@ -294,6 +265,7 @@ export const PreviewMediaContent: FC<{
   children?: React.ReactNode
   onZoomChange?: (isZoomed: boolean) => void
 }> = ({ media, initialIndex = 0, children, onZoomChange }) => {
+  const videoRefs = useRef<(VideoPlayerRef | null)[]>([])
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, startIndex: initialIndex }, [
     WheelGesturesPlugin(),
   ])
@@ -327,13 +299,29 @@ export const PreviewMediaContent: FC<{
     return () => $container.removeEventListener("keydown", handleKeyDown)
   }, [emblaApi, ref])
 
+  const setVideoRef = useCallback((el: VideoPlayerRef | null, index: number) => {
+    videoRefs.current[index] = el
+  }, [])
+
+  // Pause all videos when slide change
+  // And play the current video if it's a video
+  useEffect(() => {
+    videoRefs.current.forEach((video) => {
+      video?.controls.pause()
+    })
+    const currentVideo = videoRefs.current[currentSlideIndex]
+    if (currentVideo) {
+      currentVideo.controls.play()
+    }
+  }, [currentSlideIndex])
+
   if (media.length === 0) return null
   if (media.length === 1) {
-    const src = media[0]!.url
+    const src = media[0]!.url!
     const { type } = media[0]!
     const isVideo = type === "video"
     return (
-      <Wrapper src={src} onZoomChange={onZoomChange} canDragClose>
+      <Wrapper src={src} onZoomChange={onZoomChange} canDragClose={!isVideo}>
         {(handleZoomChange) => [
           <Fragment key={src}>
             {isVideo ? (
@@ -368,12 +356,12 @@ export const PreviewMediaContent: FC<{
       {(handleZoomChange) => [
         <div key={"left"} className="group size-full overflow-hidden" ref={emblaRef}>
           <div className="flex size-full">
-            {media.map((med) => (
+            {media.map((med, i) => (
               <div className="mr-2 flex w-full flex-none items-center justify-center" key={med.url}>
                 {med.type === "video" ? (
                   <VideoPlayer
+                    ref={(el) => setVideoRef(el, i)}
                     src={med.url}
-                    autoPlay
                     muted
                     controls
                     className="size-full object-contain"
@@ -397,25 +385,25 @@ export const PreviewMediaContent: FC<{
           </div>
 
           {currentSlideIndex > 0 && (
-            <HeaderButton
+            <GlassButton
               className={`absolute left-2 top-1/2 z-[100] flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 backdrop-blur-sm duration-200 hover:bg-black/40 group-hover:opacity-100 lg:left-4 lg:size-10`}
               onClick={() => {
                 emblaApi?.scrollPrev()
               }}
             >
               <i className={`i-mingcute-left-line text-lg lg:text-xl`} />
-            </HeaderButton>
+            </GlassButton>
           )}
 
           {currentSlideIndex < media.length - 1 && (
-            <HeaderButton
+            <GlassButton
               className={`absolute right-2 top-1/2 z-[100] flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 backdrop-blur-sm duration-200 hover:bg-black/40 group-hover:opacity-100 lg:right-4 lg:size-10`}
               onClick={() => {
                 emblaApi?.scrollNext()
               }}
             >
               <i className={`i-mingcute-right-line text-lg lg:text-xl`} />
-            </HeaderButton>
+            </GlassButton>
           )}
         </div>,
         children,
@@ -432,7 +420,7 @@ const FallbackableImage: FC<
     blurhash?: string
     onZoomChange?: (isZoomed: boolean) => void
   }
-> = ({ src, fallbackUrl, containerClassName, onZoomChange }) => {
+> = ({ src, fallbackUrl, containerClassName, onZoomChange, loading }) => {
   const [currentSrc, setCurrentSrc] = useState(() => replaceImgUrlIfNeed(src))
   const [isAllError, setIsAllError] = useState(false)
 
@@ -480,6 +468,7 @@ const FallbackableImage: FC<
           maxZoom={2}
           src={currentSrc}
           alt="preview"
+          loading={loading}
           highResLoaded={!isLoading}
           onLoad={() => setIsLoading(false)}
           onError={handleError}
@@ -519,7 +508,7 @@ const FallbackableImage: FC<
       )}
 
       {currentState === "fallback" && (
-        <div className="bg-material-thick backdrop-blur-background text-text absolute bottom-8 left-1/2 mt-4 -translate-x-1/2 rounded-lg px-3 py-2 text-center text-xs">
+        <div className="absolute bottom-8 left-1/2 mt-4 -translate-x-1/2 rounded-lg bg-material-thick px-3 py-2 text-center text-xs text-text opacity-70 backdrop-blur-background">
           <span>
             This image is preview in low quality, because the original image is not available.
           </span>
@@ -530,7 +519,7 @@ const FallbackableImage: FC<
               href={src}
               target="_blank"
               rel="noreferrer"
-              className="hover:text-accent underline duration-200"
+              className="underline duration-200 hover:text-accent"
             >
               visit the original image
             </a>{" "}
@@ -551,6 +540,7 @@ const DOMImageViewer: FC<{
   src: string
   alt: string
   highResLoaded: boolean
+  loading?: "lazy" | "eager"
   onLoad?: () => void
   onError?: () => void
 }> = ({
@@ -562,12 +552,13 @@ const DOMImageViewer: FC<{
   src,
   alt,
   highResLoaded,
+  loading = "eager",
   onLoad,
   onError,
 }) => {
+  const { isDragging: isModalDragging, lastDragEndAt } = use(PreviewWrapperDragContext)
   const onTransformed = useCallback(
     (ref: ReactZoomPanPinchRef, state: Omit<ReactZoomPanPinchState, "previousScale">) => {
-      // 当缩放比例不等于 1 时，认为图片被缩放了
       const isZoomed = state.scale !== 1
       onZoomChange?.(isZoomed)
     },
@@ -584,79 +575,87 @@ const DOMImageViewer: FC<{
   const { dismiss } = useCurrentModal()
 
   return (
-    <TransformWrapper
-      ref={transformRef}
-      initialScale={1}
-      minScale={minZoom}
-      maxScale={maxZoom}
-      wheel={{
-        step: 0.1,
-      }}
-      pinch={{
-        step: 0.5,
-      }}
-      doubleClick={{
-        step: 2,
-        mode: "toggle",
-        animationTime: 200,
-        animationType: "easeInOutCubic",
-      }}
-      limitToBounds={true}
-      centerOnInit={true}
-      smooth={true}
-      onInit={(e) => {
-        if (e.instance.wrapperComponent) {
-          e.instance.wrapperComponent.onclick = (e) => {
-            if (e.target instanceof HTMLDivElement && e.target.dataset.imageContainer) {
-              e.stopPropagation()
-            } else {
-              dismiss()
-            }
-          }
-        }
-      }}
-      alignmentAnimation={{
-        sizeX: 0,
-        sizeY: 0,
-        velocityAlignmentTime: 0.2,
-      }}
-      velocityAnimation={{
-        sensitivity: 1,
-        animationTime: 0.2,
-      }}
-      onTransformed={onTransformed}
-    >
-      <TransformComponent
-        wrapperProps={{
-          onClick: stopPropagation,
+    <div className="relative size-full">
+      <TransformWrapper
+        ref={transformRef}
+        initialScale={1}
+        minScale={minZoom}
+        maxScale={maxZoom}
+        wheel={{
+          step: 0.1,
         }}
-        wrapperClass="!w-full !h-full !absolute !inset-0"
-        contentClass="!w-full !h-full flex items-center justify-center"
+        pinch={{
+          step: 0.5,
+        }}
+        doubleClick={{
+          step: 2,
+          mode: "toggle",
+          animationTime: 200,
+          animationType: "easeInOutCubic",
+        }}
+        limitToBounds={true}
+        centerOnInit={true}
+        smooth={true}
+        centerZoomedOut
+        alignmentAnimation={{
+          sizeX: 0,
+          sizeY: 0,
+          velocityAlignmentTime: 0.2,
+        }}
+        velocityAnimation={{
+          sensitivity: 1,
+          animationTime: 0.2,
+        }}
+        onTransformed={onTransformed}
       >
-        <div
-          className="relative inline-block h-full overflow-hidden"
-          onClick={stopPropagation}
-          tabIndex={-1}
-          data-image-container
+        <TransformComponent
+          wrapperProps={{
+            onClick: (e) => {
+              if (
+                (e as React.MouseEvent).detail >= 2 ||
+                isModalDragging ||
+                performance.now() - lastDragEndAt < 150
+              ) {
+                stopPropagation(e)
+                return
+              }
+              const target = e.target as HTMLElement
+              // If click is not on the image container, treat it as overlay click and dismiss
+              if (!target.closest("[data-image-container]")) {
+                dismiss()
+                return
+              }
+              stopPropagation(e)
+            },
+          }}
+          wrapperClass="!w-full !h-full !absolute !inset-0 cursor-default"
+          contentClass="!w-full !h-full flex items-center justify-center"
         >
-          <img
-            height={height}
-            width={width}
-            src={src || undefined}
-            alt={alt}
-            className={cn(
-              "mx-auto h-full object-contain",
-              highResLoaded ? "opacity-100" : "opacity-0",
-            )}
-            draggable={false}
-            loading="eager"
-            decoding="async"
-            onLoad={onLoad}
+          <div
+            className="relative inline-block h-full cursor-grab overflow-hidden"
             onClick={stopPropagation}
-            onError={onError}
-          />
-        </div>
-      </TransformComponent>
-    </TransformWrapper>
+            tabIndex={-1}
+            data-image-container
+          >
+            <img
+              height={height}
+              width={width}
+              src={src || undefined}
+              alt={alt}
+              className={cn(
+                "mx-auto h-full object-contain",
+                highResLoaded ? "opacity-100" : "opacity-0",
+              )}
+              draggable={false}
+              loading={loading}
+              decoding="async"
+              onLoad={onLoad}
+              onClick={stopPropagation}
+              onError={onError}
+            />
+          </div>
+        </TransformComponent>
+      </TransformWrapper>
+    </div>
   )
 }

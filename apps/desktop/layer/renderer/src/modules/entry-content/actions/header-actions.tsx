@@ -1,45 +1,31 @@
-import { useGlobalFocusableScopeSelector } from "@follow/components/common/Focusable/hooks.js"
+import { RootPortal } from "@follow/components/ui/portal/index.js"
 import type { FeedViewType } from "@follow/constants"
-import { useEntry } from "@follow/store/entry/hooks"
+import { memo } from "react"
 
 import { MenuItemText } from "~/atoms/context-menu"
-import { FocusablePresets } from "~/components/common/Focusable"
 import { CommandActionButton } from "~/components/ui/button/CommandActionButton"
-import { useHasModal } from "~/components/ui/modal/stacked/hooks"
-import { useSortedEntryActions } from "~/hooks/biz/useEntryActions"
-import { COMMAND_ID } from "~/modules/command/commands/id"
-import { useCommandBinding } from "~/modules/command/hooks/use-command-binding"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu/dropdown-menu"
+import { EntryActionDropdownItem, useSortedEntryActions } from "~/hooks/biz/useEntryActions"
+import { useCommand } from "~/modules/command/hooks/use-command"
+import type { FollowCommandId } from "~/modules/command/types"
 
-export const EntryHeaderActions = ({
-  entryId,
-  view,
-  compact,
-}: {
-  entryId: string
-  view: FeedViewType
-  compact?: boolean
-}) => {
-  const { mainAction: actionConfigs } = useSortedEntryActions({ entryId, view, compact })
-  const entry = useEntry(entryId, (state) => ({ url: state.url }))
-
-  const hasModal = useHasModal()
-
-  const when = useGlobalFocusableScopeSelector(FocusablePresets.isEntryRender)
-
-  useCommandBinding({
-    when: !!entry?.url && !hasModal && when,
-    commandId: COMMAND_ID.entry.openInBrowser,
-    args: [{ entryId }],
-  })
+export const EntryHeaderActions = ({ entryId, view }: { entryId: string; view: FeedViewType }) => {
+  const { mainAction: actionConfigs } = useSortedEntryActions({ entryId, view })
 
   return actionConfigs
-    .filter((item) => item instanceof MenuItemText)
+    .filter((item) => item instanceof MenuItemText || item instanceof EntryActionDropdownItem)
     .map((config) => {
-      return (
+      const baseTrigger = (
         <CommandActionButton
           active={config.active}
           key={config.id}
-          disableTriggerShortcut={!when}
+          // Handle shortcut globally
+          disableTriggerShortcut
           commandId={config.id}
           onClick={config.onClick!}
           shortcut={config.shortcut!}
@@ -48,5 +34,59 @@ export const EntryHeaderActions = ({
           id={`${config.entryId}/${config.id}`}
         />
       )
+
+      if (config instanceof EntryActionDropdownItem && config.hasChildren) {
+        return (
+          <DropdownMenu key={config.id}>
+            <DropdownMenuTrigger asChild>{baseTrigger}</DropdownMenuTrigger>
+            <RootPortal>
+              <DropdownMenuContent>
+                {config.enabledChildren.map((child) => (
+                  <CommandDropdownMenuItem
+                    key={child.id}
+                    commandId={child.id}
+                    onClick={child.onClick!}
+                    active={child.active}
+                  />
+                ))}
+              </DropdownMenuContent>
+            </RootPortal>
+          </DropdownMenu>
+        )
+      }
+
+      if (config instanceof MenuItemText) {
+        return baseTrigger
+      }
+
+      return null
     })
 }
+
+const CommandDropdownMenuItem = memo(
+  ({
+    commandId,
+    onClick,
+    active,
+  }: {
+    commandId: FollowCommandId
+    onClick: () => void
+    active?: boolean
+  }) => {
+    const command = useCommand(commandId)
+
+    if (!command) return null
+
+    return (
+      <DropdownMenuItem
+        key={command.id}
+        className="pl-3"
+        icon={command.icon}
+        onSelect={onClick}
+        active={active}
+      >
+        {command.label.title}
+      </DropdownMenuItem>
+    )
+  },
+)
