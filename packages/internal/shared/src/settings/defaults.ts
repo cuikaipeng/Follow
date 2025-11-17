@@ -1,6 +1,7 @@
 import type { AISettings, GeneralSettings, IntegrationSettings, UISettings } from "./interface"
 
 export const DEFAULT_SUMMARIZE_TIMELINE_SHORTCUT_ID = "default-summarize-timeline"
+export const DEFAULT_RECOMMEND_FEEDS_SHORTCUT_ID = "default-recommend-feeds"
 
 export const defaultGeneralSettings: GeneralSettings = {
   // App
@@ -23,7 +24,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   unreadOnly: false,
   // mark unread
   scrollMarkUnread: true,
-  hoverMarkUnread: true,
+  hoverMarkUnread: false,
   renderMarkUnread: false,
   // timeline
   groupByDate: true,
@@ -46,7 +47,7 @@ export const defaultUISettings: UISettings = {
   accentColor: "orange",
 
   // Sidebar
-  entryColWidth: 356,
+  entryColWidth: 450,
   aiColWidth: 384,
   feedColWidth: 256,
   hideExtraBadge: false,

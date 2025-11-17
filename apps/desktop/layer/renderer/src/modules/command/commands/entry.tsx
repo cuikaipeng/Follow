@@ -1,19 +1,16 @@
 import { getMousePosition } from "@follow/components/hooks/useMouse.js"
-import { FeedViewType, UserRole } from "@follow/constants"
+import { FeedViewType } from "@follow/constants"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { isEntryStarred } from "@follow/store/collection/getter"
 import { collectionSyncService } from "@follow/store/collection/store"
 import { getEntry } from "@follow/store/entry/getter"
 import { entrySyncServices } from "@follow/store/entry/store"
 import { unreadSyncService } from "@follow/store/unread/store"
-import { useUserRole } from "@follow/store/user/hooks"
 import { cn, resolveUrlWithBase } from "@follow/utils/utils"
 import { useMutation } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { toggleShowAISummaryOnce } from "~/atoms/ai-summary"
-import { toggleShowAITranslationOnce } from "~/atoms/ai-translation"
 import { AudioPlayer, getAudioPlayerAtomValue } from "~/atoms/player"
 import { showPopover } from "~/atoms/popover"
 import { useGeneralSettingKey } from "~/atoms/settings/general"
@@ -29,7 +26,6 @@ import { getRouteParams } from "~/hooks/biz/useRouteParams"
 import { ipcServices } from "~/lib/client"
 import { copyToClipboard } from "~/lib/clipboard"
 import { parseHtml } from "~/lib/parse-html"
-import { useActivationModal } from "~/modules/activation"
 import { markAllByRoute } from "~/modules/entry-column/hooks/useMarkAll"
 import { useGalleryModal } from "~/modules/entry-content/hooks"
 
@@ -110,9 +106,6 @@ export const useRegisterEntryCommands = () => {
   const openGalleryModal = useGalleryModal()
   const read = useRead()
   const unread = useUnread()
-
-  const role = useUserRole()
-  const presentActivationModal = useActivationModal()
 
   const voice = useGeneralSettingKey("voice")
 
@@ -390,40 +383,6 @@ export const useRegisterEntryCommands = () => {
     ],
     {},
   )
-
-  useRegisterFollowCommand(
-    [
-      {
-        id: COMMAND_ID.entry.toggleAISummary,
-        label: t("entry_actions.toggle_ai_summary"),
-        icon: <i className="i-mgc-ai-cute-re" />,
-        category,
-        run: () => {
-          if (role === UserRole.Free || role === UserRole.Trial) {
-            presentActivationModal()
-            return
-          }
-          toggleShowAISummaryOnce()
-        },
-      },
-      {
-        id: COMMAND_ID.entry.toggleAITranslation,
-        label: t("entry_actions.toggle_ai_translation"),
-        icon: <i className="i-mgc-translate-2-ai-cute-re" />,
-        category,
-        run: () => {
-          if (role === UserRole.Free || role === UserRole.Trial) {
-            presentActivationModal()
-            return
-          }
-          toggleShowAITranslationOnce()
-        },
-      },
-    ],
-    {
-      deps: [role],
-    },
-  )
 }
 
 export type StarCommand = Command<{
@@ -481,11 +440,6 @@ export type ReadBelowCommand = Command<{
   fn: (data: { publishedAt: string }) => void
 }>
 
-export type ToggleAISummaryCommand = Command<{
-  id: typeof COMMAND_ID.entry.toggleAISummary
-  fn: () => void
-}>
-
 export type ToggleAITranslationCommand = Command<{
   id: typeof COMMAND_ID.entry.toggleAITranslation
   fn: () => void
@@ -518,7 +472,6 @@ export type EntryCommand =
   | ReadCommand
   | ReadAboveCommand
   | ReadBelowCommand
-  | ToggleAISummaryCommand
   | ToggleAITranslationCommand
   | ImageGalleryCommand
   | TTSCommand

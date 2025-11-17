@@ -85,7 +85,7 @@ const useRemoteEntries = (): UseEntriesReturn => {
       fetchedTime: fetchedTime!,
     }),
     {
-      refetchInterval: 1000 * 60,
+      refetchInterval: 1000 * 60 * 5,
       enabled: !!fetchedTime && !pauseQuery,
       notifyOnChangeProps: ["data"],
     },
@@ -299,6 +299,7 @@ export const useEntriesByView = ({ onReset }: { onReset?: () => void }) => {
   return {
     ...query,
 
+    type: remoteQuery.isReady ? ("remote" as const) : ("local" as const),
     hasUpdate: query.hasUpdate,
     refetch: useCallback(() => {
       const promise = query.refetch()

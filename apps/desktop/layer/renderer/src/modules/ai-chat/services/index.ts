@@ -1,8 +1,7 @@
-import type { AsyncDb } from "@follow/database/db"
 import { db } from "@follow/database/db"
 import type { AiChatMessagesModel } from "@follow/database/schemas/index"
 import { aiChatMessagesTable, aiChatTable } from "@follow/database/schemas/index"
-import { asc, count, eq, inArray, sql } from "drizzle-orm"
+import { asc, eq, inArray, sql } from "drizzle-orm"
 
 import { getI18n } from "~/i18n"
 import { followClient } from "~/lib/api-client"
@@ -37,6 +36,17 @@ class AIPersistServiceStatic {
       where: eq(aiChatMessagesTable.chatId, chatId),
       orderBy: [asc(aiChatMessagesTable.createdAt)],
     })
+  }
+
+  async hasPersistedMessages(chatId: string): Promise<boolean> {
+    const existingMessage = await db.query.aiChatMessagesTable.findFirst({
+      where: eq(aiChatMessagesTable.chatId, chatId),
+      columns: {
+        id: true,
+      },
+    })
+
+    return Boolean(existingMessage?.id === chatId)
   }
 
   /**
@@ -75,6 +85,8 @@ class AIPersistServiceStatic {
       title?: string
       createdAt: Date
       updatedAt: Date
+      isLocal: boolean
+      syncStatus: "local" | "synced"
     } | null
     messages: BizUIMessage[]
   }> {
@@ -98,9 +110,14 @@ class AIPersistServiceStatic {
       await this.updateSessionTitle(sessionRaw.chatId, resolvedTitle)
     }
 
+    const isLocal = Boolean(sessionRaw.isLocal)
+    const syncStatus: "local" | "synced" = isLocal ? "local" : "synced"
+
     const session = {
       ...sessionRaw,
       title: resolvedTitle ?? undefined,
+      isLocal,
+      syncStatus,
     }
 
     return { session, messages }
@@ -130,6 +147,10 @@ class AIPersistServiceStatic {
       const cleanParts = [] as typeof message.parts
 
       for (const part of message.parts) {
+        // Skip streaming messages
+        if ("state" in part && part.state === "streaming") {
+          return acc
+        }
         if (isDataBlockPart(part)) {
           const nextPart = structuredClone(part)
           for (const block of nextPart.data) {
@@ -159,6 +180,9 @@ class AIPersistServiceStatic {
 
       return acc
     }, [])
+    if (results.length === 0) {
+      return
+    }
     await db
       .insert(aiChatMessagesTable)
       .values(results)
@@ -169,8 +193,24 @@ class AIPersistServiceStatic {
           metadata: sql`excluded.metadata`,
           finishedAt: sql`excluded.finished_at`,
           status: sql`excluded.status`,
+          createdAt: sql`excluded.created_at`,
         },
       })
+
+    const date = results.reduce<Date | null>((latest, msg) => {
+      const date = msg.createdAt ? new Date(msg.createdAt) : null
+      if (date === null) {
+        return latest
+      }
+      if (!latest || date > latest) {
+        return date
+      }
+      return latest
+    }, null)
+    if (date) {
+      // Update session time after successfully saving messages
+      await AIPersistService.updateSessionTime(chatId, date)
+    }
   }
 
   /**
@@ -263,10 +303,11 @@ class AIPersistServiceStatic {
    */
   async ensureSession(
     chatId: string,
-    options: { title?: string; createdAt?: Date; updatedAt?: Date } = {},
+    options: { title?: string; createdAt?: Date; updatedAt?: Date; isLocal?: boolean } = {},
   ): Promise<void> {
     const cachedExists = this.getSessionExistsFromCache(chatId)
-    const shouldCheckDb = cachedExists !== true || options.title
+    const shouldCheckDb =
+      cachedExists !== true || options.title !== undefined || typeof options.isLocal === "boolean"
 
     if (!shouldCheckDb) {
       return
@@ -292,6 +333,11 @@ class AIPersistServiceStatic {
         }
       }
 
+      if (typeof options.isLocal === "boolean" && existing.isLocal !== options.isLocal) {
+        updates.isLocal = options.isLocal
+        shouldUpdate = true
+      }
+
       if (shouldUpdate) {
         updates.updatedAt = new Date()
         await db.update(aiChatTable).set(updates).where(eq(aiChatTable.chatId, chatId))
@@ -306,7 +352,7 @@ class AIPersistServiceStatic {
 
   async createSession(
     chatId: string,
-    options: { title?: string; createdAt?: Date; updatedAt?: Date } = {},
+    options: { title?: string; createdAt?: Date; updatedAt?: Date; isLocal?: boolean } = {},
   ) {
     const now = new Date()
     await db.insert(aiChatTable).values({
@@ -314,6 +360,7 @@ class AIPersistServiceStatic {
       title: this.resolveSessionTitle(chatId, options.title, { createdAt: now, updatedAt: now }),
       createdAt: options.createdAt ?? now,
       updatedAt: options.updatedAt ?? now,
+      isLocal: options.isLocal ?? true,
     })
     // Mark session as existing in cache
     this.markSessionExists(chatId, true)
@@ -350,6 +397,7 @@ class AIPersistServiceStatic {
         title: true,
         createdAt: true,
         updatedAt: true,
+        isLocal: true,
       },
     })
     return result?.chatId ? result : null
@@ -362,6 +410,7 @@ class AIPersistServiceStatic {
         title: true,
         createdAt: true,
         updatedAt: true,
+        isLocal: true,
       },
       orderBy: (t, { desc }) => desc(t.updatedAt),
       limit,
@@ -370,18 +419,6 @@ class AIPersistServiceStatic {
     if (chats.length === 0) {
       return []
     }
-
-    const chatIds = chats.map((chat) => chat.chatId)
-    const messageCounts = await (db as AsyncDb)
-      .select({
-        chatId: aiChatMessagesTable.chatId,
-        messageCount: count(aiChatMessagesTable.id),
-      })
-      .from(aiChatMessagesTable)
-      .where(inArray(aiChatMessagesTable.chatId, chatIds))
-      .groupBy(aiChatMessagesTable.chatId)
-
-    const messageCountMap = new Map(messageCounts.map((item) => [item.chatId, item.messageCount]))
 
     const normalizedChats = await Promise.all(
       chats.map(async (chat) => {
@@ -401,15 +438,19 @@ class AIPersistServiceStatic {
       }),
     )
 
-    return normalizedChats
-      .map((chat) => ({
+    return normalizedChats.map((chat) => {
+      const isLocal = Boolean(chat.isLocal)
+      const syncStatus: "local" | "synced" = isLocal ? "local" : "synced"
+
+      return {
         chatId: chat.chatId,
         title: chat.title,
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
-        messageCount: messageCountMap.get(chat.chatId) || 0,
-      }))
-      .filter((chat) => chat.messageCount > 0)
+        isLocal,
+        syncStatus,
+      }
+    })
   }
 
   async deleteSession(chatId: string) {
@@ -432,13 +473,17 @@ class AIPersistServiceStatic {
       .where(eq(aiChatTable.chatId, chatId))
   }
 
-  async updateSessionTime(chatId: string) {
+  async updateSessionTime(chatId: string, date: Date = new Date()) {
     await db
       .update(aiChatTable)
       .set({
-        updatedAt: new Date(Date.now()),
+        updatedAt: date,
       })
       .where(eq(aiChatTable.chatId, chatId))
+  }
+
+  async markSessionSynced(chatId: string) {
+    await this.ensureSession(chatId, { isLocal: false })
   }
 
   async cleanupEmptySessions() {
@@ -459,6 +504,11 @@ class AIPersistServiceStatic {
 
       // Clear deleted sessions from cache
       chatIdsToDelete.forEach((chatId) => this.clearSessionCache(chatId))
+      for (const chatId of chatIdsToDelete) {
+        await followClient.api.aiChatSessions.delete({ chatId }).catch((error) => {
+          console.error("Failed to delete remote chat sessions:", error)
+        })
+      }
     }
   }
 }

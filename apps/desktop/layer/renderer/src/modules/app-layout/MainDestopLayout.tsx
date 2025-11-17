@@ -1,5 +1,5 @@
 import { RootPortal } from "@follow/components/ui/portal/index.jsx"
-import { DEV, IN_ELECTRON, PROD } from "@follow/shared/constants"
+import { IN_ELECTRON, PROD } from "@follow/shared/constants"
 import { useWhoami } from "@follow/store/user/hooks"
 import { preventDefault } from "@follow/utils/dom"
 import type { PropsWithChildren } from "react"
@@ -172,14 +172,14 @@ export function MainDestopLayout() {
         <RootPortal>
           <DeclarativeModal
             id="login"
+            defaultOpen
             CustomModalComponent={PlainModal}
-            open
             overlay
             title="Login"
-            canClose={false}
-            clickOutsideToDismiss={false}
+            canClose={!IN_ELECTRON}
+            clickOutsideToDismiss={!IN_ELECTRON}
           >
-            <LoginModalContent canClose={false} runtime={IN_ELECTRON ? "app" : "browser"} />
+            <LoginModalContent canClose={!IN_ELECTRON} runtime={IN_ELECTRON ? "app" : "browser"} />
           </DeclarativeModal>
         </RootPortal>
       )}
@@ -233,26 +233,24 @@ const RootContainer = ({
   )
 }
 
-if (DEV) {
-  DebugRegistry.add("New User Guide", () => {
-    import("~/modules/new-user-guide/guide-modal-content").then((m) => {
-      window.presentModal({
-        title: "New User Guide",
-        content: ({ dismiss }) => (
-          <m.GuideModalContent
-            onClose={() => {
-              dismiss()
-            }}
-          />
-        ),
+DebugRegistry.add("New User Guide", () => {
+  import("~/modules/new-user-guide/guide-modal-content").then((m) => {
+    window.presentModal({
+      title: "New User Guide",
+      content: ({ dismiss }) => (
+        <m.GuideModalContent
+          onClose={() => {
+            dismiss()
+          }}
+        />
+      ),
 
-        CustomModalComponent: PlainModal,
-        modalContainerClassName: "flex items-center justify-center",
+      CustomModalComponent: PlainModal,
+      modalContainerClassName: "flex items-center justify-center",
 
-        canClose: false,
-        clickOutsideToDismiss: false,
-        overlay: true,
-      })
+      canClose: false,
+      clickOutsideToDismiss: false,
+      overlay: true,
     })
   })
-}
+})

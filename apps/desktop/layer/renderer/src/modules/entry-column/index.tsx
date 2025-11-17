@@ -4,6 +4,7 @@ import { useEntry } from "@follow/store/entry/hooks"
 import { useFeedById } from "@follow/store/feed/hooks"
 import { useSubscriptionByFeedId } from "@follow/store/subscription/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
+import { useIsLoggedIn } from "@follow/store/user/hooks"
 import { isBizId } from "@follow/utils/utils"
 import type { Range, Virtualizer } from "@tanstack/react-virtual"
 import { atom } from "jotai"
@@ -33,6 +34,7 @@ import { EntryRootStateContext } from "./store/EntryColumnContext"
 function EntryColumnContent() {
   const listRef = useRef<Virtualizer<HTMLElement, Element>>(undefined)
   const state = useEntriesState()
+
   const actions = useEntriesActions()
   // Register reset handler to keep scroll behavior when data resets
   useEffect(() => {
@@ -60,6 +62,7 @@ function EntryColumnContent() {
   const feed = useFeedById(routeFeedId)
   const title = useFeedHeaderTitle()
   useTitle(title)
+  const isLoggedIn = useIsLoggedIn()
 
   useEffect(() => {
     if (!activeEntryId) return
@@ -67,8 +70,9 @@ function EntryColumnContent() {
     if (isCollection || isPendingEntry) return
     if (!entry?.feedId) return
 
+    if (!isLoggedIn) return
     unreadSyncService.markEntryAsRead(activeEntryId)
-  }, [activeEntryId, entry?.feedId, isCollection, isPendingEntry])
+  }, [activeEntryId, entry?.feedId, isCollection, isPendingEntry, isLoggedIn])
 
   const isInteracted = useRef(false)
 
@@ -177,6 +181,7 @@ function EntryColumnContent() {
             fetchNextPage={fetchNextPage}
             refetch={actions.refetch}
             groupCounts={groupedCounts}
+            syncType={state.type}
             Footer={
               isCollection ? void 0 : <FooterMarkItem view={view} fetchedTime={state.fetchedTime} />
             }

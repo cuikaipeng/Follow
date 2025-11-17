@@ -4,13 +4,15 @@ import { RotatingRefreshIcon } from "@follow/components/ui/loading/index.jsx"
 import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
 import { FeedViewType, getView } from "@follow/constants"
 import { useIsOnline } from "@follow/hooks"
+import { DEFAULT_SUMMARIZE_TIMELINE_SHORTCUT_ID } from "@follow/shared/settings/defaults"
 import { getFeedById } from "@follow/store/feed/getter"
 import { useFeedById } from "@follow/store/feed/hooks"
-import { useWhoami } from "@follow/store/user/hooks"
+import { useIsLoggedIn, useWhoami } from "@follow/store/user/hooks"
 import { stopPropagation } from "@follow/utils/dom"
 import { clsx, cn, isBizId } from "@follow/utils/utils"
 import { useAtomValue } from "jotai"
 import type { FC } from "react"
+import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -18,8 +20,11 @@ import { previewBackPath } from "~/atoms/preview"
 import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { useSubscriptionColumnShow } from "~/atoms/sidebar"
 import { ROUTE_ENTRY_PENDING } from "~/constants"
+import { useFeature } from "~/hooks/biz/useFeature"
 import { useFollow } from "~/hooks/biz/useFollow"
 import { getRouteParams, useRouteParams } from "~/hooks/biz/useRouteParams"
+import { useLoginModal } from "~/hooks/common"
+import { useSendAIShortcut } from "~/modules/ai-chat/hooks/useSendAIShortcut"
 import { COMMAND_ID } from "~/modules/command/commands/id"
 import { useRunCommandFn } from "~/modules/command/hooks/use-command"
 import { useCommandShortcut } from "~/modules/command/hooks/use-command-binding"
@@ -43,9 +48,11 @@ export const EntryListHeader: FC<{
   const { t } = useTranslation()
 
   const unreadOnly = useGeneralSettingKey("unreadOnly")
+  const aiEnabled = useFeature("ai")
 
   const { feedId, entryId, view, isCollection } = routerParams
   const isPreview = useIsPreviewFeed()
+  const isWideMode = !!getView(view)?.wideMode
 
   const headerTitle = useFeedHeaderTitle()
   const feedIcon = useFeedHeaderIcon()
@@ -86,13 +93,25 @@ export const EntryListHeader: FC<{
 
   const { isScrolledBeyondThreshold } = useEntryRootState()
   const isScrolledBeyondThresholdValue = useAtomValue(isScrolledBeyondThreshold)
+  const { sendAIShortcut } = useSendAIShortcut()
+  const summarizeTimeline = useCallback(() => {
+    void sendAIShortcut({
+      shortcutId: DEFAULT_SUMMARIZE_TIMELINE_SHORTCUT_ID,
+      ensureNewChat: true,
+    })
+  }, [sendAIShortcut])
+  const showEntryHeader = isWideMode && !!entryId && entryId !== ROUTE_ENTRY_PENDING
+  const showTimelineSummaryButton = isWideMode && aiEnabled
+
   return (
     <div
       className={cn(
-        "flex h-top-header-with-border-b w-full flex-col pr-2.5 pt-2 @[700px]:pr-3 @[1024px]:pr-4",
+        "flex w-full flex-col pr-2.5 pt-2 @[700px]:pr-3 @[1024px]:pr-4",
         !feedColumnShow && "macos:mt-4 macos:pt-margin-macos-traffic-light-y",
         titleStyleBasedView[view],
-        isPreview && "px-2.5 @[700px]:px-3 @[1024px]:px-4",
+        isPreview
+          ? "h-top-header-in-preview-with-border-b px-2.5 @[700px]:px-3 @[1024px]:px-4"
+          : "h-top-header-with-border-b",
         view === FeedViewType.All &&
           "border-b border-transparent data-[scrolled-beyond-threshold=true]:border-b-border",
       )}
@@ -110,9 +129,17 @@ export const EntryListHeader: FC<{
             )}
             onClick={stopPropagation}
           >
-            {getView(view)?.wideMode && entryId && entryId !== ROUTE_ENTRY_PENDING && (
+            {isWideMode && (showEntryHeader || showTimelineSummaryButton) && (
               <>
-                <EntryHeader entryId={entryId} />
+                {showEntryHeader && <EntryHeader entryId={entryId} />}
+                {showTimelineSummaryButton && (
+                  <ActionButton
+                    tooltip={t("entry_list_header.timeline_summary")}
+                    onClick={summarizeTimeline}
+                  >
+                    <i className="i-mgc-paint-brush-ai-cute-re text-purple-600 dark:text-purple-400" />
+                  </ActionButton>
+                )}
                 <DividerVertical className="mx-2 w-px" />
               </>
             )}
@@ -182,6 +209,9 @@ const PreviewHeaderInfoWrapper: Component = ({ children }) => {
   const follow = useFollow()
 
   const navigate = useNavigate()
+  const isLoggedIn = useIsLoggedIn()
+  const presentLoginModal = useLoginModal()
+
   return (
     <div className="flex w-full flex-col pt-1.5">
       <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -203,6 +233,10 @@ const PreviewHeaderInfoWrapper: Component = ({ children }) => {
         type="button"
         className="-mx-4 mt-3.5 flex animate-gradient-x cursor-button place-items-center justify-center gap-1 bg-gradient-to-r from-accent/10 via-accent/15 to-accent/20 px-3 py-2 font-semibold text-accent transition-all duration-300 hover:bg-accent hover:text-white"
         onClick={() => {
+          if (!isLoggedIn) {
+            presentLoginModal()
+            return
+          }
           const { feedId, listId } = getRouteParams()
           const feed = getFeedById(feedId)
           follow({

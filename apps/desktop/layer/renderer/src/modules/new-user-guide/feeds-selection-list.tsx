@@ -7,6 +7,7 @@ import {
 import { ScrollArea } from "@follow/components/ui/scroll-area/ScrollArea.js"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@follow/components/ui/tooltip/index.js"
 import { cn } from "@follow/utils/utils"
+import { decode } from "@toon-format/toon"
 import type { PrimitiveAtom } from "jotai"
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai"
 import { AnimatePresence, m } from "motion/react"
@@ -19,16 +20,23 @@ import { useMessages } from "../ai-chat/store/hooks"
 import { SearchResultContent } from "../discover/DiscoverFeedCard"
 import { FeedIcon } from "../feed/feed-icon"
 import type { FeedSelection } from "./store"
-import { feedSelectionAtomsAtom, selectedFeedSelectionAtomsAtom } from "./store"
+import { feedSelectionAtomsAtom, selectedFeedSelectionAtomsAtom, stepAtom } from "./store"
 
 type FeedToSelect = Omit<FeedSelection, "selected">
 
 export function FeedsSelectionList() {
   const chatMessages = useMessages()
+  const setStep = useSetAtom(stepAtom)
 
   const hasFeedsSelection = chatMessages.some((msg) =>
     msg.parts.some((p) => p.type === "tool-onboardingGetTrendingFeeds" && p.output),
   )
+
+  useEffect(() => {
+    if (hasFeedsSelection) {
+      setStep("selecting-feeds")
+    }
+  }, [hasFeedsSelection, setStep])
 
   return (
     <div className="col-span-4 h-full overflow-hidden">
@@ -42,14 +50,14 @@ export function FeedsSelectionList() {
 function FeedSelectionOperationScreen() {
   const chatMessages = useMessages()
 
-  const feedsToSelect: FeedToSelect[] = useMemo(
-    () =>
-      // find the last message that has the tool
-      chatMessages
-        .findLast((m) => m.parts?.some((p) => p.type === "tool-onboardingGetTrendingFeeds"))
-        ?.parts?.findLast((p) => p.type === "tool-onboardingGetTrendingFeeds")?.output ?? [],
-    [chatMessages],
-  )
+  const feedsToSelect: FeedToSelect[] = useMemo(() => {
+    // find the last message that has the tool
+    const output = chatMessages
+      .findLast((m) => m.parts?.some((p) => p.type === "tool-onboardingGetTrendingFeeds"))
+      ?.parts?.findLast((p) => p.type === "tool-onboardingGetTrendingFeeds")?.output
+
+    return typeof output === "string" ? (decode(output) as any[]) : (output as any[])
+  }, [chatMessages])
 
   const store = useStore()
   const atomList = useAtomValue(feedSelectionAtomsAtom)
