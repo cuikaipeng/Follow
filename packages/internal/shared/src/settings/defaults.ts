@@ -27,7 +27,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   hoverMarkUnread: false,
   renderMarkUnread: false,
   // timeline
-  groupByDate: true,
+  groupByDate: false,
   autoExpandLongSocialMedia: false,
   dimRead: false,
 
@@ -169,6 +169,12 @@ export const defaultAISettings: AISettings = {
 
   // Features
   autoScrollWhenStreaming: true,
+
+  // BYOK (Bring Your Own Key)
+  byok: {
+    enabled: false,
+    providers: [],
+  },
 }
 
 export const defaultSettings = {
