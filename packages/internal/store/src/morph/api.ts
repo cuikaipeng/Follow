@@ -149,7 +149,7 @@ class APIMorph {
             image: list.image!,
             ownerUserId: list.owner.id,
             feedIds: list.feedIds!,
-            fee: list.fee!,
+            fee: list.fee ?? 0,
             subscriptionCount: null,
             purchaseAmount: null,
             type: "list",

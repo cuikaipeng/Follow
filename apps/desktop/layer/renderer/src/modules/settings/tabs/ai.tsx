@@ -7,7 +7,6 @@ import { createDefineSettingItem } from "../helper/builder"
 import { createSettingBuilder } from "../helper/setting-builder"
 import { ByokSection } from "./ai/byok"
 import { MCPServicesSection } from "./ai/mcp/MCPServicesSection"
-import { UserMemorySection } from "./ai/memory"
 import { PanelStyleSection } from "./ai/PanelStyleSection"
 import { PersonalizePromptSection } from "./ai/PersonalizePromptSection"
 import { AIShortcutsSection } from "./ai/shortcuts/AIShortcutsSection"
@@ -20,6 +19,7 @@ const defineSettingItem = createDefineSettingItem("ai", useAISettingValue, setAI
 export const AI_SETTING_SECTION_IDS = {
   shortcuts: "settings-ai-shortcuts",
   tasks: "settings-ai-tasks",
+  timelinePrompt: "settings-ai-timeline-prompt",
 } as const
 
 export const SettingAI = () => {
@@ -57,12 +57,6 @@ export const SettingAI = () => {
             id: AI_SETTING_SECTION_IDS.shortcuts,
           },
           AIShortcutsSection,
-
-          {
-            type: "title",
-            value: t("memories.section.title"),
-          },
-          UserMemorySection,
 
           {
             type: "title",

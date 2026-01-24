@@ -8,18 +8,18 @@ packages:
   - "!**/example/**"
 
 catalog:
-  "@follow-app/client-sdk": 0.3.89
-  "@folo-services/ai-tools": 0.2.61
+  "@follow-app/client-sdk": 0.3.92
+  "@folo-services/ai-tools": 0.2.65
   tailwindcss-uikit-colors: 1.0.0
   typescript: 5.9.3
 
 ignorePatchFailures: false
 
-minimumReleaseAge: 1440
+# minimumReleaseAge: 1440
 
-minimumReleaseAgeExclude:
-  - "@follow-app/*"
-  - "@folo-services/*"
+# minimumReleaseAgeExclude:
+#   - "@follow-app/*"
+#   - "@folo-services/*"
 
 onlyBuiltDependencies:
   - "@firebase/util"

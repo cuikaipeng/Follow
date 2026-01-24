@@ -183,7 +183,7 @@ export function ListItem({
       >
         <div
           className={cn(
-            "flex gap-1 text-[10px] font-bold",
+            "flex min-w-0 items-center gap-1 text-[10px] font-bold",
             "text-text-secondary",
             isInCollection && "text-text-secondary",
             isRead && dimRead && "text-text-tertiary",
@@ -196,7 +196,7 @@ export function ListItem({
               className="space-x-0.5"
             />
           </EllipsisHorizontalTextWithTooltip>
-          <span>·</span>
+          <span className="shrink-0">·</span>
           <span className="shrink-0">{!!displayTime && <RelativeTime date={displayTime} />}</span>
         </div>
         <div

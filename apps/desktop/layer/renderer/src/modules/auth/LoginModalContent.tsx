@@ -12,14 +12,11 @@ import { m } from "motion/react"
 import { useEffect, useState } from "react"
 import { Trans, useTranslation } from "react-i18next"
 
-import { useServerConfigs } from "~/atoms/server-configs"
-import { GlassButton } from "~/components/ui/button/GlassButton"
 import { useCurrentModal, useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { authClient, loginHandler } from "~/lib/auth"
 import { useAuthProviders } from "~/queries/users"
 
 import { LoginWithPassword, RegisterForm } from "./Form"
-import { ReferralForm } from "./ReferralForm"
 import { TokenModalContent } from "./TokenModal"
 
 interface LoginModalContentProps {
@@ -28,8 +25,6 @@ interface LoginModalContentProps {
 }
 
 export const LoginModalContent = (props: LoginModalContentProps) => {
-  const serverConfigs = useServerConfigs()
-
   const modal = useCurrentModal()
   const { present } = useModalStack()
 
@@ -100,34 +95,43 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
       )}
 
       {/* Header Section */}
-      <div className="mb-8 flex flex-col items-center gap-4">
+      <div className="mb-6 flex flex-col items-center gap-3">
         <m.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={Spring.presets.smooth}
         >
-          <Logo className="size-20" />
+          <Logo className="size-16" />
         </m.div>
-        <m.div
-          className="flex items-center gap-2"
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={Spring.presets.smooth}
-        >
-          <span className="text-2xl font-semibold">
-            {isRegister ? t("signin.sign_up_to") : t("signin.sign_in_to")}
-          </span>
-          <Folo className="size-12" />
-        </m.div>
+        {isRegister ? (
+          <m.div
+            className="flex flex-col items-center gap-2"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={Spring.presets.smooth}
+          >
+            <h1 className="text-2xl font-semibold">{t("login.title")}</h1>
+          </m.div>
+        ) : (
+          <m.div
+            className="flex items-center gap-2"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={Spring.presets.smooth}
+          >
+            <span className="text-2xl font-semibold">{t("signin.sign_in_to")}</span>
+            <Folo className="size-12" />
+          </m.div>
+        )}
       </div>
       {!IN_ELECTRON && (
-        <GlassButton
-          variant="flat"
-          className="absolute -right-2 -top-2 bg-material-medium bg-transparent"
+        <button
+          type="button"
+          className="absolute -right-2 -top-2 flex size-8 items-center justify-center rounded-lg border-0 bg-transparent hover:bg-fill/20"
           onClick={modal.dismiss}
         >
           <i className="i-mgc-close-cute-re size-4" />
-        </GlassButton>
+        </button>
       )}
       {isEmail ? (
         <m.div
@@ -142,19 +146,17 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
           )}
         </m.div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {/* Login Providers */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             {isLoading
               ? // Skeleton loaders to prevent CLS
-                Array.from({ length: 4 })
-                  .fill(0)
-                  .map((_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="relative h-12 w-full animate-pulse rounded-xl border border-fill-secondary bg-material-medium"
-                    />
-                  ))
+                Array.from({ length: 4 }, (_, index) => (
+                  <div
+                    key={`login-skeleton-${index}`}
+                    className="relative h-12 w-full animate-pulse rounded-xl border border-fill-secondary bg-material-medium"
+                  />
+                ))
               : providers.map(([key, provider], index) => (
                   <m.div
                     key={key}
@@ -201,19 +203,8 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
                 ))}
           </div>
 
-          {/* Referral Form */}
-          {isRegister && serverConfigs?.REFERRAL_ENABLED && (
-            <m.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...Spring.presets.smooth, delay: 0.2 }}
-            >
-              <ReferralForm className="w-full" />
-            </m.div>
-          )}
-
           {/* Footer Links */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             <div className="text-center text-xs leading-relaxed text-text-tertiary">
               <button
                 type="button"
@@ -250,7 +241,7 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
         <>
           {/* Gradient Divider */}
           <div
-            className="my-6 h-px"
+            className="my-4 h-px"
             style={{
               background:
                 "linear-gradient(to right, transparent, rgba(255, 92, 0, 0.2), transparent)",
@@ -259,7 +250,7 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
 
           {/* Switch Account Type */}
           <m.button
-            className="group w-full cursor-pointer pb-4 text-center text-sm font-medium transition-colors"
+            className="group w-full cursor-pointer pb-2 text-center text-sm font-medium transition-colors"
             onClick={() => setIsRegister(!isRegister)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -293,7 +284,7 @@ export const LoginModalContent = (props: LoginModalContentProps) => {
         <div
           onClick={stopPropagation}
           tabIndex={-1}
-          className="relative w-[28rem] overflow-hidden rounded-2xl border border-folo/20 bg-background p-8 shadow-2xl shadow-folo/10 backdrop-blur-xl"
+          className="relative w-[28rem] overflow-hidden rounded-2xl border border-folo/20 bg-background p-6 shadow-2xl shadow-folo/10 backdrop-blur-xl"
         >
           {/* Inner glow layer */}
           <div
