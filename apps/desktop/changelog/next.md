@@ -2,7 +2,7 @@
 
 ## Shiny new things
 
-- markdown link supports open share feed link directly in the app
+- Supported French localization.
 
 ## Improvements
 
@@ -10,4 +10,4 @@
 
 ## Thanks
 
-Special thanks to volunteer contributors @ for their valuable contributions
+Special thanks to volunteer contributors @AnthonyMahe for their valuable contributions
