@@ -1,6 +1,9 @@
 node_modules
 dist
 out
+.next
+.open-next
+next-env.d.ts
 .DS_Store
 *.log*
 .env
@@ -29,3 +32,5 @@ apps/desktop/build/appxmanifest.xml
 
 .claude/settings.local.json
 .serena
+
+.wrangler
