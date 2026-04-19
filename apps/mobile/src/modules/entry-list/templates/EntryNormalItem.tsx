@@ -187,7 +187,9 @@ const ThumbnailImage = ({ entryId }: { entryId: string }) => {
   const audioState = useAudioPlayState(audio?.url)
   const video = mediaModel?.type === "video" ? mediaModel : null
   const videoViewRef = useRef<null | VideoView>(null)
-  const videoPlayer = useVideoPlayer(video?.url ?? "")
+  const videoPlayer = useVideoPlayer(video?.url ?? "", (player) => {
+    player.preservesPitch = true
+  })
   const [showVideoNativeControlsForAndroid, setShowVideoNativeControlsForAndroid] = useState(false)
   const handlePressPlay = useCallback(() => {
     if (video) {
@@ -260,8 +262,8 @@ const ThumbnailImage = ({ entryId }: { entryId: string }) => {
             // The Android native controls will be shown when the video is paused
             nativeControls={isIOS || showVideoNativeControlsForAndroid}
             accessible={false}
-            allowsFullscreen={false}
             allowsVideoFrameAnalysis={false}
+            fullscreenOptions={{ enable: false }}
             onFullscreenExit={() => {
               videoPlayer.pause()
               setShowVideoNativeControlsForAndroid(false)

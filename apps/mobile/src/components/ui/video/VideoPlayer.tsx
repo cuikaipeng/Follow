@@ -28,6 +28,7 @@ export function VideoPlayer({
   const player = useVideoPlayer(source, (player) => {
     player.loop = true
     player.muted = true
+    player.preservesPitch = true
     // player.play()
   })
   const { status } = useEvent(player, "statusChange", { status: player.status })
@@ -65,8 +66,8 @@ export function VideoPlayer({
         style={videoStyle}
         contentFit={isFullScreen ? "contain" : "cover"}
         player={player}
-        allowsFullscreen
         allowsPictureInPicture
+        fullscreenOptions={{ enable: true }}
         // The Android native controls will be shown when the video is paused
         nativeControls={isIOS || isFullScreen}
         accessible={false}

@@ -4,12 +4,13 @@ packages:
   - apps/desktop/layer/*
   - "!apps/mobile/native/example"
   - apps/mobile/web-app
+  - apps/mobile/web-app/html-renderer
   - "!**/example"
   - "!**/example/**"
 
 catalog:
-  "@follow-app/client-sdk": 0.3.92
-  "@folo-services/ai-tools": 0.2.65
+  "@follow-app/client-sdk": 0.3.95
+  "@folo-services/ai-tools": 0.2.66
   tailwindcss-uikit-colors: 1.0.0
   typescript: 5.9.3
 
@@ -28,7 +29,6 @@ onlyBuiltDependencies:
   - fast-folder-size
   - fs-xattr
   - macos-alias
-  - msedge-tts
   - protobufjs
   - sharp
   - simple-git-hooks
@@ -40,8 +40,10 @@ overrides:
   "@floating-ui/dom": 1.7.2
   "@floating-ui/react": 0.27.14
   "@floating-ui/react-dom": 2.1.4
+  "@follow-app/client-sdk": 0.3.95
+  "@folo-services/drizzle": 0.1.47
   "@react-native-menu/menu": 2.0.0
-  "@types/react": 19.1.17
+  "@types/react": 19.2.14
   array-includes: npm:@nolyfill/array-includes@latest
   array.prototype.findlastindex: npm:@nolyfill/array.prototype.findlastindex@latest
   array.prototype.flat: npm:@nolyfill/array.prototype.flat@latest
@@ -60,8 +62,8 @@ overrides:
   object.groupby: npm:@nolyfill/object.groupby@latest
   object.hasown: npm:@nolyfill/object.hasown@latest
   object.values: npm:@nolyfill/object.values@latest
-  react: 19.1.0
-  react-dom: 19.1.0
+  react: 19.2.0
+  react-dom: 19.2.0
   react-native-ios-context-menu: 3.2.1
   react-native-ios-utilities: 5.2.0
   serialize-error: 2.1.0
