@@ -2,6 +2,7 @@ import { useMobile } from "@follow/components/hooks/useMobile.js"
 import { useScrollViewElement } from "@follow/components/ui/scroll-area/hooks.js"
 import { FeedViewType } from "@follow/constants"
 import { useTypeScriptHappyCallback } from "@follow/hooks"
+import { shouldRenderScrollMarkReadEndSpacer } from "@follow/shared/scroll-mark-read"
 import { LRUCache } from "@follow/utils/lru-cache"
 import type { Range, VirtualItem, Virtualizer } from "@tanstack/react-virtual"
 import { useVirtualizer } from "@tanstack/react-virtual"
@@ -20,9 +21,11 @@ import { useUISettingKey } from "~/atoms/settings/ui"
 import { MediaContainerWidthProvider } from "~/components/ui/media/MediaContainerWidthProvider"
 
 import { EntryItemSkeleton } from "./EntryItemSkeleton"
+import { useScrollMarkReadEndPadding } from "./hooks/useScrollMarkReadEndPadding"
 import { EntryItem } from "./item"
 import { PictureMasonry } from "./Items/picture-masonry"
 import type { EntryListProps } from "./list"
+import { getInitialScrollOffset, shouldApplyScrollResetSignal } from "./scroll-reset"
 
 export const EntryColumnGrid: FC<EntryListProps> = (props) => {
   const { entriesIds, feedId, hasNextPage, view, fetchNextPage } = props
@@ -38,6 +41,10 @@ export const EntryColumnGrid: FC<EntryListProps> = (props) => {
         endReached={fetchNextPage}
         data={entriesIds}
         Footer={props.Footer}
+        appliedResetScrollSignal={props.appliedResetScrollSignal}
+        onResetScrollSignalConsumed={props.onResetScrollSignalConsumed}
+        resetScrollSignal={props.resetScrollSignal}
+        suspendMarkRead={props.suspendMarkRead}
       />
     )
   }
@@ -100,6 +107,9 @@ const VirtualGridImpl: FC<
     listRef,
     measureRef,
     containerWidth,
+    appliedResetScrollSignal,
+    onResetScrollSignalConsumed,
+    resetScrollSignal,
   } = props
   const scrollRef = useScrollViewElement()
 
@@ -117,6 +127,11 @@ const VirtualGridImpl: FC<
 
   const pictureViewImageOnly = useUISettingKey("pictureViewImageOnly")
   const isImageOnly = view === FeedViewType.Pictures && pictureViewImageOnly
+  const hasEndSpacer = shouldRenderScrollMarkReadEndSpacer({
+    entryCount: entriesIds.length,
+    hasNextPage,
+  })
+  const endSpacerHeight = useScrollMarkReadEndPadding(scrollRef, hasEndSpacer)
 
   // Calculate rows based on entries
   const rows = useMemo(() => {
@@ -129,6 +144,13 @@ const VirtualGridImpl: FC<
 
   const rowCacheKey = `${feedId}-row`
   const columnCacheKey = `${feedId}-column`
+  const isResetScrollPending = shouldApplyScrollResetSignal({
+    resetSignal: resetScrollSignal,
+    appliedResetSignal: appliedResetScrollSignal,
+  })
+  const footerRowIndex = rows.length + (hasNextPage ? 1 : 0)
+  const rowCount = footerRowIndex + (Footer ? 1 : 0)
+  const estimatedRowHeight = columns[0]! / (ratioMap[view] ?? 1) + (!isImageOnly ? 58 : 0)
 
   const columnVirtualizer = useVirtualizer({
     horizontal: true,
@@ -136,7 +158,11 @@ const VirtualGridImpl: FC<
     getScrollElement: () => scrollRef,
     estimateSize: (i) => columns[i]!,
     overscan: 5,
-    initialOffset: offsetCache.get(columnCacheKey) ?? 0,
+    initialOffset: getInitialScrollOffset({
+      cachedOffset: offsetCache.get(columnCacheKey),
+      resetSignal: resetScrollSignal,
+      appliedResetSignal: appliedResetScrollSignal,
+    }),
     initialMeasurementsCache: measurementsCache.get(columnCacheKey) ?? [],
     onChange: useTypeScriptHappyCallback(
       (virtualizer: Virtualizer<HTMLElement, Element>) => {
@@ -150,14 +176,16 @@ const VirtualGridImpl: FC<
   })
 
   const rowVirtualizer = useVirtualizer({
-    count: rows.length + (hasNextPage ? 1 : 0) + (Footer ? 1 : 0),
-    estimateSize: () => {
-      return columns[0]! / (ratioMap[view] ?? 1) + (!isImageOnly ? 58 : 0)
-    },
+    count: rowCount,
+    estimateSize: () => estimatedRowHeight,
     overscan: 5,
     gap: 8,
     getScrollElement: () => scrollRef,
-    initialOffset: offsetCache.get(rowCacheKey) ?? 0,
+    initialOffset: getInitialScrollOffset({
+      cachedOffset: offsetCache.get(rowCacheKey),
+      resetSignal: resetScrollSignal,
+      appliedResetSignal: appliedResetScrollSignal,
+    }),
     initialMeasurementsCache: measurementsCache.get(rowCacheKey) ?? [],
     paddingEnd: 32,
     onChange: useTypeScriptHappyCallback(
@@ -185,6 +213,29 @@ const VirtualGridImpl: FC<
     if (!listRef) return
     listRef.current = rowVirtualizer
   }, [rowVirtualizer, listRef])
+
+  useLayoutEffect(() => {
+    if (!scrollRef) return
+    if (!isResetScrollPending) return
+    if (resetScrollSignal === undefined) return
+
+    rowVirtualizer.scrollToOffset(0)
+    columnVirtualizer.scrollToOffset(0)
+    scrollRef.scrollTop = 0
+    scrollRef.scrollLeft = 0
+    offsetCache.put(rowCacheKey, 0)
+    offsetCache.put(columnCacheKey, 0)
+    onResetScrollSignalConsumed?.(resetScrollSignal)
+  }, [
+    columnCacheKey,
+    columnVirtualizer,
+    isResetScrollPending,
+    onResetScrollSignalConsumed,
+    resetScrollSignal,
+    rowCacheKey,
+    rowVirtualizer,
+    scrollRef,
+  ])
 
   useLayoutEffect(() => {
     measureRef.current = () => {
@@ -223,12 +274,11 @@ const VirtualGridImpl: FC<
     <div
       className="relative mx-4"
       style={{
-        height: `${rowVirtualizer.getTotalSize()}px`,
+        height: `${rowVirtualizer.getTotalSize() + endSpacerHeight}px`,
       }}
     >
       {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-        const footerRowIndex = rows.length + (hasNextPage ? 1 : 0)
-        const isFooterRow = Footer && virtualRow.key === footerRowIndex
+        const isFooterRow = Footer && virtualRow.index === footerRowIndex
 
         if (isFooterRow && ready) {
           return (

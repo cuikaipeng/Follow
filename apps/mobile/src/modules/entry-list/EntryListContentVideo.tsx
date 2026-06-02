@@ -1,6 +1,7 @@
 import type { FeedViewType } from "@follow/constants"
 import { UserRole } from "@follow/constants"
 import { useTypeScriptHappyCallback } from "@follow/hooks"
+import { shouldRenderScrollMarkReadEndSpacer } from "@follow/shared/scroll-mark-read"
 import { usePrefetchEntryTranslation } from "@follow/store/translation/hooks"
 import { useUserRole } from "@follow/store/user/hooks"
 import type { FlashListProps, FlashListRef } from "@shopify/flash-list"
@@ -15,6 +16,7 @@ import { useEntries } from "@/src/modules/screen/atoms"
 import { useHeaderHeight } from "@/src/modules/screen/hooks/useHeaderHeight"
 
 import { TimelineSelectorMasonryList } from "../screen/TimelineSelectorList"
+import { EntryListEndScrollSpacer } from "./EntryListEndScrollSpacer"
 import { GridEntryListFooter } from "./EntryListFooter"
 import { useOnViewableItemsChanged } from "./hooks"
 import { EntryVideoItem } from "./templates/EntryVideoItem"
@@ -26,11 +28,19 @@ export const EntryListContentVideo = ({
   entryIds,
   active,
   view,
+  onResetScrollSignalConsumed,
+  resetScrollSignal,
+  suspendMarkRead,
   ...rest
 }: { entryIds: string[] | null; active?: boolean; view: FeedViewType } & Omit<
   FlashListProps<string>,
   "data" | "renderItem"
-> & { ref?: React.Ref<ElementRef<typeof TimelineSelectorMasonryList> | null> }) => {
+> & {
+    ref?: React.Ref<ElementRef<typeof TimelineSelectorMasonryList> | null>
+    onResetScrollSignalConsumed?: (signal: number) => void
+    resetScrollSignal?: number
+    suspendMarkRead?: boolean
+  }) => {
   const ref = useRef<FlashListRef<any>>(null)
   useImperativeHandle(forwardRef, () => ref.current!)
   const isTablet = useIsTabletLayout()
@@ -47,7 +57,7 @@ export const EntryListContentVideo = ({
     active,
   })
   const { onViewableItemsChanged, onScroll, viewableItems } = useOnViewableItemsChanged({
-    disabled: active === false || isFetching,
+    disabled: active === false || isFetching || suspendMarkRead,
     refreshing: isFetching && !isFetchingNextPage,
   })
 
@@ -64,6 +74,10 @@ export const EntryListContentVideo = ({
     mode: translationMode,
   })
 
+  const hasEndSpacer = shouldRenderScrollMarkReadEndSpacer({
+    entryCount: entryIds?.length ?? 0,
+    hasNextPage,
+  })
   const ListFooterComponent = useMemo(
     () =>
       hasNextPage ? (
@@ -72,9 +86,12 @@ export const EntryListContentVideo = ({
           <EntryItemSkeleton />
         </View>
       ) : (
-        <GridEntryListFooter />
+        <View>
+          <GridEntryListFooter />
+          {hasEndSpacer && <EntryListEndScrollSpacer />}
+        </View>
       ),
-    [hasNextPage],
+    [hasEndSpacer, hasNextPage],
   )
 
   const renderItem = useTypeScriptHappyCallback(({ item }: { item: string }) => {
@@ -111,6 +128,8 @@ export const EntryListContentVideo = ({
     <TimelineSelectorMasonryList
       ref={ref}
       isRefetching={isRefetching}
+      onResetScrollSignalConsumed={onResetScrollSignalConsumed}
+      resetScrollSignal={resetScrollSignal}
       data={entryIds}
       renderItem={renderItem}
       keyExtractor={defaultKeyExtractor}

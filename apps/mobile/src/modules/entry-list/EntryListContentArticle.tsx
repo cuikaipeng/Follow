@@ -1,5 +1,6 @@
 import type { FeedViewType } from "@follow/constants"
 import { UserRole } from "@follow/constants"
+import { shouldRenderScrollMarkReadEndSpacer } from "@follow/shared/scroll-mark-read"
 import { usePrefetchEntryTranslation } from "@follow/store/translation/hooks"
 import { useUserRole } from "@follow/store/user/hooks"
 import type { FlashListRef, ListRenderItemInfo } from "@shopify/flash-list"
@@ -14,6 +15,7 @@ import { useHeaderHeight } from "@/src/modules/screen/hooks/useHeaderHeight"
 
 import { useEntries } from "../screen/atoms"
 import { TimelineSelectorList } from "../screen/TimelineSelectorList"
+import { EntryListEndScrollSpacer } from "./EntryListEndScrollSpacer"
 import { EntryListFooter } from "./EntryListFooter"
 import { useOnViewableItemsChanged } from "./hooks"
 import { EntryNormalItem } from "./templates/EntryNormalItem"
@@ -34,8 +36,14 @@ export const EntryListContentArticle = ({
   entryIds,
   active,
   view,
+  onResetScrollSignalConsumed,
+  resetScrollSignal,
+  suspendMarkRead,
 }: { entryIds: string[] | null; active?: boolean; view: FeedViewType } & {
   ref?: React.Ref<ElementRef<typeof TimelineSelectorList> | null>
+  onResetScrollSignalConsumed?: (signal: number) => void
+  resetScrollSignal?: number
+  suspendMarkRead?: boolean
 }) => {
   const extraData: EntryExtraData = useMemo(() => ({ entryIds }), [entryIds])
   const readableItemStyle = useReadableContainerStyle(860, 16)
@@ -66,15 +74,27 @@ export const EntryListContentArticle = ({
     [readableItemStyle, view],
   )
 
+  const hasEndSpacer = shouldRenderScrollMarkReadEndSpacer({
+    entryCount: entryIds?.length ?? 0,
+    hasNextPage,
+  })
   const ListFooterComponent = useMemo(
-    () => (hasNextPage ? <EntryItemSkeleton /> : <EntryListFooter fetchedTime={fetchedTime} />),
-    [hasNextPage, fetchedTime],
+    () =>
+      hasNextPage ? (
+        <EntryItemSkeleton />
+      ) : (
+        <View>
+          <EntryListFooter fetchedTime={fetchedTime} />
+          {hasEndSpacer && <EntryListEndScrollSpacer />}
+        </View>
+      ),
+    [hasEndSpacer, hasNextPage, fetchedTime],
   )
 
   const ref = useRef<FlashListRef<any>>(null)
 
   const { onViewableItemsChanged, onScroll, viewableItems } = useOnViewableItemsChanged({
-    disabled: active === false || isFetching,
+    disabled: active === false || isFetching || suspendMarkRead,
     refreshing: isFetching && !isFetchingNextPage,
   })
 
@@ -115,6 +135,8 @@ export const EntryListContentArticle = ({
       ref={ref}
       onRefresh={refetch}
       isRefetching={isRefetching}
+      onResetScrollSignalConsumed={onResetScrollSignalConsumed}
+      resetScrollSignal={resetScrollSignal}
       data={entryIds}
       extraData={extraData}
       keyExtractor={defaultKeyExtractor}
